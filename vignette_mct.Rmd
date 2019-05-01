@@ -1,0 +1,161 @@
+---
+title: "Mass Curve Technique, Gao et al."
+author: "Beni Stocker"
+date: "4/30/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(rbeni)
+library(lubridate)
+library(survival)
+library(SPREDA)
+library(extRemes)
+```
+
+## R Markdown
+
+Gao et al. (2014) suggest that the plant rooting is adapted to the cumulative water deficit during the dry season. They adopt the Mass Curve Technique to derive it. This requires precipitation ($P$), runoff ($Q$), potential evapotranspiration ($E_p$) and green vegetation cover ($f_v$) to be specified for each time step (here daily) over multiple years. The cumulative water deficit (events) are assumed to follow a Gumbel distribution.
+
+Let's try this out for the FLUXNET site FR-Pue, for which whe have these variables. 
+```{r}
+# ## get data
+# load("~/eval_pmodel/data/v3/out_eval_FULL.Rdata")
+# df <- obs_eval_NT$ddf %>% 
+#   as_tibble() %>% 
+#   filter(sitename=="FR-Pue") %>% 
+#   select(date, fv=fapar, prec=prec_fluxnet2015)
+# 
+# ## add PET from the model output
+# load("~/eval_pmodel/data/mod_FULL.Rdata")
+# df <- df %>% 
+#   left_join( select( mod_FULL$daily$`FR-Pue`, date, pet ), by="date" ) %>% 
+#   cutna_headtail_df("fv") %>% 
+#   mutate(fv = rbeni::myapprox(fv), pet = rbeni::myapprox(pet), prec=ifelse(is.na(prec),0,prec))
+# save(df, file = "data/df.Rdata")
+
+load("data/df.Rdata")
+df %>% 
+  ggplot(aes(date, fv*pet)) +
+  geom_line()
+```
+
+Plot the demand curve, given by cumulative $f_v E_p$.
+```{r}
+df <- df %>% 
+  mutate(demand_cum = cumsum(fv * pet),
+         supply_cum = cumsum(prec)) %>% 
+  mutate(bal = prec - fv*pet) %>% 
+  mutate(bal = myapprox(bal)) %>% 
+  mutate(bal_cum = cumsum(bal))
+
+# df %>% 
+#   ggplot(aes(date, bal)) +
+#   geom_line()
+```
+
+Get events of consecutive deficit using the `mct()` function.
+```{r}
+source("R/mct.R")
+out1 <- mct(df)
+out2 <- mct(df, method = "threshbal", thresh_deficit=0.5)
+```
+
+
+Plot the cumulative deficit and rain events.
+```{r}
+ggplot() +
+  geom_rect(
+    data=out2$inst, 
+    aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999), 
+    fill=rgb(0,0,0,0.3), 
+    color=NA) +
+  # geom_line(data = out1$df, aes(date, -bal_cum), size = 0.3, color="royalblue") +
+  geom_line(data = out1$df, aes(date, prec), size = 0.3, color="royalblue") +
+  geom_line(data = out1$df, aes(date, deficit)) +
+  geom_line(data = out2$df, aes(date, deficit), color="tomato") +
+  coord_cartesian(ylim=c(0, 450), xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))) +
+  theme_classic()
+```
+
+
+Plot cumulative variables.
+```{r}
+ggplot() +
+  geom_rect(
+    data=out2$inst, 
+    aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999), 
+    fill=rgb(0,0,0,0.3), 
+    color=NA) + 
+  geom_line(data=df, aes(date, demand_cum)) +
+  geom_line(data=df, aes(date, supply_cum, color="supply_cum"), color="tomato") +
+  labs(y=expression(integral(f[v] ~ E[p])), x="Date") +
+  coord_cartesian(ylim=c(0, 10000)) +
+  theme_classic()
+```
+
+Plot the distribution of cumulative deficits
+```{r}
+ggplot(out2$inst, aes(deficit)) +
+  geom_histogram()
+```
+
+Fit a Gumbel distribution following [this link](http://blogs2.datall-analyse.nl/2016/02/17/extreme_value_analysis_maxima/#more-120). Paper on R package [extRemes](file:///Users/benjaminstocker/Downloads/v72i08.pdf).
+```{r}
+## Take only the N largest instances (deficits), where N is given by the number of years available in the data
+nyears <- year(range(out2$df$date)[2]) - year(range(out2$df$date)[1]) + 1
+vals <- out2$inst %>% 
+  arrange(desc(deficit)) %>% 
+  dplyr::slice(1:nyears) %>% 
+  select(deficit) %>% 
+  unlist() %>% 
+  unname()
+
+gumbi <- extRemes::fevd(x=vals, type="Gumbel", method="MLE")
+summary(gumbi)
+
+# extract MLEs (these are needed for the remaining part of the analysis)
+muG <- gumbi$results$par[1]
+sigmaG <- gumbi$results$par[2]
+
+## don't know which package these are coming from (e1071?)
+probplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
+cprobplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
+
+QQplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
+PPplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
+
+# all plots ("primary")
+# extRemes::plot.fevd(gumbi)
+
+# only return period plot
+extRemes::plot.fevd(gumbi, 
+      # type = c("primary", "probprob", "qq", "qq2", "Zplot", "hist", "density", "rl", "trace"),
+      type = c("rl"),
+      rperiods = c(2, 5, 10, 20, 50, 80, 100, 120, 200, 250, 300, 500, 800),
+      a = 0, hist.args = NULL, density.args = NULL, d = NULL )
+
+## get return levels for a given vector of return periods
+return_period <- c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800)
+return_level <- extRemes::return.level(
+  gumbi, 
+  return.period = return_period
+  )
+df_return <- tibble( 
+  return_period = return_period, 
+  return_level = unname(c(return_level)), 
+  trans_period = -log( -log(1 - 1/return_period)) )
+```
+
+Get tranformed variate of return period $T$ as described in Gao et al. as
+$$
+y = - \ln ( -\ln (1-1/T) )
+$$
+```{r}
+df_return %>% 
+  ggplot(aes(trans_period, return_level)) +
+  geom_point()
+```
