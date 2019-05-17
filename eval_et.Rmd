@@ -1,0 +1,134 @@
+---
+title: "Evaluation with ET data"
+author: "Beni Stocker"
+date: "5/17/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(lubridate)
+library(rbeni)
+load("~/mct/data/obs_eval.RData")
+load("~/mct/data/out_eval.RData")
+df_flue <- read_csv("~/alphadata01/bstocker/data/fLUE/flue_stocker18nphyt.csv")
+```
+
+## "Correcting fAPAR data"
+
+```{r  message=FALSE, warning=FALSE}
+df_flue_dry <- df_flue %>% filter(cluster %in% c("cGR", "cDD"))
+ddf_obs_dry <- obs_eval$ddf %>% 
+  filter(sitename %in% df_flue_dry$site)
+
+ddf_obs_dry %>% 
+  ggplot(aes(fapar, stat(density))) +
+  geom_histogram( ) +
+  geom_density() +
+  geom_vline(xintercept = 0.1, color="red")
+```
+
+Looking at mean fAPAR seasonality by sites it seems like the "absolute minimum" is around 0.1 and not 0.
+
+```{r  message=FALSE, warning=FALSE, fig.height=18}
+df_meandoy <- ddf_obs_dry %>% 
+  mutate(doy = yday(date)) %>% 
+  group_by(sitename, doy) %>% 
+  summarise( fapar_mean = mean( fapar, na.rm=TRUE ), 
+             fapar_min  = min( fapar, na.rm=TRUE ), 
+             fapar_max  = max( fapar, na.rm=TRUE )
+             ) %>%
+  mutate( fapar_min = ifelse( is.infinite(fapar_min), NA, fapar_min ), 
+          fapar_max = ifelse( is.infinite(fapar_max), NA, fapar_max ) )
+
+df_meandoy %>% 
+  ggplot(aes(doy, fapar_mean)) +
+  geom_line() +
+  geom_hline(yintercept = 0.1, color="red") +
+  facet_wrap( ~sitename, ncol=4 ) +
+  ylim(0,1) +
+  geom_ribbon(aes(ymin = fapar_min, ymax = fapar_max), alpha=0.4)
+
+#ggsave("fig/fapar_seasonality_bysite.pdf", width=10, height = 10)
+```
+
+
+## ET
+
+ET seasonality by site using AET (which included fAPAR in this simulation):
+
+```{r  message=FALSE, warning=FALSE}
+ddf_modobs_dry <- out_eval$aet$fluxnet2015$data$meandoydf %>% 
+  filter(sitename %in% df_flue_dry$site)
+
+convert_le <- function(x){ x / (60*60*24)}
+
+# ddf_modobs_dry %>% 
+#   mutate_at(vars(starts_with("mod_"), starts_with("obs_")), list(~convert_le)) %>% 
+#   ggplot(aes(x = doy)) +
+#   geom_line(aes(y=obs_mean)) +
+#   geom_ribbon(aes(ymin = obs_min, ymax = obs_max), alpha=0.4) +
+#   geom_line(aes(y=mod_mean), color="red") +
+#   geom_ribbon(aes(ymin = mod_min, ymax = mod_max), alpha=0.4, fill="tomato") +
+#   facet_wrap( ~sitename, ncol=5 )
+
+#ggsave("fig/aet_seasonality_bysite.pdf", width=10, height = 10)
+```
+
+ET seasonality by site using PET (dashed red, not shown), AET (blue), and PET * fAPAR (red):
+
+```{r  message=FALSE, warning=FALSE, fig.height=18}
+load("~/mct/data/mod.RData")
+ddf_mod <- mod$daily %>% 
+  bind_rows(.id="sitename") %>% 
+  right_join(ddf_obs_dry, by=c("sitename", "date")) %>% 
+  mutate(fapar_corr = (fapar - 0.1)/(1-0.1)) %>% 
+  mutate(fapar_corr = ifelse(fapar_corr<0, 0, fapar_corr)) %>% 
+  mutate(pet = convert_le(pet)) %>% 
+  mutate(pet_fapar_corr = pet * fapar_corr)
+
+ddf_mod_meandoy <- ddf_mod %>% 
+  mutate(doy = yday(date)) %>% 
+  mutate(latenth = convert_le(latenth)) %>% 
+  group_by(sitename, doy) %>% 
+  summarise_at( 
+    vars(starts_with("fapar_"), starts_with("pet"), starts_with("latenth")), 
+    list(~mean, ~min, ~max), na.rm=TRUE ) %>% 
+  mutate_at( vars(-group_cols()), ~ifelse(is.infinite(.), NA, .)) %>% 
+  left_join(
+      mutate_at( 
+        select(ddf_modobs_dry, sitename, doy, starts_with("mod_")), 
+        vars(starts_with("mod_"), starts_with("obs_")), 
+        list(~convert_le)),
+      by=c("sitename", "doy")
+      )
+
+# # plot fapar "corrected"
+# ddf_mod_meandoy %>% 
+#   ggplot(aes(x = doy)) +
+#   geom_line(aes(y=fapar_corr_mean)) +
+#   geom_ribbon(aes(ymin = fapar_corr_min, ymax = fapar_corr_max), alpha=0.4) +
+#   facet_wrap( ~sitename, ncol=5 )
+
+#ggsave("fig/fapar_corr_seasonality_bysite.pdf", width=10, height = 10)
+
+# plot latent heat
+ddf_mod_meandoy %>% 
+  ggplot(aes(x = doy)) +
+  geom_line(aes(y=latenth_mean)) +
+  geom_ribbon(aes(ymin = latenth_min, ymax = latenth_max), alpha=0.4) +
+  geom_line(aes(y=pet_fapar_corr_mean), color="red") +
+  geom_ribbon(aes(ymin = pet_fapar_corr_min, ymax = pet_fapar_corr_max), alpha=0.4, fill="red") +
+  geom_line(aes(y=mod_mean), color="dodgerblue") +
+  geom_ribbon(aes(ymin = mod_min, ymax = mod_max), alpha=0.4, fill="dodgerblue") +
+  # geom_line(aes(y=pet_mean), color="red", linetype="dashed") +
+  facet_wrap( ~sitename, ncol=4 )
+
+#ggsave("fig/et_pet_fapar_corr_seasonality_bysite.pdf", width=10, height = 10)
+```

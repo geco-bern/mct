@@ -1,4 +1,4 @@
-mct <- function(df, method="posbal", thresh_deficit=0.1){
+mct <- function(df, method="threshbal", thresh_deficit=0.5){
   inst <- tibble()
   idx <- 0
   df$deficit <- rep(0, nrow(df))

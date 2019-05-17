@@ -2,7 +2,11 @@
 title: "Mass Curve Technique, Gao et al."
 author: "Beni Stocker"
 date: "4/30/2019"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
@@ -14,13 +18,26 @@ library(lubridate)
 library(survival)
 library(SPREDA)
 library(extRemes)
+source("R/eva_max.R")
 ```
 
-## R Markdown
+Code for this is available on [my github](https://github.com/stineb/mct).
 
-Gao et al. (2014) suggest that the plant rooting is adapted to the cumulative water deficit during the dry season. They adopt the Mass Curve Technique to derive it. This requires precipitation ($P$), runoff ($Q$), potential evapotranspiration ($E_p$) and green vegetation cover ($f_v$) to be specified for each time step (here daily) over multiple years. The cumulative water deficit (events) are assumed to follow a Gumbel distribution.
+## Approach
 
-Let's try this out for the FLUXNET site FR-Pue, for which whe have these variables. 
+Gao et al. (2014) suggest that the plant rooting is adapted to the cumulative water deficit during the dry spells They adopt the Mass Curve Technique to derive it. A Gumbel distribution is fit to the accumulated water deficits during dry spells and allows for an estimate of the deficit with a given return period. The method requires precipitation ($P$), runoff ($Q$), potential evapotranspiration ($E_p$) and green vegetation cover ($f_v$) to be specified for each time step (here daily) over multiple years.
+
+The approach implemented here (function `mct()`) considers temporal variations in the demand, while Gao et al. calculated a mean annual and mean dry season demand. Here, PET is calculated based on the Priestly-Taylor equation as opposed to the Hargreaves equation used by Gao et al. Limitations of the method described here include that lateral runon and runoff and delayed water inflow by snow melt are ignored, and PET is assumed to drive the demand but is not affected by other plant adaptations to dry conditions (reduction of stomatal conductance, internal water storage). Effects of phenological changes on water demand during droughts are accounted for by $f_v$.
+
+The steps for the method are:
+
+1. Identify events where the water deficit ($f_v E_p - P$) is accumulating. 
+2. Fit a gumbel distribution to the largest $N$ events.
+3. Extract the estimated water deficit for a given return period $T$.
+
+### Identify events
+
+Let's try this out for the FLUXNET site 'FR-Pue', for which whe have these variables. 
 ```{r}
 # ## get data
 # load("~/eval_pmodel/data/v3/out_eval_FULL.Rdata")
@@ -81,8 +98,7 @@ ggplot() +
   theme_classic()
 ```
 
-
-Plot cumulative variables.
+As an additional illustration, plot cumulative variables.
 ```{r}
 ggplot() +
   geom_rect(
@@ -103,7 +119,9 @@ ggplot(out2$inst, aes(deficit)) +
   geom_histogram()
 ```
 
-Fit a Gumbel distribution following [this link](http://blogs2.datall-analyse.nl/2016/02/17/extreme_value_analysis_maxima/#more-120). Paper on R package [extRemes](file:///Users/benjaminstocker/Downloads/v72i08.pdf).
+### Fit a distribution
+
+To estimate the probability of extreme values, we fit a Gumbel distribution following [this link](http://blogs2.datall-analyse.nl/2016/02/17/extreme_value_analysis_maxima/#more-120). A paper on the R package [extRemes](file:///Users/benjaminstocker/Downloads/v72i08.pdf).
 ```{r}
 ## Take only the N largest instances (deficits), where N is given by the number of years available in the data
 nyears <- year(range(out2$df$date)[2]) - year(range(out2$df$date)[1]) + 1
@@ -123,7 +141,7 @@ sigmaG <- gumbi$results$par[2]
 
 ## don't know which package these are coming from (e1071?)
 probplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
-cprobplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
+#cprobplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
 
 QQplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
 PPplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
@@ -132,12 +150,25 @@ PPplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
 # extRemes::plot.fevd(gumbi)
 
 # only return period plot
-extRemes::plot.fevd(gumbi, 
+plot.fevd.mle(gumbi, 
       # type = c("primary", "probprob", "qq", "qq2", "Zplot", "hist", "density", "rl", "trace"),
       type = c("rl"),
       rperiods = c(2, 5, 10, 20, 50, 80, 100, 120, 200, 250, 300, 500, 800),
       a = 0, hist.args = NULL, density.args = NULL, d = NULL )
 
+source("R/get_return_period.R")
+df_test <- get_return_period(gumbi)
+with(df_test, plot(trans_period, return_values, pch=16, col="red"))
+```
+
+### Extract value for return periods
+
+Get tranformed variate of return period $T$ as described in Gao et al. as
+$$
+y = - \ln ( -\ln (1-1/T) )
+$$
+
+```{r}
 ## get return levels for a given vector of return periods
 return_period <- c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800)
 return_level <- extRemes::return.level(
@@ -148,14 +179,17 @@ df_return <- tibble(
   return_period = return_period, 
   return_level = unname(c(return_level)), 
   trans_period = -log( -log(1 - 1/return_period)) )
-```
 
-Get tranformed variate of return period $T$ as described in Gao et al. as
-$$
-y = - \ln ( -\ln (1-1/T) )
-$$
-```{r}
 df_return %>% 
   ggplot(aes(trans_period, return_level)) +
   geom_point()
+```
+
+### Nice function
+
+```{r}
+source("R/get_data_fluxnet2015_mct.R")
+source("R/get_plantwhc_gao.R")
+ddf <- get_data_fluxnet2015_mct("FR-Pue")
+result <- get_plantwhc_mct(ddf)
 ```
