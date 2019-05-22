@@ -1,0 +1,24 @@
+---
+title: "Determine plant-WHC globally"
+author: "Beni Stocker"
+date: "4/30/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(rbeni)
+library(tidyr)
+
+source("R/mct.R")
+source("R/get_plantwhc_mct_bysite.R")
+```
+
+Invoke all at once.
+```{r}
+df <- get_plantwhc_mct_global()
+```

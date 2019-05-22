@@ -1,50 +1,49 @@
 
-library(dplyr)
-library(rbeni)
-library(tidyr)
 
-source("R/mct.R")
+get_plantwhc_mct_global <- function(){
 
-## get land mask (data frame with lon, lat, ilon, and ilat for each land cell)
-filn <- "/alphadata01/bstocker/sofun/output_nc_global/s1_fapar3g_v3_global.fland.nc"
-
-nc <- ncdf4::nc_open(filn)
-{
-  sink(paste0(filn, ".txt"))
-  print(nc)
-  sink()
+  df <- df %>% 
+    slice(1:3) %>% 
+    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat)))
+  # mutate(data = purrr::map(out_ilon_ilat, ~read_nc_gridcell( .$ilon, .$ilat)))
+  
+  return(df)
 }
 
-out <- list(
-  lon = ncdf4::ncvar_get(nc, nc$dim$lon$name),
-  lat = ncdf4::ncvar_get(nc, nc$dim$lat$name)
-)
+get_df_landmask <- function(maskfiln){
+  
+  ## get land mask (data frame with lon, lat, ilon, and ilat for each land cell)
+  maskfiln <- "~/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc"
+  
+  nc <- ncdf4::nc_open(filn)
+  {
+    sink(paste0(filn, ".txt"))
+    print(nc)
+    sink()
+  }
+  
+  out <- list(
+    lon = ncdf4::ncvar_get(nc, nc$dim$lon$name),
+    lat = ncdf4::ncvar_get(nc, nc$dim$lat$name)
+  )
+  
+  df <- expand.grid(out$lon, out$lat) %>%
+    as.matrix() %>%
+    as_tibble() %>%
+    setNames(c("lon", "lat"))
+  
+  fland <- ncdf4::ncvar_get(nc, "fland")
+  
+  df <- df %>%
+    bind_cols(tibble(fland = as.vector(fland))) %>%
+    tidyr::drop_na() %>% 
+    mutate(idx = 1:n()) %>% 
+    group_by(idx) %>% 
+    nest() %>% 
+    mutate(out_ilon_ilat = purrr::map(data, ~get_ilon_ilat( .$lon, .$lat, out$lon, out$lat )))
 
-df <- expand.grid(out$lon, out$lat) %>%
-  as.matrix() %>%
-  as_tibble() %>%
-  setNames(c("lon", "lat"))
-
-fland <- ncdf4::ncvar_get(nc, "fland")
-
-df <- df %>%
-  bind_cols(tibble(fland = as.vector(fland))) %>%
-  tidyr::drop_na() %>% 
-  mutate(idx = 1:n()) %>% 
-  group_by(idx) %>% 
-  nest() %>% 
-  mutate(out_ilon_ilat = purrr::map(data, ~get_ilon_ilat( .$lon, .$lat, out$lon, out$lat )))
-  # unnest(out_ilon_ilat) %>% 
-  # select(-data)
-
-df_test <- df %>% 
-  slice(1:3) %>% 
-  mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat)))
-  # mutate(data = purrr::map(out_ilon_ilat, ~read_nc_gridcell( .$ilon, .$ilat)))
-
-## for each land pixel:
-
-  ## read complete time series
+  return(df)  
+}
 
 get_plantwhc_mct_gridcell <- function(ilon, ilat){
   
@@ -68,7 +67,7 @@ read_nc_gridcell <- function(ilon, ilat){
 
 read_nc_gridcell_oneyear <- function(year, ilon, ilat){
   
-  filn <- paste0("/alphadata01/bstocker/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.", as.character(year), ".d.wbal.nc")
+  filn <- paste0("~/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.", as.character(year), ".d.wbal.nc")
 
   nc <- ncdf4::nc_open(filn)
   # Save the print(nc) dump to a text file
@@ -128,7 +127,7 @@ get_wbal_nc <- function(filn){
   require(rbeni)
 
   ## file 
-  filn <- "/alphadata01/bstocker/sofun/output_nc_global/s1_fapar3g_v3_global.fland.nc"
+  filn <- "~/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc"
 
   ## read nc file
   out <- read_nc_onefile(filn)
