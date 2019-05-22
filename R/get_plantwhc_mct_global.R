@@ -1,6 +1,6 @@
 
 
-get_plantwhc_mct_global <- function(){
+get_plantwhc_mct_global <- function(df){
 
   df <- df %>% 
     slice(1:3) %>% 
@@ -10,14 +10,14 @@ get_plantwhc_mct_global <- function(){
   return(df)
 }
 
-get_df_landmask <- function(maskfiln){
+get_df_landmask <- function(){
   
   ## get land mask (data frame with lon, lat, ilon, and ilat for each land cell)
   maskfiln <- "~/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc"
   
-  nc <- ncdf4::nc_open(filn)
+  nc <- ncdf4::nc_open(maskfiln)
   {
-    sink(paste0(filn, ".txt"))
+    sink(paste0(maskfiln, ".txt"))
     print(nc)
     sink()
   }
