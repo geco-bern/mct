@@ -16,9 +16,13 @@ library(tidyr)
 
 source("R/mct.R")
 source("R/get_plantwhc_mct_bysite.R")
+source("R/get_plantwhc_mct_global.R")
 ```
 
 Invoke all at once.
 ```{r}
-df <- get_plantwhc_mct_global()
+dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
+df <- get_df_landmask(dir)
+df_test <- get_plantwhc_mct_global(df, dir) %>% 
+  unnest(out_ilon_ilat)
 ```

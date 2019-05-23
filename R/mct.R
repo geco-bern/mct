@@ -8,7 +8,7 @@ mct <- function(df, method="threshbal", thresh_deficit=0.5){
   while (idx <= (nrow(df)-1)){
     idx <- idx + 1
     
-    ## if the water balance (prec-pet*fv) is negative, start accumulating deficit
+    ## if the water balance (deficit = prec - pet*fv) is negative, start accumulating deficit
     if (df$wbal[idx]<0){
       
       deficit <- 0

@@ -22,28 +22,51 @@ get_plantwhc_mct_bysite <- function( df,
   ## Get events of consecutive water deficit and accumulated deficit
   out <- mct(df, method = "threshbal", thresh_deficit=0.5)
   
-  ## Get N largest deficts
-  ## Take only the N largest instances (deficits), where N is given by the number of years available in the data
-  nyears <- lubridate::year(range(out$df$date)[2]) - lubridate::year(range(out$df$date)[1]) + 1
-  vals <- out$inst %>% 
-    dplyr::arrange(desc(deficit)) %>% 
-    dplyr::slice(1:nyears) %>% 
-    dplyr::select(deficit) %>% 
-    unlist() %>% 
-    unname()
-  
-  ## Fit an extreme value distribution (Gumbel)
-  gumbi <- extRemes::fevd(x=vals, type="Gumbel", method="MLE")
-  
-  ## Get values for return periods and constructi data frame with it
-  return_level <- extRemes::return.level(
-    gumbi, 
-    return.period = return_period )
-  
-  df_return <- tibble( 
-    return_period = return_period, 
-    return_level = unname(c(return_level))) 
+  if (nrow(out$inst)>0){
+    ## Get N largest deficts
+    ## Take only the N largest instances (deficits), where N is given by the number of years available in the data
+    nyears <- lubridate::year(range(out$df$date)[2]) - lubridate::year(range(out$df$date)[1]) + 1
+    vals <- out$inst %>% 
+      dplyr::arrange(desc(deficit)) %>% 
+      dplyr::slice(1:nyears) %>% 
+      dplyr::select(deficit) %>% 
+      unlist() %>% 
+      unname()
+
+    if (length(vals)>3){
+
+      ## Fit an extreme value distribution (Gumbel)
+      gumbi <- extRemes::fevd(x=vals, type="Gumbel", method="MLE")
+      
+      ## Get values for return periods and constructi data frame with it
+      return_level <- extRemes::return.level(
+        gumbi, 
+        return.period = return_period )
+      
+      df_return <- tibble( 
+        return_period = return_period, 
+        return_level = unname(c(return_level))
+        ) 
+
+    } else {
+
+      df_return <- tibble(
+        return_period = return_period, 
+        return_level = rep(NA, length(return_period))
+        )
+
+    }
+    
     # trans_period = -log( -log(1 - 1/return_period)) )
+    
+  } else {
+
+    df_return <- tibble(
+      return_period = return_period, 
+      return_level = rep(NA, length(return_period))
+      )
+
+  }
   
   return(df_return)
 }

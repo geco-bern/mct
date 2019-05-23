@@ -1,19 +1,26 @@
-
-
-get_plantwhc_mct_global <- function(df){
+#' Convert NetCDF contents to a data frame.
+#'
+#' Converts the output of \code{"read_nc_onefile()"} into a data frame (tibble)
+#'
+#' @param out An object returned by the function \link{read_nc_onefile}.
+#' @return A tidy data frame with a row for each gridcell. Contains columns
+#' \code{"lon"} (longitude), \code{"lat"} (latitude), and \code{"data"}
+#' (containing all time steps' data for each gridcell.)
+#' @export
+#'
+get_plantwhc_mct_global <- function(df, dir){
 
   df <- df %>% 
-    slice(1:3) %>% 
-    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat)))
-  # mutate(data = purrr::map(out_ilon_ilat, ~read_nc_gridcell( .$ilon, .$ilat)))
+    # slice(1:3) %>% 
+    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, dir)))
   
   return(df)
 }
 
-get_df_landmask <- function(){
+get_df_landmask <- function(dir){
   
   ## get land mask (data frame with lon, lat, ilon, and ilat for each land cell)
-  maskfiln <- "~/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc"
+  maskfiln <- paste0(dir, "s1_fapar3g_v3_global.fland.nc")
   
   nc <- ncdf4::nc_open(maskfiln)
   {
@@ -45,9 +52,9 @@ get_df_landmask <- function(){
   return(df)  
 }
 
-get_plantwhc_mct_gridcell <- function(ilon, ilat){
+get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
   
-  ddf <- read_nc_gridcell(ilon, ilat)
+  ddf <- read_nc_gridcell(ilon, ilat, dir)
  
   out_plantwhc_mct <- get_plantwhc_mct_bysite(ddf)
   
@@ -55,19 +62,19 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat){
    
 }
 
-read_nc_gridcell <- function(ilon, ilat){
+read_nc_gridcell <- function(ilon, ilat, dir){
   
   # years <- seq(1982, 2016)
-  years <- seq(1982, 1982)
+  years <- seq(1982, 1994)
   
-  df <- purrr::map_dfr(as.list(years), ~read_nc_gridcell_oneyear(., ilon, ilat))
+  df <- purrr::map_dfr(as.list(years), ~read_nc_gridcell_oneyear(., ilon, ilat, dir))
   
   return(df)
 }
 
-read_nc_gridcell_oneyear <- function(year, ilon, ilat){
+read_nc_gridcell_oneyear <- function(year, ilon, ilat, dir){
   
-  filn <- paste0("~/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.", as.character(year), ".d.wbal.nc")
+  filn <- paste0(dir, "s1_fapar3g_v3_global.", as.character(year), ".d.wbal.nc")
 
   nc <- ncdf4::nc_open(filn)
   # Save the print(nc) dump to a text file
@@ -99,68 +106,6 @@ get_ilon_ilat <- function(lon, lat, lon_vec, lat_vec){
   
   df <- tibble(lon=lon, lat=lat, ilon=ilon, ilat=ilat)
   
-  return(df)
-}
-
-
-
-
-
-
-
-
-
-#' Convert NetCDF contents to a data frame.
-#'
-#' Converts the output of \code{"read_nc_onefile()"} into a data frame (tibble)
-#'
-#' @param out An object returned by the function \link{read_nc_onefile}.
-#' @return A tidy data frame with a row for each gridcell. Contains columns
-#' \code{"lon"} (longitude), \code{"lat"} (latitude), and \code{"data"}
-#' (containing all time steps' data for each gridcell.)
-#' @export
-#'
-get_wbal_nc <- function(filn){
-
-  require(dplyr)
-  require(tidyr)
-  require(rbeni)
-
-  ## file 
-  filn <- "~/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc"
-
-  ## read nc file
-  out <- read_nc_onefile(filn)
-  varnams <- out[["varnams"]]
-
-  if (length(out$lat)>1 && length(out$lat)>1){
-
-
-
-  } else {
-
-    ## expand lon-lat-time grid -> produces flat data frame
-    df <- expand.grid(out$lon, out$lat, out$time) %>%
-      as.matrix() %>%
-      as_tibble() %>%
-      setNames(c("lon", "lat", "time"))
-
-    ## get all data as columns in a data frame
-    df_data <- purrr::map_dfc(as.list(varnams), ~as_tibble_byvar(., out)) %>%
-      setNames(varnams)
-  }
-
-  ## combine lon, lat, time, and data columns
-  df <- df %>%
-    bind_cols(df_data) %>%
-    tidyr::drop_na()
-
-  ## nest time
-  df <- df %>%
-    dplyr::group_by(lon, lat) %>%
-    tidyr::nest()
-
-
   return(df)
 }
 
