@@ -10,7 +10,6 @@ source("R/mct.R")
 source("R/get_plantwhc_mct_bysite.R")
 source("R/get_plantwhc_mct_global.R")
 
-
 dir <- "~/sofun/output_nc_global_sofun/"
 
 df_grid <- get_df_landmask(dir)
