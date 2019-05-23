@@ -15,29 +15,34 @@ get_plantwhc_mct_global <- function(df, dir){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(irow_chunk, ~get_plantwhc_mct_chunk( slice(df, .), dir ))
+  df <- purrr::map_dfr(as.list(seq(length(irow_chunk))), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
   
   return(df)
 }
 
-get_plantwhc_mct_chunk <- function(df, dir){
+get_plantwhc_mct_chunk <- function(df, dir, idx){
   
   print("----------------")
-  print("DOIN IT BY CHUNK")
+  print(paste("DOIN IT BY CHUNK", as.character(idx)))
   print("----------------")
   
   df <- df %>% 
     mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, dir)))
   
-  outfil <- "./data/df_plantwhc_mct.Rdata"
-  if (file.exists(outfil)){
-    load(outfil)
-  } else {
-    df2 <- df
-  }
-  df2 <- df2 %>% bind_rows(df)
+  # outfil <- "./data/df_plantwhc_mct.Rdata"
+  # if (file.exists(outfil)){
+  #   load(outfil)
+  # } else {
+  #   df2 <- df
+  # }
+  # df2 <- df2 %>% bind_rows(df)
+  # print(paste("Saving to", outfil, "..."))
+  # save(df2, file = outfil)
+  # print("... done.")
+  
+  outfil <- paste0("./data/df_plantwhc_mct", as.character(idx), ".Rdata")
   print(paste("Saving to", outfil, "..."))
-  save(df2, file = outfil)
+  save(df, file = outfil)
   print("... done.")
 
   return(df)
@@ -45,11 +50,14 @@ get_plantwhc_mct_chunk <- function(df, dir){
 
 get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
   
-  print("doin it by gridcell.")
+  print(paste("doin it by gridcell:", as.character(ilon), as.character(ilat)))
+  print("reading nc file...")
   ddf <- read_nc_gridcell(ilon, ilat, dir)
+  print("... done.")
   
+  print("get plantwhc by site ...")
   out_plantwhc_mct <- get_plantwhc_mct_bysite(ddf)
-  
+  print("... done.")
   return(out_plantwhc_mct)
   
 }
@@ -92,7 +100,7 @@ get_df_landmask <- function(dir){
 read_nc_gridcell <- function(ilon, ilat, dir){
   
   # years <- seq(1982, 2016)
-  years <- seq(1982, 1994)
+  years <- seq(1982, 2016)
   
   df <- purrr::map_dfr(as.list(years), ~read_nc_gridcell_oneyear(., ilon, ilat, dir))
   

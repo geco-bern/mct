@@ -26,9 +26,12 @@ gridfile <- "./data/df_grid.Rdata"
 if (file.exists(gridfile)){
   load(gridfile)
 } else {
-  df <- get_df_landmask(dir)
-  save(df, file = gridfile)
+  df_grid <- get_df_landmask(dir)
+  save(df_grid, file = gridfile)
 }
-df_test <- get_plantwhc_mct_global(df, dir) %>% 
+df <- get_plantwhc_mct_global(df_grid, dir) %>% 
   unnest(out_ilon_ilat)
+
+## test
+test <- get_plantwhc_mct_gridcell(211, 75, dir)
 ```
