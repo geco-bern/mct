@@ -10,11 +10,48 @@
 #'
 get_plantwhc_mct_global <- function(df, dir){
 
-  df <- df %>% 
-    # slice(1:3) %>% 
-    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, dir)))
+  nchunk <- 1000
+  nrows_chunk <- ceiling(nrow(df)/nchunk)
+  irow <- seq(1:nrow(df))
+  irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
+  
+  df <- purrr::map_dfr(irow_chunk, ~get_plantwhc_mct_chunk( slice(df, .), dir ))
   
   return(df)
+}
+
+get_plantwhc_mct_chunk <- function(df, dir){
+  
+  print("----------------")
+  print("DOIN IT BY CHUNK")
+  print("----------------")
+  
+  df <- df %>% 
+    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, dir)))
+  
+  outfil <- "./data/df_plantwhc_mct.Rdata"
+  if (file.exists(outfil)){
+    load(outfil)
+  } else {
+    df2 <- df
+  }
+  df2 <- df2 %>% bind_rows(df)
+  print(paste("Saving to", outfil, "..."))
+  save(df2, file = outfil)
+  print("... done.")
+
+  return(df)
+}
+
+get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
+  
+  print("doin it by gridcell.")
+  ddf <- read_nc_gridcell(ilon, ilat, dir)
+  
+  out_plantwhc_mct <- get_plantwhc_mct_bysite(ddf)
+  
+  return(out_plantwhc_mct)
+  
 }
 
 get_df_landmask <- function(dir){
@@ -50,16 +87,6 @@ get_df_landmask <- function(dir){
     mutate(out_ilon_ilat = purrr::map(data, ~get_ilon_ilat( .$lon, .$lat, out$lon, out$lat )))
 
   return(df)  
-}
-
-get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
-  
-  ddf <- read_nc_gridcell(ilon, ilat, dir)
- 
-  out_plantwhc_mct <- get_plantwhc_mct_bysite(ddf)
-  
-  return(out_plantwhc_mct)
-   
 }
 
 read_nc_gridcell <- function(ilon, ilat, dir){

@@ -10,9 +10,12 @@ source("R/mct.R")
 source("R/get_plantwhc_mct_bysite.R")
 source("R/get_plantwhc_mct_global.R")
 
+
 dir <- "~/sofun/output_nc_global_sofun/"
-df <- get_df_landmask(dir) %>% 
-  get_plantwhc_mct_global(dir) %>% 
+
+df_grid <- get_df_landmask(dir)
+save(df_grid, file = "./data/df_grid.Rdata")
+
+df <- get_plantwhc_mct_global(df_grid, dir) %>% 
   unnest(out_ilon_ilat)
 
-save(df, file="./data/df_plantwhc_mct.Rdata")
