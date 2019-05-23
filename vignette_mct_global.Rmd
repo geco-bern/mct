@@ -22,7 +22,13 @@ source("R/get_plantwhc_mct_global.R")
 Invoke all at once.
 ```{r}
 dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
-df <- get_df_landmask(dir)
+gridfile <- "./data/df_grid.Rdata"
+if (file.exists(gridfile)){
+  load(gridfile)
+} else {
+  df <- get_df_landmask(dir)
+  save(df, file = gridfile)
+}
 df_test <- get_plantwhc_mct_global(df, dir) %>% 
   unnest(out_ilon_ilat)
 ```
