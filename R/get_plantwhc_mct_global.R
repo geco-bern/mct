@@ -100,9 +100,10 @@ get_df_landmask <- function(dir){
 read_nc_gridcell <- function(ilon, ilat, dir){
   
   # years <- seq(1982, 2016)
-  years <- seq(1982, 2016)
-  
-  df <- purrr::map_dfr(as.list(years), ~read_nc_gridcell_oneyear(., ilon, ilat, dir))
+  # years <- seq(1982, 2016)
+  # df <- purrr::map_dfr(as.list(years), ~read_nc_gridcell_oneyear(., ilon, ilat, dir))
+
+  df <- read_nc_gridcell_allyears(ilon, ilat, dir)
   
   return(df)
 }
@@ -132,6 +133,31 @@ read_nc_gridcell_oneyear <- function(year, ilon, ilat, dir){
   return(df)
 }
 
+
+read_nc_gridcell_allyears <- function(ilon, ilat, dir){
+  
+  filn <- paste0(dir, "s1_fapar3g_v3_global.d.wbal.nc")
+
+  nc <- ncdf4::nc_open(filn)
+  # Save the print(nc) dump to a text file
+  {
+    sink(paste0(filn, ".txt"))
+    print(nc)
+    sink()
+  }
+  
+  time <- ncdf4::ncvar_get(nc, nc$dim$time$name)
+  
+  ## convert to date
+  if (nc$dim$time$units=="days since 2001-1-1 0:0:0"){
+    date <- conv_noleap_to_ymd(time, origin = lubridate::ymd("2001-01-01"))
+  }
+
+  wbal <- ncdf4::ncvar_get(nc, "wbal", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)) )
+  
+  df <- tibble(date = date, wbal = wbal)
+  return(df)
+}
 
 get_ilon_ilat <- function(lon, lat, lon_vec, lat_vec){
 
