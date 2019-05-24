@@ -13,6 +13,11 @@ output:
 library(dplyr)
 library(rbeni)
 library(tidyr)
+library(purrr)
+library(ncdf4)
+library(lubridate)
+library(extRemes)
+library(R.utils)
 
 source("R/mct.R")
 source("R/get_plantwhc_mct_bysite.R")
@@ -29,9 +34,11 @@ if (file.exists(gridfile)){
   df_grid <- get_df_landmask(dir)
   save(df_grid, file = gridfile)
 }
-df <- get_plantwhc_mct_global(df_grid, dir) %>% 
-  unnest(out_ilon_ilat)
+df <- get_plantwhc_mct_global(df_grid, dir)
+
+# %>% 
+#   unnest(out_ilon_ilat)
 
 ## test
-test <- get_plantwhc_mct_gridcell(211, 75, dir)
+#test <- get_plantwhc_mct_gridcell(211, 75, dir)
 ```

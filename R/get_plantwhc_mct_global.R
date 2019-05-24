@@ -15,7 +15,7 @@ get_plantwhc_mct_global <- function(df, dir){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(as.list(seq(length(irow_chunk))), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
+  df <- purrr::map_dfr(as.list(613:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
   
   return(df)
 }
@@ -44,7 +44,13 @@ get_plantwhc_mct_chunk <- function(df, dir, idx){
   print(paste("Saving to", outfil, "..."))
   save(df, file = outfil)
   print("... done.")
-
+  save(idx, file = "./data/idx.Rdata")
+  rm(list = ls())
+  dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
+  gridfile <- "./data/df_grid.Rdata"
+  load(gridfile)
+  load <- "./data/idx.Rdata"
+  
   return(df)
 }
 
@@ -52,12 +58,32 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
   
   print(paste("doin it by gridcell:", as.character(ilon), as.character(ilat)))
   print("reading nc file...")
-  ddf <- read_nc_gridcell(ilon, ilat, dir)
-  print("... done.")
+  ddf <- withTimeout(read_nc_gridcell(ilon, ilat, dir), timeout = 60, onTimeout = "warning")
+  if (typeof(ddf)=="character"){
+    return_period <- c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800)
+    out_plant_whc <-tibble(
+      return_period = return_period, 
+      return_level = rep(NA, length(return_period))
+      )
+    print("TIMED OUT (5 s)")
+  } else {
+    print("... done.")
+    
+    print("get plantwhc by site ...")
+    out_plantwhc_mct <- withTimeout(get_plantwhc_mct_bysite(ddf), timeout = 60, onTimeout = "warning")
+    if (typeof(out_plantwhc_mct)=="character"){
+      return_period <- c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800)
+      out_plant_whc <-tibble(
+        return_period = return_period, 
+        return_level = rep(NA, length(return_period))
+      )
+      print("TIMED OUT (5 s)")
+    } else {
+      print("... done.")
+    }
+    
+  }
   
-  print("get plantwhc by site ...")
-  out_plantwhc_mct <- get_plantwhc_mct_bysite(ddf)
-  print("... done.")
   return(out_plantwhc_mct)
   
 }
@@ -72,8 +98,9 @@ get_df_landmask <- function(dir){
     sink(paste0(maskfiln, ".txt"))
     print(nc)
     sink()
+    unlink(paste0(maskfiln, ".txt"))
   }
-  
+
   out <- list(
     lon = ncdf4::ncvar_get(nc, nc$dim$lon$name),
     lat = ncdf4::ncvar_get(nc, nc$dim$lat$name)
@@ -85,6 +112,7 @@ get_df_landmask <- function(dir){
     setNames(c("lon", "lat"))
   
   fland <- ncdf4::ncvar_get(nc, "fland")
+  ncdf4::nc_close(nc)
   
   df <- df %>%
     bind_cols(tibble(fland = as.vector(fland))) %>%
@@ -118,6 +146,7 @@ read_nc_gridcell_oneyear <- function(year, ilon, ilat, dir){
     sink(paste0(filn, ".txt"))
     print(nc)
     sink()
+    unlink(paste0(filn, ".txt"))
   }
   
   time <- ncdf4::ncvar_get(nc, nc$dim$time$name)
@@ -128,7 +157,8 @@ read_nc_gridcell_oneyear <- function(year, ilon, ilat, dir){
   }
 
   wbal <- ncdf4::ncvar_get(nc, "wbal", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)) )
-  
+  ncdf4::nc_close(nc)
+
   df <- tibble(date = date, wbal = wbal)
   return(df)
 }
@@ -144,6 +174,7 @@ read_nc_gridcell_allyears <- function(ilon, ilat, dir){
     sink(paste0(filn, ".txt"))
     print(nc)
     sink()
+    unlink(paste0(filn, ".txt"))
   }
   
   time <- ncdf4::ncvar_get(nc, nc$dim$time$name)
@@ -153,8 +184,9 @@ read_nc_gridcell_allyears <- function(ilon, ilat, dir){
     date <- conv_noleap_to_ymd(time, origin = lubridate::ymd("2001-01-01"))
   }
 
-  wbal <- ncdf4::ncvar_get(nc, "wbal", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)) )
-  
+  wbal <- ncdf4::ncvar_get(nc, "wbal", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
+  ncdf4::nc_close(nc)
+
   df <- tibble(date = date, wbal = wbal)
   return(df)
 }
