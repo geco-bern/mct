@@ -46,7 +46,7 @@ get_plantwhc_mct_chunk <- function(df, dir, idx){
   print("... done.")
   save(idx, file = "./data/idx.Rdata")
   rm(list = ls())
-  dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
+  dir <- "~/sofun/output_nc_global_sofun/"
   gridfile <- "./data/df_grid.Rdata"
   load(gridfile)
   load <- "./data/idx.Rdata"
