@@ -15,7 +15,7 @@ get_plantwhc_mct_global <- function(df, dir){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(as.list(613:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
+  df <- purrr::map_dfr(as.list(812:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
   
   return(df)
 }
@@ -46,7 +46,7 @@ get_plantwhc_mct_chunk <- function(df, dir, idx){
   print("... done.")
   save(idx, file = "./data/idx.Rdata")
   rm(list = ls())
-  dir <- "~/sofun/output_nc_global_sofun/"
+  dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
   gridfile <- "./data/df_grid.Rdata"
   load(gridfile)
   load <- "./data/idx.Rdata"
@@ -65,7 +65,7 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
       return_period = return_period, 
       return_level = rep(NA, length(return_period))
       )
-    print("TIMED OUT (5 s)")
+    print("TIMED OUT (60 s)")
   } else {
     print("... done.")
     
@@ -77,7 +77,7 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
         return_period = return_period, 
         return_level = rep(NA, length(return_period))
       )
-      print("TIMED OUT (5 s)")
+      print("TIMED OUT (60 s)")
     } else {
       print("... done.")
     }

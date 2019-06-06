@@ -18,15 +18,17 @@ library(ncdf4)
 library(lubridate)
 library(extRemes)
 library(R.utils)
+library(readr)
 
 source("R/mct.R")
 source("R/get_plantwhc_mct_bysite.R")
 source("R/get_plantwhc_mct_global.R")
+source("R/convert_df_mct_to_grid.R")
 ```
 
-Invoke all at once.
+Invoke all at once. This takes several days. Chunks of data are written to `./data/df_plantwhc_mct<i>.Rdata`, where `i` runs from 1 to 1000.
 ```{r}
-dir <- "~/sofun/output_nc_global_sofun/"
+dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
 gridfile <- "./data/df_grid.Rdata"
 if (file.exists(gridfile)){
   load(gridfile)
@@ -34,11 +36,37 @@ if (file.exists(gridfile)){
   df_grid <- get_df_landmask(dir)
   save(df_grid, file = gridfile)
 }
-df <- get_plantwhc_mct_global(df_grid, dir)
+df_mct <- get_plantwhc_mct_global(df_grid, dir)
+```
 
-# %>% 
-#   unnest(out_ilon_ilat)
+Read chunks of output data files generated above into one data frame
+```{r}
+read_onefile <- function(path){
+  load(path)
+  return(df)
+}
+data_path <- "./data/"
+files <-  list.files(data_path, pattern = "df_plantwhc_mct")
+# files <- files[1:10]
+df_mct <- purrr::map_dfr( files, ~read_onefile(paste0(data_path, .))) %>% 
+  unnest(out_ilon_ilat)
+```
 
-## test
-#test <- get_plantwhc_mct_gridcell(211, 75, dir)
+Extract return level (mm) for a given return period (yr) and convert data frame to an array (grid).
+```{r}
+df_mct <- df_mct %>% 
+  mutate(return_level_20y = purrr::map(data, ~slice(., 4))) %>%   # 20-year return period is the 4th row
+  mutate(return_level_20y = purrr::map_dbl(return_level_20y, 2)) %>% 
+  mutate(return_level_40y = purrr::map(data, ~slice(., 6))) %>%   # 40-year return period is the 6th row
+  mutate(return_level_40y = purrr::map_dbl(return_level_40y, 2))
+
+grid_mct_20y <- df_mct %>% 
+  convert_df_mct_to_grid("return_level_20y", paste0(dir, "s1_fapar3g_v3_global.fland.nc")) 
+
+rbeni::plot_map(grid_mct_20y, lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="map_mct_20y.pdf")
+
+grid_mct <- df_mct %>% 
+  convert_df_mct_to_grid("return_level_40y", paste0(dir, "s1_fapar3g_v3_global.fland.nc"))
+
+rbeni::plot_map(t(grid_mct), lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="map_mct_40y.pdf")
 ```

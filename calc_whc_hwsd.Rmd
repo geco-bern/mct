@@ -1,0 +1,96 @@
+---
+title: "Determine plant-WHC globally"
+author: "Beni Stocker"
+date: "4/30/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+library(rbeni)
+library(dplyr)
+library(ggplot2)
+source("R/calc_soilparams.R")
+```
+
+## Load data
+Read HWSD NetCDF files into a data frame
+```{r}
+df <- rbeni::nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/T_SAND.nc4","T_SAND") %>%
+  rename( fsand = myvar ) %>%
+  left_join(
+    rbeni::nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/T_CLAY.nc4","T_CLAY") %>%
+      rename( fclay = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/T_OC.nc4","T_OC") %>%
+      rename( forg = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/T_GRAVEL.nc4","T_GRAVEL") %>%
+      rename( fgravel = myvar ),
+    by = c("lon", "lat")
+  )
+```
+
+For testing
+```{r}
+df_sub <- df %>% 
+  tidyr::drop_na() %>%
+  sample_n(10000)
+```
+
+## Calculate soil parameters
+Calculate soil parameters following Saxton & Rawls 2006
+```{r}
+df_sr <- df_sub %>% calc_soilparams(method = "saxtonrawls")
+```
+
+Calculate soil parameters following Ballard et al. 2008
+```{r}
+df_bl <- df_sub %>% calc_soilparams(method = "ballard")
+```
+
+## Field capacity
+```{r}
+out <- df_sr %>% 
+  select(fc_sr = fc) %>% 
+  bind_cols(
+    select(df_bl, fc_bl = fc)
+  ) %>% 
+  analyse_modobs2(mod = "fc_bl", obs = "fc_sr", type = "heat")
+out$gg +
+  labs(x = "FC Ballard 2008 (m3 m-3)", y = "FC Saxton & Rawls 2006 (m3 m-3)",
+       title = "FC")
+```
+
+## Permanent wilting point
+```{r}
+out <- df_sr %>% 
+  select(pwp_sr = pwp) %>% 
+  bind_cols(
+    select(df_bl, pwp_bl = pwp)
+  ) %>% 
+  analyse_modobs2(mod = "pwp_bl", obs = "pwp_sr", type = "heat")
+out$gg +
+  labs(x = "PWP Ballard 2008 (m3 m-3)", y = "PWP Saxton & Rawls 2006 (m3 m-3)",
+       title = "PWP")
+```
+
+## Water holding capacity
+```{r}
+out <- df_sr %>% 
+  select(whc_sr = whc) %>% 
+  bind_cols(
+    select(df_bl, whc_bl = whc)
+  ) %>% 
+  analyse_modobs2(mod = "whc_bl", obs = "whc_sr", type = "heat")
+out$gg +
+  labs(x = "WHC Ballard 2008 (m3 m-3)", y = "WHC Saxton & Rawls 2006 (m3 m-3)",
+       title = "WHC")
+```
