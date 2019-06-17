@@ -2,7 +2,7 @@ calc_soilparams <- function(df, method = "saxtonrawls"){
   
   if (method == "saxtonrawls"){
     
-    # ADOPTED FROM soil_hydro.R by David Calle Sandoval
+    # ADOPTED FROM soil_hydro.R by David Sandoval
     # Soil Hydrophysics
     # ************************************************************************
     # Name:     soil_hydro
@@ -63,9 +63,9 @@ calc_soilparams <- function(df, method = "saxtonrawls"){
       mutate(ksat = 1930*(sat-fc)^(3-coef_lambda)) %>%
       select(-coef_A, -coef_B, -coef_lambda) 
   
-  } else if (method == "ballard"){
+  } else if (method == "balland"){
     
-    ## ADOPTED FROM Hydrophysics_V2.R by David Calle Sandoval
+    ## ADOPTED FROM Hydrophysics_V2.R by David Sandoval
     # Hydrophysics V2
     # ************************************************************************
     # Name:     soil_hydro

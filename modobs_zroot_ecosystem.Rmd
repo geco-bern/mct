@@ -1,0 +1,216 @@
+---
+title: "Modelled vs. observed ecosystem-scale zroot"
+author: "Beni Stocker"
+date: "4/30/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+library(rbeni)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
+library(raster)
+```
+
+## Comparison of global z$_\text{root}$ estimate with RPGE data
+
+### Distribution of values
+
+The global z$_\text{root}$ estimate can be compared with the ecosystem-level RPGE data.
+
+The figure below shows the distribution of modelled values (bars, where 'Balland' and 'SaxtonRawls' refers to the WHC estimate based on pedotransfer functions from Balland et al., 2008, and Saxton & Rawls, 2006, respectively.). The blue line represents the distribution of depth estimates for the extrapolated 95% quantile of root mass (`D95_extrapolated`) in the RPGE data.
+```{r echo = FALSE}
+# Load data
+df_obs <- read_csv("/alphadata01/bstocker/data/RPGE/data/root_profiles_D50D95.csv")
+
+# Look at distribution of global values and values in dataset.
+
+load("./data/df_40y_sr.Rdata")
+load("./data/df_40y_bl.Rdata")
+
+df_tmp <- df_40y_sr %>% 
+  dplyr::select(lon, lat, zroot_sr = zroot) %>% 
+  left_join(dplyr::select(df_40y_bl, lon, lat, zroot_bl = zroot), by=c("lon", "lat")) %>% 
+  tidyr::gather(method, zroot, c(zroot_bl, zroot_sr))
+
+ggplot() +
+  geom_histogram(
+    data = df_tmp,
+    aes(x = zroot/1000, y = ..count../sum(..count..), fill = method), 
+    color = "black", alpha = 0.3, binwidth = 0.1, 
+    position="identity") +
+  xlim(0,10) + ylim(0, 0.045) +
+  geom_density(
+    data = df_obs,
+    aes(x = D95_extrapolated, y=..density..*0.03/0.7), color = "dodgerblue1", size = 1, show.legend = FALSE
+    ) +
+  geom_hline(yintercept = 0, color = "black") +  
+  scale_fill_manual(name = "", values = c("black", "red"), labels = c("Balland", "SaxtonRawls"))
+```
+
+This suggests:
+
+- A good general agreement of the magnitude and the distribution, especially at intermediate values (between about 0.5 m and 2.3 m),
+- The frequency of very shallow rooting (below about 0.5 m) is overestimated by the model, and the frequency of rather deep rooting (values around 2.5 m and above) tends to be underestimated. This may be related to the scale mismatch. The model uses gridcell-average fAPAR to estimate the water demand per unit area, with must be lower than the water demand per unit area of vegetetated land only. This discrepancy is highest in areas with low fAPAR, including arid regions with large dry season water deficits. 
+
+
+### Site-by-site evaluation
+
+A site-by-site comparison of modelled vs. observed rooting depth (scatterplot), where modelled is extracted from the global simulation, is done below. 
+
+```{r echo = FALSE}
+# Extract values from the global halfdegree map, complementing the observational data frame. 
+df_obs <- df_obs %>% 
+  rowwise() %>% 
+  mutate( 
+    zroot_40y_bl = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_40y_bl.nc", varnam = "grid_zroot_40y_bl"),
+    zroot_40y_sr = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_40y_sr.nc", varnam = "grid_zroot_40y_sr"),
+    zroot_20y_bl = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_20y_bl.nc", varnam = "grid_zroot_20y_bl"),
+    zroot_20y_sr = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_20y_sr.nc", varnam = "grid_zroot_20y_sr")
+    )
+
+## Compare observed and modelled in a scatterplot.
+## Balland, 40 y
+out <- df_obs %>% analyse_modobs2(mod = "zroot_40y_bl", obs = "D95_extrapolated")
+out$gg + labs(title = "Balland, 40y, comparing to 95% quantile", x = "Modelled rooting depth (m)", y = "Observed rooting depth (m)")
+
+## Saxton & Rawls, 40 y
+out <- df_obs %>% analyse_modobs2(mod = "zroot_40y_sr", obs = "D50_extrapolated")
+out$gg + labs(title = "Saxton & Rawls, 40y", x = "Modelled rooting depth (m)", y = "Observed rooting depth (m)")
+```
+
+This suggests:
+
+- A poor model performance.
+- An likely challenge of scale mismatch.
+
+### Rooting depth map
+
+The values of the points in the RPGE data are overlaid onto the rooting depth map from the model. The question is: Are there broad patterns that we could focus on?
+
+```{r echo = FALSE}
+# Compare modelled and observed on the map.
+
+# nc <- read_nc_onefile("data/zroot_mct_40y_bl.nc")
+# plot_map( nc, lev = c(0,5,10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 10 )
+
+rasta <- brick("data/zroot_mct_40y_bl.nc")
+
+gg <- plot_map2(
+  rasta,
+  nbin = 10,
+  legend_title = expression(paste("z"[root], " (m)"))
+  ) +
+  labs(title = expression(paste("z"[root])))
+
+df_obs <- df_obs %>% 
+  mutate(D95_extrapolated_lim = min(D95_extrapolated, 5.0))
+
+gg + 
+  geom_point(
+    data = df_obs, 
+    aes(Longitude, Latitude, fill = D95_extrapolated),
+    color='black', shape=21,  size=2, stroke=0.1,
+    show.legend = FALSE
+    ) +
+  scale_color_gradientn(
+    colors = c( "wheat", "tomato2", "tomato4", "orchid4" ), 
+    na.value = 'grey90',
+    breaks = seq(0, maxval, length.out = (nbin+1)), limits = c(0,maxval), oob=scales::squish )
+
+#ggsave("fig/zroot_mct_40y_bl.pdf", width = 10, height = 7)
+```
+
+Let's discuss what we can get from this ...
+
+### Addressing the scale mismatch
+
+We may argue that we cannot expect a global model that does not account for local topography to accurately simulate rooting depth measured at the site scale. Can we instead require the model to capture known patterns in the rooting depth across some class of vegetation type, climate, biome, ... ? The challenge is to identify such patterns where *a priori* expect rooting depth variations. 
+
+Let's discuss this further ...
+
+<!-- Distribution of values within Ahlstroem land classes. -->
+<!-- ```{r} -->
+<!-- df_anders <- nc_to_df( -->
+<!--   "/alphadata01/bstocker/data/landclass_ahlstroem/semiarid_shrub_savannah.nc",  -->
+<!--   varnam = "semidry shrub & savannah") %>%  -->
+<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
+<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
+<!--   rename( semiarid_shrub_savannah = myvar ) %>% -->
+<!--   left_join( -->
+<!--     nc_to_df( -->
+<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/forest_extratropical.nc",  -->
+<!--       varnam = "extra-tropical forest"), -->
+<!--     by = c("lon", "lat") -->
+<!--   ) %>%  -->
+<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
+<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
+<!--   rename( forest_extratropical = myvar ) %>% -->
+<!--   left_join( -->
+<!--     nc_to_df( -->
+<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/forest_tropical.nc",  -->
+<!--       varnam = "tropical forest"), -->
+<!--     by = c("lon", "lat") -->
+<!--   ) %>%  -->
+<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
+<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
+<!--   rename( forest_tropical = myvar ) %>% -->
+<!--   left_join( -->
+<!--     nc_to_df( -->
+<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/grassland_crops.nc",  -->
+<!--       varnam = "grasslands & crops"), -->
+<!--     by = c("lon", "lat") -->
+<!--   ) %>%  -->
+<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
+<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
+<!--   rename( grassland_crops = myvar ) %>% -->
+<!--   left_join( -->
+<!--     nc_to_df( -->
+<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/sparse_veg.nc",  -->
+<!--       varnam = "sparsely veg"), -->
+<!--     by = c("lon", "lat") -->
+<!--   ) %>%  -->
+<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
+<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
+<!--   rename( sparse_veg = myvar ) %>% -->
+<!--   left_join( -->
+<!--     nc_to_df( -->
+<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/tundra_cool_shrub.nc",  -->
+<!--       varnam = "tundra & cool shrub"), -->
+<!--     by = c("lon", "lat") -->
+<!--   ) %>%  -->
+<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
+<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>% -->
+<!--   rename( tundra_cool_shrub = myvar ) %>%  -->
+<!--   tidyr::gather( -->
+<!--     landclass,  -->
+<!--     value,  -->
+<!--     c(semiarid_shrub_savannah, forest_extratropical, forest_tropical, grassland_crops, sparse_veg, tundra_cool_shrub)) %>%  -->
+<!--   dplyr::filter(value) %>%  -->
+<!--   dplyr::select(-value) -->
+
+<!-- df_tmp <- df_tmp %>%  -->
+<!--   left_join(df_anders, by=c("lon", "lat")) -->
+
+<!-- ggplot() + -->
+<!--   geom_histogram( -->
+<!--     data = dplyr::filter(df_tmp, landclass == "semiarid_shrub_savannah"), -->
+<!--     aes(x = zroot/1000, y = ..count../sum(..count..), fill = method),  -->
+<!--     color = "black", alpha = 0.3, binwidth = 0.1,  -->
+<!--     position="identity") + -->
+<!--   xlim(0,10) + ylim(0, 0.08) + -->
+
+<!-- ggplot() + -->
+<!--   geom_density( -->
+<!--     data = df_obs, -->
+<!--     aes(x = D95_extrapolated, y=..density..), color = "dodgerblue1", size = 1, show.legend = FALSE -->
+<!--     ) + -->
+<!--   geom_hline(yintercept = 0, color = "black") +   -->
+<!--   scale_fill_manual(name = "", values = c("black", "red"), labels = c("Balland", "SaxtonRawls")) -->
+<!-- ``` -->

@@ -1,0 +1,181 @@
+---
+title: "Determine plant-WHC globally"
+author: "Beni Stocker"
+date: "4/30/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+library(rbeni)
+library(dplyr)
+library(ggplot2)
+source("R/calc_soilparams.R")
+```
+
+## Load data
+
+Specify whether is to be done for top soil (`"T"`) or subsoil (`"S"`).
+```{r}
+# zid <- "T" # for top soil
+zid <- "S" # for sub soil
+```
+
+Read HWSD NetCDF files into a data frame
+```{r}
+df <- rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), paste0(zid, "_SAND")) %>%
+  rename( fsand = myvar ) %>%
+  left_join(
+    rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_CLAY.nc4"), paste0(zid, "_CLAY")) %>%
+      rename( fclay = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_OC.nc4"), paste0(zid, "_OC")) %>%
+      rename( forg = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_GRAVEL.nc4"), paste0(zid, "_GRAVEL")) %>%
+      rename( fgravel = myvar ),
+    by = c("lon", "lat")
+  ) %>% 
+  tidyr::drop_na()
+```
+
+## Calculate soil parameters
+Calculate soil parameters following Saxton & Rawls 2006
+```{r warning = FALSE, message = FALSE}
+filnam <- paste0("data/", zid, "_df_sr.Rdata")
+if(!exists("df_srXXX")){
+  if (!file.exists(filnam)){
+    df_sr <- df %>% calc_soilparams(method = "saxtonrawls")
+    save(df_sr, file = filnam)
+  } else {
+    load(filnam)
+  }
+}
+```
+
+Calculate soil parameters following Balland et al. 2008
+```{r warning = FALSE, message = FALSE}
+filnam <- paste0("data/", zid, "_df_bl.Rdata")
+if(!exists("df_blXXX")){
+  if (!file.exists(filnam)){
+    df_bl <- df %>% calc_soilparams(method = "balland")
+    save(df_bl, file = paste0("data/", zid, "_df_bl.Rdata"))
+  } else {
+    load(filnam)
+  }
+}
+```
+
+## Field capacity
+```{r}
+out <- df_sr %>%
+  select(fc_sr = fc) %>% 
+  bind_cols(
+    select(df_bl, fc_bl = fc)
+  ) %>% 
+  sample_n(100000) %>% 
+  analyse_modobs2(mod = "fc_bl", obs = "fc_sr", type = "heat")
+out$gg +
+  labs(x = "FC Balland 2008 (m3 m-3)", y = "FC Saxton & Rawls 2006 (m3 m-3)",
+       title = "FC")
+ggsave(paste0("fig/modobs_fc_", zid, "_saxtonrawls_balland.pdf"), width=5, height=5)
+```
+
+## Permanent wilting point
+```{r}
+out <- df_sr %>% 
+  select(pwp_sr = pwp) %>% 
+  bind_cols(
+    select(df_bl, pwp_bl = pwp)
+  ) %>% 
+  sample_n(100000) %>% 
+  analyse_modobs2(mod = "pwp_bl", obs = "pwp_sr", type = "heat")
+out$gg +
+  labs(x = "PWP Balland 2008 (m3 m-3)", y = "PWP Saxton & Rawls 2006 (m3 m-3)",
+       title = "PWP")
+ggsave(paste0("fig/modobs_pwp_", zid, "_saxtonrawls_balland.pdf"), width=5, height=5)
+```
+
+## Water holding capacity
+```{r}
+out <- df_sr %>% 
+  select(whc_sr = whc) %>% 
+  bind_cols(
+    select(df_bl, whc_bl = whc)
+  ) %>% 
+  sample_n(100000) %>% 
+  analyse_modobs2(mod = "whc_bl", obs = "whc_sr", type = "heat")
+out$gg +
+  labs(x = "WHC Balland 2008 (m3 m-3)", y = "WHC Saxton & Rawls 2006 (m3 m-3)",
+       title = "WHC")
+ggsave(paste0("fig/modobs_whc_", zid, "_saxtonrawls_balland.pdf"), width=5, height=5)
+```
+
+Compare distribution of values as histograms
+```{r}
+if (!exists("df_bl")) load(paste0("data/", zid, "_df_bl.Rdata"))
+if (!exists("df_sr")) load(paste0("data/", zid, "_df_sr.Rdata"))
+df_tmp <- df_sr %>% 
+  select(whc_sr = whc) %>% 
+  bind_cols(select(df_bl, whc_bl = whc)) %>% 
+  tidyr::gather(method, whc, c(whc_bl, whc_sr))
+
+df_tmp %>% 
+  ggplot() +
+  geom_histogram(
+    aes(x = whc, y = ..density.., fill = method), 
+    color = "black", alpha = 0.3, binwidth = 0.02, 
+    position="identity") +
+  scale_fill_manual(name = "", values = c("black", "red"), labels = c("Balland", "SaxtonRawls"))
+ggsave(paste0("fig/hist_whc_", zid, "_saxtonrawls_balland.pdf"), width=7, height=5)
+```
+
+## Create maps
+
+```{r}
+## convert data frame to matrix (2D)
+arr_sr <- df_sr %>% 
+  df_to_grid("whc", paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"))
+
+arr_bl <- df_bl %>% 
+  df_to_grid("whc", paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"))
+
+## write matrix to NetCDF 
+write_nc2(
+  var = arr_sr, 
+  varnam = "whc", 
+  filnam_template = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), 
+  outfilnam = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc"),
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
+write_nc2(
+  var = arr_bl, 
+  varnam = "whc", 
+  filnam_template = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), 
+  outfilnam = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_bl_WHC.nc"),
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
+
+## read NetCDF as test
+test <- rbeni::read_nc_onefile(filn = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc"))
+print(dim(test$vars$whc))
+
+## regrid to half degree
+system(paste0("cdo remapbil,gridfile_halfdeg.txt /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_sr_WHC.nc"))
+
+system(paste0("cdo remapbil,gridfile_halfdeg.txt /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_bl_WHC.nc /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_bl_WHC.nc"))
+
+## read NetCDF as test
+test <- rbeni::read_nc_onefile(filn = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_bl_WHC.nc"))
+print(dim(test$vars$whc))
+plot_map(test$vars$whc, lev = c(0,0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 1))
+```

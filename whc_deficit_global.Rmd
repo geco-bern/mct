@@ -50,23 +50,44 @@ files <-  list.files(data_path, pattern = "df_plantwhc_mct")
 # files <- files[1:10]
 df_mct <- purrr::map_dfr( files, ~read_onefile(paste0(data_path, .))) %>% 
   unnest(out_ilon_ilat)
+save(df_mct, file = "data/df_mct.Rdata")
 ```
 
 Extract return level (mm) for a given return period (yr) and convert data frame to an array (grid).
 ```{r}
+if (!exists("df_mct")) load("data/df_mct.Rdata")
 df_mct <- df_mct %>% 
   mutate(return_level_20y = purrr::map(data, ~slice(., 4))) %>%   # 20-year return period is the 4th row
   mutate(return_level_20y = purrr::map_dbl(return_level_20y, 2)) %>% 
   mutate(return_level_40y = purrr::map(data, ~slice(., 6))) %>%   # 40-year return period is the 6th row
   mutate(return_level_40y = purrr::map_dbl(return_level_40y, 2))
 
+## convert to a 2D matrix (grid)
 grid_mct_20y <- df_mct %>% 
-  convert_df_mct_to_grid("return_level_20y", paste0(dir, "s1_fapar3g_v3_global.fland.nc")) 
+  df_to_grid("return_level_20y", paste0(dir, "s1_fapar3g_v3_global.fland.nc")) 
+grid_mct_40y <- df_mct %>% 
+  df_to_grid("return_level_40y", paste0(dir, "s1_fapar3g_v3_global.fland.nc")) 
 
-rbeni::plot_map(grid_mct_20y, lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="map_mct_20y.pdf")
+## save as NetCDF
+write_nc2(
+  var = grid_mct_20y, 
+  varnam = "whc_mct_20y", 
+  filnam_template = paste0(dir, "s1_fapar3g_v3_global.fland.nc"), 
+  outfilnam = "data/whc_mct_20y.nc",
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
+write_nc2(
+  var = grid_mct_40y, 
+  varnam = "whc_mct_40y", 
+  filnam_template = paste0(dir, "s1_fapar3g_v3_global.fland.nc"), 
+  outfilnam = "data/whc_mct_40y.nc",
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
 
-grid_mct <- df_mct %>% 
-  convert_df_mct_to_grid("return_level_40y", paste0(dir, "s1_fapar3g_v3_global.fland.nc"))
+## create plots
+plot_map(grid_mct_20y, lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="fig/map_mct_20y.pdf")
 
-rbeni::plot_map(t(grid_mct), lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="map_mct_40y.pdf")
+plot_map(grid_mct_40y, lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="fig/map_mct_40y.pdf")
 ```

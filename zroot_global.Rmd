@@ -1,0 +1,171 @@
+---
+title: "Calculate rooting depth globally"
+author: "Beni Stocker"
+date: "4/30/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+library(rbeni)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+Get WHC based on soil texture
+```{r}
+df_sr <- nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/T_sr_WHC.nc", "whc") %>% 
+  rename(whc_t = myvar) %>% 
+  left_join(
+    nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/S_sr_WHC.nc", "whc") %>% 
+      rename(whc_s = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  drop_na()
+
+df_bl <- nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/T_bl_WHC.nc", "whc") %>% 
+  rename(whc_t = myvar) %>% 
+  left_join(
+    nc_to_df("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/S_bl_WHC.nc", "whc") %>% 
+      rename(whc_s = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  drop_na()
+```
+
+Add MCT-WHC with return period of 40 years.
+```{r}
+df_sr <- df_sr %>% 
+  left_join(
+    nc_to_df("data/whc_mct_40y.nc", "whc_mct_40y", do_get_ilon_ilat=FALSE) %>% 
+      drop_na() %>% 
+      rename( whc_mct_40y = myvar ),
+    by = c("lon", "lat")
+  )  %>% 
+  left_join(
+    nc_to_df("data/whc_mct_20y.nc", "whc_mct_20y", do_get_ilon_ilat=FALSE) %>% 
+      drop_na() %>% 
+      rename( whc_mct_20y = myvar ),
+    by = c("lon", "lat")
+  )
+
+df_bl <- df_bl %>% 
+  left_join(
+    nc_to_df("data/whc_mct_40y.nc", "whc_mct_40y", do_get_ilon_ilat=FALSE) %>% 
+      drop_na() %>% 
+      rename( whc_mct_40y = myvar ),
+    by = c("lon", "lat")
+  )  %>% 
+  left_join(
+    nc_to_df("data/whc_mct_20y.nc", "whc_mct_20y", do_get_ilon_ilat=FALSE) %>% 
+      drop_na() %>% 
+      rename( whc_mct_20y = myvar ),
+    by = c("lon", "lat")
+  )
+```
+
+Calculate rooting depth
+```{r}
+df_40y_sr <- df_sr %>% 
+  rowwise() %>% 
+  drop_na() %>% 
+  mutate(zroot = calc_zroot(whc_mct_40y, whc_t, whc_s))
+save(df_40y_sr, file = "./data/df_40y_sr.Rdata")
+
+df_20y_sr <- df_sr %>% 
+  rowwise() %>% 
+  drop_na() %>% 
+  mutate(zroot = calc_zroot(whc_mct_20y, whc_t, whc_s))
+save(df_20y_sr, file = "./data/df_20y_sr.Rdata")
+
+df_40y_bl <- df_bl %>% 
+  rowwise() %>% 
+  drop_na() %>% 
+  mutate(zroot = calc_zroot(whc_mct_40y, whc_t, whc_s))
+save(df_40y_bl, file = "./data/df_40y_bl.Rdata")
+
+df_20y_bl <- df_bl %>% 
+  rowwise() %>% 
+  drop_na() %>% 
+  mutate(zroot = calc_zroot(whc_mct_20y, whc_t, whc_s))
+save(df_20y_bl, file = "./data/df_20y_bl.Rdata")
+```
+
+Distribution of rooting depth.
+```{r}
+df_tmp <- df_40y_sr %>% 
+  select(zroot_sr = zroot) %>% 
+  bind_cols(select(df_40y_bl, zroot_bl = zroot)) %>% 
+  tidyr::gather(method, zroot, c(zroot_bl, zroot_sr))
+
+df_tmp %>% 
+  ggplot() +
+  geom_histogram(
+    aes(x = zroot, y = ..density.., fill = method), 
+    color = "black", alpha = 0.3, binwidth = 100, 
+    position="identity") +
+  xlim(0,10000) +
+  scale_fill_manual(name = "", values = c("black", "red"), labels = c("Balland", "SaxtonRawls"))
+ggsave(paste0("fig/hist_zroot_saxtonrawls_balland.pdf"), width=7, height=5)
+```
+
+Map of rooting depth, plot and write to file.
+```{r}
+## 40 y
+grid_zroot_40y_bl <- df_40y_bl %>% 
+  df_to_grid("zroot", "/alphadata01/bstocker/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc") 
+grid_zroot_40y_sr <- df_40y_sr %>% 
+  df_to_grid("zroot", "/alphadata01/bstocker/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc") 
+
+plot_map(grid_zroot_40y_bl/1000, lev = c(0, 5, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 10, file="fig/map_zroot_40y_bl.pdf")
+
+plot_map(grid_zroot_40y_sr/1000, lev = c(0, 5, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 10, file="fig/map_zroot_40y_sr.pdf")
+
+write_nc2(
+  var = grid_zroot_40y_bl/1000, 
+  varnam = "grid_zroot_40y_bl", 
+  filnam_template = paste0(dir, "s1_fapar3g_v3_global.fland.nc"), 
+  outfilnam = "data/zroot_mct_40y_bl.nc",
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
+write_nc2(
+  var = grid_zroot_40y_sr/1000, 
+  varnam = "grid_zroot_40y_sr", 
+  filnam_template = paste0(dir, "s1_fapar3g_v3_global.fland.nc"), 
+  outfilnam = "data/zroot_mct_40y_sr.nc",
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
+
+## 20 y
+grid_zroot_20y_bl <- df_20y_bl %>% 
+  df_to_grid("zroot", "/alphadata01/bstocker/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc") 
+grid_zroot_20y_sr <- df_20y_sr %>% 
+  df_to_grid("zroot", "/alphadata01/bstocker/sofun/output_nc_global_sofun/s1_fapar3g_v3_global.fland.nc") 
+
+plot_map(grid_zroot_20y_bl/1000, lev = c(0, 5, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 10, file="fig/map_zroot_20y_bl.pdf")
+
+plot_map(grid_zroot_20y_sr/1000, lev = c(0, 5, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 10, file="fig/map_zroot_20y_sr.pdf")
+
+write_nc2(
+  var = grid_zroot_20y_bl/1000, 
+  varnam = "grid_zroot_20y_bl", 
+  filnam_template = paste0(dir, "s1_fapar3g_v3_global.fland.nc"), 
+  outfilnam = "data/zroot_mct_20y_bl.nc",
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
+write_nc2(
+  var = grid_zroot_20y_sr/1000, 
+  varnam = "grid_zroot_20y_sr", 
+  filnam_template = paste0(dir, "s1_fapar3g_v3_global.fland.nc"), 
+  outfilnam = "data/zroot_mct_20y_sr.nc",
+  lonnam_template = "lon", 
+  latnam_template = "lat"
+  )
+```
