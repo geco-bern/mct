@@ -13,7 +13,7 @@ do
 		# cdo remapbil,${here}/halfdeg.txt modis_vegetation__LPDAAC__v5__0.05deg__${iyr}${imon}.nc modis_vegetation__LPDAAC__v5__0.5deg__${iyr}${imon}.nc
   #   done
     cdo mergetime modis_vegetation__LPDAAC__v5__0.05deg__*_halfdeg.nc modis_vegetation__LPDAAC__v5__halfdegMAX_${iyr}.nc
-    mv modis_vegetation__LPDAAC__v5__halfdeg_${iyr}.nc ..
+    mv modis_vegetation__LPDAAC__v5__halfdegMAX_${iyr}.nc ..
     cd ..
 done
 cdo mergetime modis_vegetation__LPDAAC__v5__halfdegMAX_????.nc modis_vegetation__LPDAAC__v5__halfdegMAX.nc
