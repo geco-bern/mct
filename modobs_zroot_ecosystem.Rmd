@@ -16,21 +16,78 @@ library(ggplot2)
 library(tidyr)
 library(readr)
 library(raster)
+library(stringr)
 ```
 
 ## Comparison of global z$_\text{root}$ estimate with RPGE data
 
-### Distribution of values
+### Data exploration
 
 The global z$_\text{root}$ estimate can be compared with the ecosystem-level RPGE data.
 
 The figure below shows the distribution of modelled values (bars, where 'Balland' and 'SaxtonRawls' refers to the WHC estimate based on pedotransfer functions from Balland et al., 2008, and Saxton & Rawls, 2006, respectively.). The blue line represents the distribution of depth estimates for the extrapolated 95% quantile of root mass (`D95_extrapolated`) in the RPGE data.
 ```{r echo = FALSE}
 # Load data
-df_obs <- read_csv("/alphadata01/bstocker/data/RPGE/data/root_profiles_D50D95.csv")
+# note: re-downloaded data is the same as the one shersingh gave me
+#df_obs2 <- read_csv("/alphadata01/bstocker/data/RPGE_shersing/data/root_profiles_D50D95.csv")
+df_obs <- read_csv("/alphadata01/bstocker/data/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv")
+#all_equal(df_obs, df_obs2)
+```
 
+Exclude from analysis.
+```{r}
+df_obs <- df_obs %>% 
+  dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES")
+```
+
+
+
+Do some data explorations, trying to reproduce analyses in Schenk & Jackson (2002).
+
+Histograms of depth of 95% quantile.
+```{r}
+df_obs$Vegetation %>% unique() %>% print()
+
+df_obs <- df_obs %>% 
+  mutate( veg2 = Vegetation ) %>% 
+  mutate( veg2 = ifelse(str_detect(Vegetation, "boreal") & str_detect(Vegetation, "forest"), "boreal_forest", veg2) ) %>% 
+  mutate( veg2 = ifelse(str_detect(Vegetation, "tem")    & str_detect(Vegetation, "forest"), "temperate_forest", veg2) ) %>% 
+  mutate( veg2 = ifelse( str_detect(Vegetation, "EBL forest / trop"), "tropical_evergreen_forest", veg2) ) %>% 
+  mutate( veg2 = ifelse( str_detect(Vegetation, "DBL forest / trop"), "tropical_deciduous_forest", veg2) ) %>% 
+  mutate( veg2 = ifelse( str_detect(Vegetation, "Savanna") & abs(Latitude) <= 30.0, "tropical_savanna", veg2) ) %>% 
+  mutate( veg2 = as.factor(veg2) )
+
+df_obs %>% 
+  dplyr::filter( veg2 %in% c("Tundra", "boreal_forest", "temperate_forest", "tropical_evergreen_forest", "tropical_deciduous_forest", "tropical_savanna") ) %>% 
+  ggplot() +
+  geom_boxplot(aes(x = veg2, y = D95_extrapolated)) +
+  ylim(0,3)
+```
+
+Rooting depth vs. latitude.
+```{r}
+df_obs %>% 
+  mutate(tropical = ifelse(abs(Latitude)<30, TRUE, FALSE )) %>% 
+  mutate(D95_extrapolated_neg_log = -log(D95_extrapolated)) %>% 
+  dplyr::filter(abs(Latitude) <= 90) %>% 
+  ggplot() +
+  geom_point(aes(x = abs(Latitude), y = D95_extrapolated_neg_log, color = tropical))
+```
+
+Rooting depth vs. PET
+```{r}
+df_obs %>% 
+  dplyr::filter(PET>0) %>% 
+  ggplot() +
+  geom_point(aes(x = PET, y = D95_extrapolated * 100)) +
+  ylim(0, 500)
+```
+
+
+### Distribution of values
+
+```{r}
 # Look at distribution of global values and values in dataset.
-
 load("./data/df_40y_sr.Rdata")
 load("./data/df_40y_bl.Rdata")
 
@@ -101,10 +158,16 @@ The values of the points in the RPGE data are overlaid onto the rooting depth ma
 # plot_map( nc, lev = c(0,5,10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 10 )
 
 rasta <- brick("data/zroot_mct_40y_bl.nc")
+nbin <- 10
+
+df_sp <- as(rasta, "SpatialPixelsDataFrame")
+df <- as.data.frame(df_sp)
+names(df) <- c("layer", "x", "y")
+maxval <- quantile(df$layer, 0.99) %>% ceiling()
 
 gg <- plot_map2(
   rasta,
-  nbin = 10,
+  nbin = nbin,
   legend_title = expression(paste("z"[root], " (m)"))
   ) +
   labs(title = expression(paste("z"[root])))
@@ -135,82 +198,84 @@ We may argue that we cannot expect a global model that does not account for loca
 
 Let's discuss this further ...
 
-<!-- Distribution of values within Ahlstroem land classes. -->
-<!-- ```{r} -->
-<!-- df_anders <- nc_to_df( -->
-<!--   "/alphadata01/bstocker/data/landclass_ahlstroem/semiarid_shrub_savannah.nc",  -->
-<!--   varnam = "semidry shrub & savannah") %>%  -->
-<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
-<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
-<!--   rename( semiarid_shrub_savannah = myvar ) %>% -->
-<!--   left_join( -->
-<!--     nc_to_df( -->
-<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/forest_extratropical.nc",  -->
-<!--       varnam = "extra-tropical forest"), -->
-<!--     by = c("lon", "lat") -->
-<!--   ) %>%  -->
-<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
-<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
-<!--   rename( forest_extratropical = myvar ) %>% -->
-<!--   left_join( -->
-<!--     nc_to_df( -->
-<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/forest_tropical.nc",  -->
-<!--       varnam = "tropical forest"), -->
-<!--     by = c("lon", "lat") -->
-<!--   ) %>%  -->
-<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
-<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
-<!--   rename( forest_tropical = myvar ) %>% -->
-<!--   left_join( -->
-<!--     nc_to_df( -->
-<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/grassland_crops.nc",  -->
-<!--       varnam = "grasslands & crops"), -->
-<!--     by = c("lon", "lat") -->
-<!--   ) %>%  -->
-<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
-<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
-<!--   rename( grassland_crops = myvar ) %>% -->
-<!--   left_join( -->
-<!--     nc_to_df( -->
-<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/sparse_veg.nc",  -->
-<!--       varnam = "sparsely veg"), -->
-<!--     by = c("lon", "lat") -->
-<!--   ) %>%  -->
-<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
-<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%  -->
-<!--   rename( sparse_veg = myvar ) %>% -->
-<!--   left_join( -->
-<!--     nc_to_df( -->
-<!--       "/alphadata01/bstocker/data/landclass_ahlstroem/tundra_cool_shrub.nc",  -->
-<!--       varnam = "tundra & cool shrub"), -->
-<!--     by = c("lon", "lat") -->
-<!--   ) %>%  -->
-<!--   mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>% -->
-<!--   mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>% -->
-<!--   rename( tundra_cool_shrub = myvar ) %>%  -->
-<!--   tidyr::gather( -->
-<!--     landclass,  -->
-<!--     value,  -->
-<!--     c(semiarid_shrub_savannah, forest_extratropical, forest_tropical, grassland_crops, sparse_veg, tundra_cool_shrub)) %>%  -->
-<!--   dplyr::filter(value) %>%  -->
-<!--   dplyr::select(-value) -->
+Distribution of values within Ahlstroem land classes.
+```{r}
+df_anders <- nc_to_df(
+  "/alphadata01/bstocker/data/landclass_ahlstroem/semiarid_shrub_savannah.nc",
+  varnam = "semidry shrub & savannah") %>%
+  mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>%
+  mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%
+  rename( semiarid_shrub_savannah = myvar ) %>%
+  left_join(
+    nc_to_df(
+      "/alphadata01/bstocker/data/landclass_ahlstroem/forest_extratropical.nc",
+      varnam = "extra-tropical forest"),
+    by = c("lon", "lat")
+  ) %>%
+  mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>%
+  mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%
+  rename( forest_extratropical = myvar ) %>%
+  left_join(
+    nc_to_df(
+      "/alphadata01/bstocker/data/landclass_ahlstroem/forest_tropical.nc",
+      varnam = "tropical forest"),
+    by = c("lon", "lat")
+  ) %>%
+  mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>%
+  mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%
+  rename( forest_tropical = myvar ) %>%
+  left_join(
+    nc_to_df(
+      "/alphadata01/bstocker/data/landclass_ahlstroem/grassland_crops.nc",
+      varnam = "grasslands & crops"),
+    by = c("lon", "lat")
+  ) %>%
+  mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>%
+  mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%
+  rename( grassland_crops = myvar ) %>%
+  left_join(
+    nc_to_df(
+      "/alphadata01/bstocker/data/landclass_ahlstroem/sparse_veg.nc",
+      varnam = "sparsely veg"),
+    by = c("lon", "lat")
+  ) %>%
+  mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>%
+  mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%
+  rename( sparse_veg = myvar ) %>%
+  left_join(
+    nc_to_df(
+      "/alphadata01/bstocker/data/landclass_ahlstroem/tundra_cool_shrub.nc",
+      varnam = "tundra & cool shrub"),
+    by = c("lon", "lat")
+  ) %>%
+  mutate( myvar = ifelse(is.nan(myvar), NA, myvar)) %>%
+  mutate( myvar = ifelse(!is.na(myvar), TRUE, FALSE)) %>%
+  rename( tundra_cool_shrub = myvar ) %>%
+  tidyr::gather(
+    landclass,
+    value,
+    c(semiarid_shrub_savannah, forest_extratropical, forest_tropical, grassland_crops, sparse_veg, tundra_cool_shrub)) %>%
+  dplyr::filter(value) %>%
+  dplyr::select(-value)
 
-<!-- df_tmp <- df_tmp %>%  -->
-<!--   left_join(df_anders, by=c("lon", "lat")) -->
+save(df_anders, file = "data/df_anders.Rdata")
 
-<!-- ggplot() + -->
-<!--   geom_histogram( -->
-<!--     data = dplyr::filter(df_tmp, landclass == "semiarid_shrub_savannah"), -->
-<!--     aes(x = zroot/1000, y = ..count../sum(..count..), fill = method),  -->
-<!--     color = "black", alpha = 0.3, binwidth = 0.1,  -->
-<!--     position="identity") + -->
-<!--   xlim(0,10) + ylim(0, 0.08) + -->
+df_tmp <- df_tmp %>%
+  left_join(df_anders, by=c("lon", "lat"))
 
-<!-- ggplot() + -->
-<!--   geom_density( -->
-<!--     data = df_obs, -->
-<!--     aes(x = D95_extrapolated, y=..density..), color = "dodgerblue1", size = 1, show.legend = FALSE -->
-<!--     ) + -->
-<!--   geom_hline(yintercept = 0, color = "black") +   -->
-<!--   scale_fill_manual(name = "", values = c("black", "red"), labels = c("Balland", "SaxtonRawls")) -->
-<!-- ``` -->
+ggplot() +
+  geom_histogram(
+    data = dplyr::filter(df_tmp, landclass == "semiarid_shrub_savannah"),
+    aes(x = zroot/1000, y = ..count../sum(..count..), fill = method),
+    color = "black", alpha = 0.3, binwidth = 0.1,
+    position="identity") +
+  xlim(0,10) + ylim(0, 0.08) +
+
+ggplot() +
+  geom_density(
+    data = df_obs,
+    aes(x = D95_extrapolated, y=..density..), color = "dodgerblue1", size = 1, show.legend = FALSE
+    ) +
+  geom_hline(yintercept = 0, color = "black") +
+  scale_fill_manual(name = "", values = c("black", "red"), labels = c("Balland", "SaxtonRawls"))
+```

@@ -15,7 +15,7 @@ get_plantwhc_mct_global <- function(df, dir){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(as.list(812:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
+  df <- purrr::map_dfr(as.list(1:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
   
   return(df)
 }

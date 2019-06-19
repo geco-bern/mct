@@ -1,0 +1,133 @@
+---
+title: "Global run with maximum fAPAR"
+author: "Beni Stocker"
+date: "4/30/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+library(rbeni)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
+library(raster)
+library(stringr)
+```
+
+## Compare fAPAR vs. EVI 
+
+Use half-degree files and get the (linear) relationship between fAPAR and EVI in order to estimate fAPAR from EVI.
+```{r}
+df <- nc_to_df(
+  obj = "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/halfdeg/modis_vegetation__LPDAAC__v5__0.5deg_MEAN.nc",
+  varnam = "evi") %>% 
+  rename( evi = myvar ) %>% 
+  left_join( 
+    nc_to_df(
+      obj = "/alphadata01/bstocker/data/fAPAR/fAPAR3g_v2/fAPAR3g_v2_1982_2016_FILLED_MEAN.nc",
+      varnam = "FAPAR_FILLED") %>% rename( fapar3g = myvar ),
+    by = c("lon", "lat") ) %>% 
+  left_join(
+    nc_to_df(
+      obj = "/alphadata01/bstocker/data/landmasks/gicew_halfdeg.cdf",
+      varnam = "GICEW"
+    ) %>% rename( gicew = myvar ),
+    by = c("lon", "lat")
+  ) %>% 
+  rowwise() %>% 
+  mutate(evi = ifelse(gicew > 0.05, NA, evi),
+         fapar3g = ifelse(gicew > 0.05, NA, fapar3g))
+```
+
+```{r}
+out <- df %>% 
+  analyse_modobs2("evi", "fapar3g", type = "heat")
+out$gg +
+  labs( x = "EVI", y = "fAPAR3g")
+```
+
+That's a bit weird with these free-floating blobs there. Where are they
+```{r}
+df <- df %>% 
+  mutate( ratio_fapar_evi = fapar3g / evi ) %>% 
+  mutate( ratio_fapar_evi = remove_outliers(ratio_fapar_evi, coef = 5) )
+
+df %>% 
+  ggplot(aes(x = ratio_fapar_evi)) +
+  geom_histogram(color = "black", fill = "grey70") +
+  xlim(0,5)
+```
+
+```{r}
+plot_map2( dplyr::select(df, x = lon, y = lat, layer = ratio_fapar_evi), breaks = seq(2, 10, length.out = 11), centered = FALSE )
+```
+
+The difference between EVI and fAPAR3g is most pronounced at high latitudes. That's not going to be critical. Let's exclude all data above 60 degrees N. 
+```{r}
+df <- df %>% 
+  mutate(evi = ifelse(lat > 60, NA, evi),
+         fapar3g = ifelse(gicew > 60, NA, fapar3g))
+
+out <- df %>% 
+  analyse_modobs2("evi", "fapar3g", type = "heat")
+out$gg +
+  labs( x = "EVI", y = "fAPAR3g")
+```
+
+Still a weird blob for cells where EVI is very high. Tropics?
+```{r}
+load("data/df_anders.Rdata")
+df <- df %>% 
+  left_join(df_anders, by=c("lon", "lat")) %>% 
+  mutate(evi = ifelse(landclass == "forest_tropical", NA, evi),
+         fapar3g = ifelse(landclass == "forest_tropical", NA, fapar3g))
+
+out <- df %>% 
+  analyse_modobs2("evi", "fapar3g", type = "heat")
+out$gg +
+  labs( x = "EVI", y = "fAPAR3g")
+```
+
+Fit a GAM for the relationship.
+```{r}
+library(mgcv)
+library(mgcViz)
+df_fit <- df %>% 
+  tidyr::drop_na() %>% 
+  dplyr::filter(evi > 0.04 & evi < 0.53)
+
+gam_evi_fapar <- gam( fapar3g ~ s(evi), data = df_fit, method = "REML" )
+gam_evi_fapar <- getViz(gam_evi_fapar)
+gg2 <- plot( sm(gam_evi_fapar, 1) )
+
+gg2 + 
+  l_fitLine(colour = "red") + 
+  l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+  l_ciLine(mul = 5, colour = "red", linetype = 2) + 
+  l_points(shape = 19, size = 1, alpha = 0.1) + 
+  theme_classic()
+```
+
+Regrid EVI files from 0.05 to 0.5 degrees by maximum.
+```{r}
+filn <- "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/0_05deg/2001/modis_vegetation__LPDAAC__v5__0.05deg__200101.nc"
+out <- regrid_nc(obj = filn, varname = "evi", method = "max", outgrid = "halfdeg", returnobj = FALSE)
+
+files <- list.files(path = "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/0_05deg", pattern = "modis_vegetation__LPDAAC__v5__0.05deg", recursive = TRUE )
+
+files <- tibble(filnam = files) %>% 
+  dplyr::filter(!str_detect(filnam, "halfdeg")) %>% 
+  dplyr::select(filnam) %>% 
+  unlist() %>% 
+  unname()
+
+purrr::map(
+  as.list(files), 
+  regrid_nc(obj = ., varname = "evi", method = "max", outgrid = "halfdeg", returnobj = FALSE))
+```
+
