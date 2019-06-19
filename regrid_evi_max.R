@@ -7,6 +7,7 @@ files <- list.files(path = dirn, pattern = "modis_vegetation__LPDAAC__v5__0.05de
 
 files <- tibble(filnam = files) %>% 
   dplyr::filter(!str_detect(filnam, "halfdeg")) %>% 
+  dplyr::filter(str_detect(filnam, "201")) %>% 
   dplyr::select(filnam) %>% 
   unlist() %>% 
   unname() %>% 

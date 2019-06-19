@@ -17,6 +17,7 @@ library(tidyr)
 library(readr)
 library(raster)
 library(stringr)
+library(purrr)
 ```
 
 ## Compare fAPAR vs. EVI 
@@ -83,9 +84,9 @@ Still a weird blob for cells where EVI is very high. Tropics?
 ```{r}
 load("data/df_anders.Rdata")
 df <- df %>% 
-  left_join(df_anders, by=c("lon", "lat")) %>% 
+  left_join(df_anders, by=c("lon", "lat")) %>%
   mutate(evi = ifelse(landclass == "forest_tropical", NA, evi),
-         fapar3g = ifelse(landclass == "forest_tropical", NA, fapar3g))
+         fapar3g = ifelse(landclass == "forest_tropical", NA, fapar3g)) 
 
 out <- df %>% 
   analyse_modobs2("evi", "fapar3g", type = "heat")
@@ -99,7 +100,7 @@ library(mgcv)
 library(mgcViz)
 df_fit <- df %>% 
   tidyr::drop_na() %>% 
-  dplyr::filter(evi > 0.04 & evi < 0.53)
+  dplyr::filter(evi > 0.04 & evi < 0.55)
 
 gam_evi_fapar <- gam( fapar3g ~ s(evi), data = df_fit, method = "REML" )
 gam_evi_fapar <- getViz(gam_evi_fapar)
@@ -107,27 +108,44 @@ gg2 <- plot( sm(gam_evi_fapar, 1) )
 
 gg2 + 
   l_fitLine(colour = "red") + 
-  l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
+  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   l_ciLine(mul = 5, colour = "red", linetype = 2) + 
   l_points(shape = 19, size = 1, alpha = 0.1) + 
-  theme_classic()
+  theme_classic() +
+  xlim(0, 0.5) +
+  stat_smooth(method = "lm", col = "blue") +
+  labs(x = "EVI", y = "fAPAR3g")
+
+linmod <- lm(fapar3g ~ evi, data = df_fit)
 ```
+
+The linear regression fit seems quite ok. The coefficients for it are:
+```{r}
+print(coef(linmod))
+```
+
+## Regrid EVI files
+
+Do this on CX1. The code below is implemented in the script `regrid_evi_max.R`.
 
 Regrid EVI files from 0.05 to 0.5 degrees by maximum.
 ```{r}
-filn <- "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/0_05deg/2001/modis_vegetation__LPDAAC__v5__0.05deg__200101.nc"
-out <- regrid_nc(obj = filn, varname = "evi", method = "max", outgrid = "halfdeg", returnobj = FALSE)
-
-files <- list.files(path = "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/0_05deg", pattern = "modis_vegetation__LPDAAC__v5__0.05deg", recursive = TRUE )
+dirn <- "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/0_05deg/"
+files <- list.files(path = dirn, pattern = "modis_vegetation__LPDAAC__v5__0.05deg", recursive = TRUE )
 
 files <- tibble(filnam = files) %>% 
   dplyr::filter(!str_detect(filnam, "halfdeg")) %>% 
   dplyr::select(filnam) %>% 
   unlist() %>% 
-  unname()
+  unname() %>% 
+  paste0(dirn, .)
 
 purrr::map(
   as.list(files), 
-  regrid_nc(obj = ., varname = "evi", method = "max", outgrid = "halfdeg", returnobj = FALSE))
+  ~regrid_nc(obj = ., varname = "evi", method = "max", outgrid = "halfdeg", returnobj = FALSE))
 ```
+
+Then combine all regridded files into a single file using `./bash/combine_files_evi_zmaw.sh`.
+
+
 
