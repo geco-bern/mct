@@ -2,7 +2,7 @@
 
 here=`pwd`
 
-cd "/rds/general/user/bstocker/home/data/modis_monthly-evi/zmaw_data/0_05deg"
+cd /rds/general/user/bstocker/home/data/modis_monthly-evi/zmaw_data/0_05deg
 for iyr in `seq 2001 2015`
 do 
     cd "$iyr"
@@ -12,11 +12,11 @@ do
   #   	echo $imon
 		# cdo remapbil,${here}/halfdeg.txt modis_vegetation__LPDAAC__v5__0.05deg__${iyr}${imon}.nc modis_vegetation__LPDAAC__v5__0.5deg__${iyr}${imon}.nc
   #   done
-    cdo modis_vegetation__LPDAAC__v5__0.05deg__*_halfdeg.nc modis_vegetation__LPDAAC__v5__halfdeg_${iyr}.nc
+    cdo mergetime modis_vegetation__LPDAAC__v5__0.05deg__*_halfdeg.nc modis_vegetation__LPDAAC__v5__halfdegMAX_${iyr}.nc
     mv modis_vegetation__LPDAAC__v5__halfdeg_${iyr}.nc ..
     cd ..
 done
-cdo modis_vegetation__LPDAAC__v5__halfdeg_????.nc modis_vegetation__LPDAAC__v5__halfdeg.nc
+cdo mergetime modis_vegetation__LPDAAC__v5__halfdegMAX_????.nc modis_vegetation__LPDAAC__v5__halfdegMAX.nc
 cd $here
 
 # now run Ferret script fill_gaps_modis_evi.jnl
