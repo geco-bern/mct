@@ -18,4 +18,4 @@ files <- tibble(filnam = files) %>%
 
 purrr::map(
   as.list(files), 
-  ~regrid_nc(obj = ., varname = "evi", method = "max", outgrid = "halfdeg", returnobj = FALSE))
+  ~regrid_nc(obj = ., varname = "evi", method = "max", lonout = seq(-179.75, 179.75, by = 0.5), latout = seq(-89.75, 89.75, by = 0.5), returnobj = FALSE))
