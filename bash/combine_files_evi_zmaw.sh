@@ -12,6 +12,8 @@ do
     cd ..
 done
 cdo mergetime modis_vegetation__LPDAAC__v5__halfdegMAX_????.nc modis_vegetation__LPDAAC__v5__halfdegMAX.nc
+#cdo -O invertlat modis_vegetation__LPDAAC__v5__halfdegMAX.nc modis_vegetation__LPDAAC__v5__halfdegMAX.nc
+mv modis_vegetation__LPDAAC__v5__halfdegMAX.nc ../halfdeg/
 cd $here
 
 # now run Ferret script fill_gaps_modis_evi.jnl

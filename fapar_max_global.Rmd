@@ -145,7 +145,8 @@ purrr::map(
   ~regrid_nc(obj = ., varname = "evi", method = "max", outgrid = "halfdeg", returnobj = FALSE))
 ```
 
-Then combine all regridded files into a single file using `./bash/combine_files_evi_zmaw.sh`.
+Then combine all regridded files into a single file using `./bash/combine_files_evi_zmaw.sh` and extend to additional time steps and missing values on grid by `./extend_evi_zmaw.R`.
+
 
 
 
