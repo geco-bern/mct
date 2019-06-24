@@ -11,7 +11,7 @@ source("R/mct.R")
 source("R/get_plantwhc_mct_bysite.R")
 source("R/get_plantwhc_mct_global.R")
 
-dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
+dir <- "~/sofun/output_nc_global_sofun/"
 gridfile <- "./data/df_grid.Rdata"
 if (file.exists(gridfile)){
   load(gridfile)

@@ -1,4 +1,5 @@
-get_plantwhc_mct_bysite <- function( df, 
+get_plantwhc_mct_bysite <- function( 
+  df, 
   settings=list(method_mct="threshbal", thresh_deficit=0.5),
   return_period=c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800) ){
 
