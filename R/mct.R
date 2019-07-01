@@ -1,4 +1,4 @@
-mct <- function(df, method="threshbal", thresh_deficit=0.5){
+mct <- function(df, varname_wbal, method="threshbal", thresh_deficit=0.5){
   
   inst <- tibble()
   idx <- 0
@@ -9,7 +9,7 @@ mct <- function(df, method="threshbal", thresh_deficit=0.5){
     idx <- idx + 1
     
     ## if the water balance (deficit = prec - pet*fv) is negative, start accumulating deficit
-    if (df$wbal[idx]<0){
+    if (df[[ varname_wbal ]][idx]<0){
       
       deficit <- 0
       if (method=="threshbal") max_deficit <- 0
@@ -17,16 +17,16 @@ mct <- function(df, method="threshbal", thresh_deficit=0.5){
       
       if (method=="posbal"){
         ## continue accumulating deficit as long as the water balance is negative
-        while (iidx <= (nrow(df)-1) && df$wbal[iidx]<0){
-          deficit <- deficit - df$wbal[iidx]
+        while (iidx <= (nrow(df)-1) && df[[ varname_wbal ]][iidx]<0){
+          deficit <- deficit - df[[ varname_wbal ]][iidx]
           df$deficit[iidx] <- deficit
           iidx <- iidx + 1
         }
         
       } else if (method=="threshbal"){
         ## continue accumulating deficit as long as the deficit is not recuded by more than (thresh_deficit*100) % 
-        while (iidx <= (nrow(df)-1) && (deficit - df$wbal[iidx] > (1-thresh_deficit) * max_deficit)){
-          deficit <- deficit - df$wbal[iidx]
+        while (iidx <= (nrow(df)-1) && (deficit - df[[ varname_wbal ]][iidx] > (1-thresh_deficit) * max_deficit)){
+          deficit <- deficit - df[[ varname_wbal ]][iidx]
           if (deficit>max_deficit) max_deficit <- deficit
           df$deficit[iidx] <- deficit
           iidx <- iidx + 1

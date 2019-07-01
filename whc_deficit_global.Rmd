@@ -23,20 +23,20 @@ library(readr)
 source("R/mct.R")
 source("R/get_plantwhc_mct_bysite.R")
 source("R/get_plantwhc_mct_global.R")
-source("R/convert_df_mct_to_grid.R")
 ```
 
 Invoke all at once. This takes several days. Chunks of data are written to `./data/df_plantwhc_mct<i>.Rdata`, where `i` runs from 1 to 1000.
-```{r}
-dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
-gridfile <- "./data/df_grid.Rdata"
-if (file.exists(gridfile)){
-  load(gridfile)
-} else {
-  df_grid <- get_df_landmask(dir)
-  save(df_grid, file = gridfile)
-}
-df_mct <- get_plantwhc_mct_global(df_grid, dir)
+```{r eval=FALSE}
+## DO THIS BETTER WITH rscript_mct_global.R
+# dir <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
+# gridfile <- "./data/df_grid.Rdata"
+# if (file.exists(gridfile)){
+#   load(gridfile)
+# } else {
+#   df_grid <- get_df_landmask(dir)
+#   save(df_grid, file = gridfile)
+# }
+# df_mct <- get_plantwhc_mct_global(df_grid, dir)
 ```
 
 Read chunks of output data files generated above into one data frame
@@ -45,12 +45,11 @@ read_onefile <- function(path){
   load(path)
   return(df)
 }
-data_path <- "./data/"
+data_path <- "./data/v2/"
 files <-  list.files(data_path, pattern = "df_plantwhc_mct")
-# files <- files[1:10]
 df_mct <- purrr::map_dfr( files, ~read_onefile(paste0(data_path, .))) %>% 
   unnest(out_ilon_ilat)
-save(df_mct, file = "data/df_mct.Rdata")
+save(df_mct, file = "data/df_mct_v2.Rdata")
 ```
 
 Extract return level (mm) for a given return period (yr) and convert data frame to an array (grid).

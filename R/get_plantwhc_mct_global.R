@@ -24,7 +24,7 @@ get_plantwhc_mct_global <- function(df, dir){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(as.list(1:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
+  df <- purrr::map_dfr(as.list(790:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
     
   return(df)
 }
@@ -82,13 +82,30 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
     print("... done.")
     
     ## interpolate to daily values for fapar
-    ddf <- ddf %>% 
-      mutate(fapar = myapprox(evi)) %>% 
-      cutna_headtail_df("fapar", extend = TRUE) %>% 
-    
-      ## calculate daily water balance
-      rowwise() %>% 
-      mutate(wbal = water_to_soil - fapar * pet)
+    if (sum(!is.na(ddf$evi))>1){
+      
+      ddf$fapar <- approx( ddf$evi, xout = 1:length(ddf$evi) )$y
+      
+      ddf <- ddf %>% 
+        # mutate(fapar = myapprox(evi)) %>%
+        cutna_headtail_df("fapar", extend = TRUE) %>% 
+        
+        ## calculate daily water balance
+        rowwise() %>% 
+        mutate(wbal = water_to_soil - fapar * pet)
+      
+      # library(ggplot2)
+      # gg <- ggplot2::ggplot(ddf) +
+      #   geom_line(aes(x=date, y=fapar)) +
+      #   geom_point(aes(x=date, y=evi), color="red")
+      # print(gg)
+      
+    } else {
+      
+      ddf <- ddf %>% 
+        mutate(fapar = NA, wbal = NA)
+      
+    }
     
     ## calculate whc_mct given daily climate data
     print("get plantwhc by site ...")
@@ -96,7 +113,7 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
     ##----------------------------------------------
     ## call the MCT function
     ##----------------------------------------------
-    out_plantwhc_mct <- withTimeout(get_plantwhc_mct_bysite(ddf), timeout = 60, onTimeout = "warning")
+    out_plantwhc_mct <- withTimeout( get_plantwhc_mct_bysite(ddf), varname_wbal = "wbal", timeout = 60, onTimeout = "warning")
     ##----------------------------------------------
     
     if (typeof(out_plantwhc_mct)=="character"){
@@ -203,7 +220,7 @@ read_nc_gridcell <- function(ilon, ilat, dir){
     pet = 1.0
     # pet = pet
     ) %>% 
-    mutate(year = year(date), doy = yday(date))
+    mutate(year = year(date), doy = yday(date), moy = month(date))
   
   ##-------------------------------------------------
   ## fAPAR as EVI
@@ -219,37 +236,74 @@ read_nc_gridcell <- function(ilon, ilat, dir){
     sink()
     unlink(paste0(filn, ".txt"))
   }
-  
+
+
   time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
   ## convert to date
   if (nc$dim$time$units=="days since 2001-1-1 0:0:0"){
     date2 <- conv_noleap_to_ymd(time2, origin = lubridate::ymd("2001-01-01"))
   }
   
+  ## override
+  date2 <- seq(from = ymd("2000-01-01"), to = ymd("2015-12-01"), by = "months") + days(14)
+  
+  # get evi from NetCDF
   evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
+  
   ncdf4::nc_close(nc)
   
   df2 <- tibble(date = date2, evi = evi) %>% 
-    mutate(year = year(date2), doy = yday(date2))
+    mutate(year = year(date2), moy = month(date)) #
   
-  ## do it in two steps. First years 1982-2000: each year the same.
-  df_top1 <- df1 %>% 
-    dplyr::filter(year %in% 1982:2000)
-  df_top2 <- df2 %>% 
-    dplyr::filter(year == 2000)
-  df_top <- df_top1 %>% 
-    left_join( dplyr::select(df_top2, -date, -year), by = "doy")
+  # gg <- ggplot(df2) +
+  #   geom_line(aes(x = date, y = evi)) +
+  #   labs( title = paste("ilon:", as.character(ilon), " ilat:", as.character(ilat)) )
+  # print(gg)
+  
+  ## first take mean seasonality (is stored in year 2000)
+  df2_meandoy <- df2 %>%
+    dplyr::filter(year == 2000) %>%
+    dplyr::select(-date, -year) %>%
+    dplyr::rename(evi_meandoy = evi)
 
-  df_bottom1 <- df1 %>% 
-    dplyr::filter(year %in% 2001:2015)
-  df_bottom2 <- df2 %>% 
-    dplyr::filter(year %in% 2001:2015)
-  df_bottom <- df_bottom1 %>% 
-    left_join( dplyr::select(df_bottom2, -date), by = c("year", "doy"))
-  
-  
-  df <- bind_rows(df_top, df_bottom) 
+  ## merge mean seasonality (evi_meandoy) into the main df
+  df <- df1 %>%
+    left_join(df2_meandoy, by = "moy")
+
+  ## merge actual evi into main df
+  df <- df %>%
+    left_join(dplyr::select(df2, year, moy, evi), by = c("year", "moy")) %>% 
+    mutate(dom = mday(date)) %>% 
     
+    # fill up years before 2000 with mean seasonality (2000 has already mean seasonality)
+    rowwise() %>% 
+    mutate(evi = ifelse(is.na(evi), evi_meandoy, evi)) %>% 
+    
+    # remove again all days data except the 15th of each month
+    mutate(evi = ifelse(dom==15, evi, NA)) %>% 
+    dplyr::select(-dom, -evi_meandoy, -year, -moy, -doy)
+
+  # gg <- ggplot(df) +
+  #   geom_point(aes(x=date, y=evi))
+  # print(gg)
+  
+  # ## do it in two steps. First years 1982-2000: each year the same.
+  # df_top1 <- df1 %>% 
+  #   dplyr::filter(year %in% 1982:2000)
+  # df_top2 <- df2 %>% 
+  #   dplyr::filter(year == 2000)
+  # df_top <- df_top1 %>% 
+  #   left_join( dplyr::select(df_top2, -date, -year), by = "doy")
+  # 
+  # df_bottom1 <- df1 %>% 
+  #   dplyr::filter(year %in% 2001:2015)
+  # df_bottom2 <- df2 %>% 
+  #   dplyr::filter(year %in% 2001:2015)
+  # df_bottom <- df_bottom1 %>% 
+  #   left_join( dplyr::select(df_bottom2, -date), by = c("year", "doy"))
+  # 
+  # df <- bind_rows(df_top, df_bottom) 
+  #   
   return(df)
 }
 
