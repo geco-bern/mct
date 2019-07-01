@@ -13,7 +13,6 @@ get_plantwhc_mct_global <- function(df, dir){
   # ## preprocess data: DOES NOT MAKE SENSE!!!
   # ## 1. Convert arrays (lon-lat-time) from annual output files to 
   # ##    nested data frames and save as Rdata files.
-  # dir <- "~/sofun/output_nc_global_sofun/"
   # #filn <- paste0(dir, "s1_fapar3g_v3_global.", as.character(year), ".d.wbal.nc")
   # list_filn <- list.files(path = dir, pattern = "s1_fapar3g_v4_global.*.d.wbal.nc")
   # list_nc <- purrr::map(list_filn, ~read_nc_onefile(paste0(dir, .)))
@@ -24,7 +23,7 @@ get_plantwhc_mct_global <- function(df, dir){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(as.list(790:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
+  df <- purrr::map_dfr(as.list(1:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
     
   return(df)
 }
@@ -49,7 +48,7 @@ get_plantwhc_mct_chunk <- function(df, dir, idx){
   # save(df2, file = outfil)
   # print("... done.")
   
-  outfil <- paste0("./data/df_plantwhc_mct", as.character(idx), ".Rdata")
+  outfil <- paste0("./data/v2/df_plantwhc_mct", as.character(idx), ".Rdata")
   print(paste("Saving to", outfil, "..."))
   save(df, file = outfil)
   print("... done.")
@@ -93,13 +92,7 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
         ## calculate daily water balance
         rowwise() %>% 
         mutate(wbal = water_to_soil - fapar * pet)
-      
-      # library(ggplot2)
-      # gg <- ggplot2::ggplot(ddf) +
-      #   geom_line(aes(x=date, y=fapar)) +
-      #   geom_point(aes(x=date, y=evi), color="red")
-      # print(gg)
-      
+
     } else {
       
       ddf <- ddf %>% 
@@ -197,33 +190,33 @@ read_nc_gridcell <- function(ilon, ilat, dir){
   wbal <- ncdf4::ncvar_get(nc, "wbal", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
   ncdf4::nc_close(nc)
   
-  ##-------------------------------------------------
-  ## PET
-  ##-------------------------------------------------
-  # filn <- paste0(dir, "s1_fapar3g_v3_global.d.pet.nc")
-  # 
-  # nc <- ncdf4::nc_open(filn)
-  # # Save the print(nc) dump to a text file
-  # {
-  #   sink(paste0(filn, ".txt"))
-  #   print(nc)
-  #   sink()
-  #   unlink(paste0(filn, ".txt"))
-  # }
-  # 
-  # pet <- ncdf4::ncvar_get(nc, "pet", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
-  # ncdf4::nc_close(nc)  
+  #-------------------------------------------------
+  # PET
+  #-------------------------------------------------
+  filn <- paste0(dir, "s1_fapar3g_v4_global.d.pet.nc")
 
+  nc <- ncdf4::nc_open(filn)
+  # Save the print(nc) dump to a text file
+  {
+    sink(paste0(filn, ".txt"))
+    print(nc)
+    sink()
+    unlink(paste0(filn, ".txt"))
+  }
+
+  pet <- ncdf4::ncvar_get(nc, "pet", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
+  ncdf4::nc_close(nc)
+
+  # data frame with SOFUN outputs
   df1 <- tibble(
     date = date, 
     water_to_soil = wbal,
-    pet = 1.0
-    # pet = pet
+    pet = pet
     ) %>% 
     mutate(year = year(date), doy = yday(date), moy = month(date))
   
   ##-------------------------------------------------
-  ## fAPAR as EVI
+  ## fAPAR as EVI (ZMAW data)
   ##-------------------------------------------------
   dir2 <- "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/halfdeg/"
   filn <- paste0(dir2, "modis_vegetation__LPDAAC__v5__halfdegMAX_mean2000.nc")
@@ -237,7 +230,6 @@ read_nc_gridcell <- function(ilon, ilat, dir){
     unlink(paste0(filn, ".txt"))
   }
 
-
   time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
   ## convert to date
   if (nc$dim$time$units=="days since 2001-1-1 0:0:0"){
@@ -248,7 +240,8 @@ read_nc_gridcell <- function(ilon, ilat, dir){
   date2 <- seq(from = ymd("2000-01-01"), to = ymd("2015-12-01"), by = "months") + days(14)
   
   # get evi from NetCDF
-  evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
+  # evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
+  evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,12))
   
   ncdf4::nc_close(nc)
   
@@ -270,40 +263,24 @@ read_nc_gridcell <- function(ilon, ilat, dir){
   df <- df1 %>%
     left_join(df2_meandoy, by = "moy")
 
-  ## merge actual evi into main df
-  df <- df %>%
-    left_join(dplyr::select(df2, year, moy, evi), by = c("year", "moy")) %>% 
-    mutate(dom = mday(date)) %>% 
-    
-    # fill up years before 2000 with mean seasonality (2000 has already mean seasonality)
-    rowwise() %>% 
-    mutate(evi = ifelse(is.na(evi), evi_meandoy, evi)) %>% 
-    
-    # remove again all days data except the 15th of each month
-    mutate(evi = ifelse(dom==15, evi, NA)) %>% 
-    dplyr::select(-dom, -evi_meandoy, -year, -moy, -doy)
-
-  # gg <- ggplot(df) +
-  #   geom_point(aes(x=date, y=evi))
-  # print(gg)
+  ## MEAN SEASONAL CYCLE: take evi as evi_meandoy
+  df <- df %>% 
+    mutate(evi = evi_meandoy)
   
-  # ## do it in two steps. First years 1982-2000: each year the same.
-  # df_top1 <- df1 %>% 
-  #   dplyr::filter(year %in% 1982:2000)
-  # df_top2 <- df2 %>% 
-  #   dplyr::filter(year == 2000)
-  # df_top <- df_top1 %>% 
-  #   left_join( dplyr::select(df_top2, -date, -year), by = "doy")
-  # 
-  # df_bottom1 <- df1 %>% 
-  #   dplyr::filter(year %in% 2001:2015)
-  # df_bottom2 <- df2 %>% 
-  #   dplyr::filter(year %in% 2001:2015)
-  # df_bottom <- df_bottom1 %>% 
-  #   left_join( dplyr::select(df_bottom2, -date), by = c("year", "doy"))
-  # 
-  # df <- bind_rows(df_top, df_bottom) 
+  # ## ACTUAL EVI FOR POST-2000: merge actual evi into main df
+  # df <- df %>%
+  #   left_join(dplyr::select(df2, year, moy, evi), by = c("year", "moy")) %>% 
+  #   mutate(dom = mday(date)) %>% 
   #   
+  #   # fill up years before 2000 with mean seasonality (2000 has already mean seasonality)
+  #   rowwise() %>% 
+  #   mutate(evi = ifelse(is.na(evi), evi_meandoy, evi)) %>% 
+  #   
+  #   # remove again all days data except the 15th of each month
+  #   mutate(evi = ifelse(dom==15, evi, NA)) %>% 
+  #   dplyr::select(-dom, -evi_meandoy, -year, -moy, -doy)
+
+  
   return(df)
 }
 
