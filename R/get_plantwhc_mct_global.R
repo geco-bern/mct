@@ -8,7 +8,7 @@
 #' (containing all time steps' data for each gridcell.)
 #' @export
 #'
-get_plantwhc_mct_global <- function(df, dir){
+get_plantwhc_mct_global <- function(df, dir, fapar_source = "fAPAR3g"){
 
   # ## preprocess data: DOES NOT MAKE SENSE!!!
   # ## 1. Convert arrays (lon-lat-time) from annual output files to 
@@ -23,19 +23,19 @@ get_plantwhc_mct_global <- function(df, dir){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(as.list(1:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, . ))
+  df <- purrr::map_dfr(as.list(1:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, ., fapar_source = fapar_source))
     
   return(df)
 }
 
-get_plantwhc_mct_chunk <- function(df, dir, idx){
+get_plantwhc_mct_chunk <- function(df, dir, idx, fapar_source = "fAPAR3g"){
   
   print("----------------")
   print(paste("DOIN IT BY CHUNK", as.character(idx)))
   print("----------------")
   
   df <- df %>% 
-    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, dir)))
+    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, dir, fapar_source = fapar_source)))
   
   # outfil <- "./data/df_plantwhc_mct.Rdata"
   # if (file.exists(outfil)){
@@ -48,7 +48,7 @@ get_plantwhc_mct_chunk <- function(df, dir, idx){
   # save(df2, file = outfil)
   # print("... done.")
   
-  outfil <- paste0("./data/v2/df_plantwhc_mct", as.character(idx), ".Rdata")
+  outfil <- paste0("./data/v3/df_plantwhc_mct", as.character(idx), ".Rdata")
   print(paste("Saving to", outfil, "..."))
   save(df, file = outfil)
   print("... done.")
@@ -62,13 +62,13 @@ get_plantwhc_mct_chunk <- function(df, dir, idx){
   return(df)
 }
 
-get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
+get_plantwhc_mct_gridcell <- function(ilon, ilat, dir, fapar_source = "fAPAR3g"){
   
   print(paste("doin it by gridcell:", as.character(ilon), as.character(ilat)))
   
   ## read daily climate data (prec, PET, fAPAR) for this gridcell
   print("reading nc file...")
-  ddf <- withTimeout(read_nc_gridcell(ilon, ilat, dir), timeout = 60, onTimeout = "warning")
+  ddf <- withTimeout(read_nc_gridcell(ilon, ilat, dir, fapar_source = fapar_source), timeout = 60, onTimeout = "warning")
   if (typeof(ddf)=="character"){
     return_period <- c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800)
     out_plant_whc <- tibble(
@@ -81,20 +81,27 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir){
     print("... done.")
     
     ## interpolate to daily values for fapar
-    if (sum(!is.na(ddf$evi))>1){
+    if (sum(!is.na(ddf$fapar))>1){
       
-      ddf$fapar <- approx( ddf$evi, xout = 1:length(ddf$evi) )$y
+      # ddf$fapar <- approx( ddf$evi, xout = 1:length(ddf$evi) )$y
       
       ddf <- ddf %>% 
-        # mutate(fapar = myapprox(evi)) %>%
+        
+        ## interpolate fapar
+        rename(fapar_readin = fapar) %>% 
+        mutate(fapar = myapprox(fapar_readin)) %>%
         cutna_headtail_df("fapar", extend = TRUE) %>% 
         
         ## calculate daily water balance
         rowwise() %>% 
         mutate(wbal = water_to_soil - fapar * pet)
 
+      # ggplot(ddf, aes(x = date)) +
+      #   geom_line( aes(y = fapar) ) +
+      #   geom_point( aes(y = fapar_readin), color = "red")
+
     } else {
-      
+      print("WARNING: No fAPAR data for this cell.")
       ddf <- ddf %>% 
         mutate(fapar = NA, wbal = NA)
       
@@ -164,7 +171,7 @@ get_df_landmask <- function(dir){
 }
 
 
-read_nc_gridcell <- function(ilon, ilat, dir){
+read_nc_gridcell <- function(ilon, ilat, dir, fapar_source = "fAPAR3g"){
   
   ##-------------------------------------------------
   ## WBAL: in SOFUN output it's liquid-water-to-soil 
@@ -215,72 +222,154 @@ read_nc_gridcell <- function(ilon, ilat, dir){
     ) %>% 
     mutate(year = year(date), doy = yday(date), moy = month(date))
   
-  ##-------------------------------------------------
-  ## fAPAR as EVI (ZMAW data)
-  ##-------------------------------------------------
-  dir2 <- "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/halfdeg/"
-  filn <- paste0(dir2, "modis_vegetation__LPDAAC__v5__halfdegMAX_mean2000.nc")
-  
-  nc <- ncdf4::nc_open(filn)
-  # Save the print(nc) dump to a text file
-  {
-    sink(paste0(filn, ".txt"))
-    print(nc)
-    sink()
-    unlink(paste0(filn, ".txt"))
+  if (fapar_source == "EVI"){
+    ##-------------------------------------------------
+    ## fAPAR as EVI (ZMAW data)
+    ##-------------------------------------------------
+    dir2 <- "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/halfdeg/"
+    filn <- paste0(dir2, "modis_vegetation__LPDAAC__v5__halfdegMAX_mean2000.nc")
+    
+    nc <- ncdf4::nc_open(filn)
+    # Save the print(nc) dump to a text file
+    {
+      sink(paste0(filn, ".txt"))
+      print(nc)
+      sink()
+      unlink(paste0(filn, ".txt"))
+    }
+    
+    time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
+    ## convert to date
+    if (nc$dim$time$units=="days since 2001-1-1 0:0:0"){
+      date2 <- conv_noleap_to_ymd(time2, origin = lubridate::ymd("2001-01-01"))
+    }
+    
+    ## override
+    date2 <- seq(from = ymd("2000-01-01"), to = ymd("2015-12-01"), by = "months") + days(14)
+    
+    # get evi from NetCDF
+    # evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
+    evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,12))
+    
+    ncdf4::nc_close(nc)
+    
+    df2 <- tibble(date = date2, evi = evi) %>% 
+      mutate(year = year(date2), moy = month(date)) #
+    
+    # gg <- ggplot(df2) +
+    #   geom_line(aes(x = date, y = evi)) +
+    #   labs( title = paste("ilon:", as.character(ilon), " ilat:", as.character(ilat)) )
+    # print(gg)
+    
+    ## first take mean seasonality (is stored in year 2000)
+    df2_meandoy <- df2 %>%
+      dplyr::filter(year == 2000) %>%
+      dplyr::select(-date, -year) %>%
+      dplyr::rename(evi_meandoy = evi)
+    
+    ## merge mean seasonality (evi_meandoy) into the main df
+    df <- df1 %>%
+      left_join(dplyr::select(df2_meandoy, -date), by = "moy")
+    
+    ## MEAN SEASONAL CYCLE: take evi as evi_meandoy
+    df <- df %>% 
+      mutate(evi = evi_meandoy)
+    
+    # ## ACTUAL EVI FOR POST-2000: merge actual evi into main df
+    # df <- df %>%
+    #   left_join(dplyr::select(df2, year, moy, evi), by = c("year", "moy")) %>% 
+    #   mutate(dom = mday(date)) %>% 
+    #   
+    #   # fill up years before 2000 with mean seasonality (2000 has already mean seasonality)
+    #   rowwise() %>% 
+    #   mutate(evi = ifelse(is.na(evi), evi_meandoy, evi)) %>% 
+    #   
+    #   # remove again all days data except the 15th of each month
+    #   mutate(evi = ifelse(dom==15, evi, NA)) %>% 
+    #   dplyr::select(-dom, -evi_meandoy, -year, -moy, -doy)    
+    
+  } else if (fapar_source == "fAPAR3g") {
+    ##-------------------------------------------------
+    ## MEAN SEASONAL CYCLE fAPAR from fAPAR3g3g v2
+    ##-------------------------------------------------
+    dir2 <- "~/data/fAPAR/fAPAR3g_v2_halfdeg_max/"
+    filn <- paste0(dir2, "fAPAR3g_v2_halfdeg_max_1982_2011.nc")
+    
+    nc <- ncdf4::nc_open(filn)
+    # Save the print(nc) dump to a text file
+    {
+      sink(paste0(filn, ".txt"))
+      print(nc)
+      sink()
+      unlink(paste0(filn, ".txt"))
+    }
+    
+    time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
+    
+    ## override
+    date2 <- seq(from = ymd("1982-01-01"), to = ymd("2011-12-01"), by = "months") + days(14)
+    
+    # get fapar from NetCDF
+    fapar <- ncdf4::ncvar_get(nc, "fapar", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
+
+    ncdf4::nc_close(nc)
+    
+    df2 <- tibble(date = date2, fapar = fapar) %>% 
+      mutate(year = year(date2), moy = month(date2))
+        
+    ## merge into the main df
+    df <- df1 %>%
+      left_join(dplyr::select(df2, -date), by = c("year", "moy")) %>% 
+
+      # remove again all days data except the 15th of each month
+      mutate(dom = mday(date)) %>%
+      mutate(fapar = ifelse(dom==15, fapar, NA)) %>%
+      dplyr::select(-dom, -moy) %>% 
+      
+      # remove years beyond 2011
+      dplyr::filter(year <= 2011)
+    
+    
+  } else if (fapar_source == "fAPAR3g_meandoy") {
+    ##-------------------------------------------------
+    ## MEAN SEASONAL CYCLE fAPAR from fAPAR3g3g v2
+    ##-------------------------------------------------
+    dir2 <- "~/data/fAPAR/fAPAR3g_v2_halfdeg_max/"
+    filn <- paste0(dir2, "fAPAR3g_v2_halfdeg_max_YMONMEAN.nc")
+    
+    nc <- ncdf4::nc_open(filn)
+    # Save the print(nc) dump to a text file
+    {
+      sink(paste0(filn, ".txt"))
+      print(nc)
+      sink()
+      unlink(paste0(filn, ".txt"))
+    }
+    
+    time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
+    
+    ## override
+    date2 <- seq(from = ymd("2000-01-01"), to = ymd("2000-12-01"), by = "months") + days(14)
+    
+    # get fapar from NetCDF
+    fapar <- ncdf4::ncvar_get(nc, "fapar", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
+    
+    ncdf4::nc_close(nc)
+    
+    df2 <- tibble(date = date2, fapar = fapar) %>% 
+      mutate(moy = month(date))
+    
+    ## merge mean seasonality into the main df
+    df <- df1 %>%
+      left_join(dplyr::select(df2, -date), by = "moy") %>% 
+      mutate(dom = mday(date)) %>%
+      
+      # remove again all days data except the 15th of each month
+      mutate(fapar = ifelse(dom==15, fapar, NA)) %>%
+      dplyr::select(-dom, -moy)
+    
   }
 
-  time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
-  ## convert to date
-  if (nc$dim$time$units=="days since 2001-1-1 0:0:0"){
-    date2 <- conv_noleap_to_ymd(time2, origin = lubridate::ymd("2001-01-01"))
-  }
-  
-  ## override
-  date2 <- seq(from = ymd("2000-01-01"), to = ymd("2015-12-01"), by = "months") + days(14)
-  
-  # get evi from NetCDF
-  # evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
-  evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,12))
-  
-  ncdf4::nc_close(nc)
-  
-  df2 <- tibble(date = date2, evi = evi) %>% 
-    mutate(year = year(date2), moy = month(date)) #
-  
-  # gg <- ggplot(df2) +
-  #   geom_line(aes(x = date, y = evi)) +
-  #   labs( title = paste("ilon:", as.character(ilon), " ilat:", as.character(ilat)) )
-  # print(gg)
-  
-  ## first take mean seasonality (is stored in year 2000)
-  df2_meandoy <- df2 %>%
-    dplyr::filter(year == 2000) %>%
-    dplyr::select(-date, -year) %>%
-    dplyr::rename(evi_meandoy = evi)
-
-  ## merge mean seasonality (evi_meandoy) into the main df
-  df <- df1 %>%
-    left_join(df2_meandoy, by = "moy")
-
-  ## MEAN SEASONAL CYCLE: take evi as evi_meandoy
-  df <- df %>% 
-    mutate(evi = evi_meandoy)
-  
-  # ## ACTUAL EVI FOR POST-2000: merge actual evi into main df
-  # df <- df %>%
-  #   left_join(dplyr::select(df2, year, moy, evi), by = c("year", "moy")) %>% 
-  #   mutate(dom = mday(date)) %>% 
-  #   
-  #   # fill up years before 2000 with mean seasonality (2000 has already mean seasonality)
-  #   rowwise() %>% 
-  #   mutate(evi = ifelse(is.na(evi), evi_meandoy, evi)) %>% 
-  #   
-  #   # remove again all days data except the 15th of each month
-  #   mutate(evi = ifelse(dom==15, evi, NA)) %>% 
-  #   dplyr::select(-dom, -evi_meandoy, -year, -moy, -doy)
-
-  
   return(df)
 }
 

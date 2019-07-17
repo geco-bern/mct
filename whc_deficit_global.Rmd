@@ -40,106 +40,102 @@ Invoke all at once. This takes several days. Chunks of data are written to `./da
 # df_mct <- get_plantwhc_mct_global(df_grid, dir)
 ```
 
-Read chunks of output data files generated above into one data frame
+Read chunks of output data files generated above into one data frame.
 ```{r}
 read_onefile <- function(path){
   load(path)
   return(df)
 }
-data_path <- "./data/v2/"
+data_path <- "./data/v3/"
 files <-  list.files(data_path, pattern = "df_plantwhc_mct")
 df_mct <- purrr::map_dfr( files, ~read_onefile(paste0(data_path, .))) %>% 
   unnest(out_ilon_ilat)
-save(df_mct, file = "data/df_mct_v2.Rdata")
+save(df_mct, file = "data/df_mct_v3.Rdata")
 ```
 
 Extract return level (mm) for a given return period (yr) and convert data frame to an array (grid).
 ```{r}
 ## Load v1 (grid) file (NetCDF)
-nc_20y <- read_nc_onefile("data/whc_mct_20y_v1.nc")
-nc_40y <- read_nc_onefile("data/whc_mct_40y_v1.nc")
-df_mct_v1 <- tibble( return_level_20y = c(nc_20y$vars$whc_mct_20y),
-                     return_level_40y = c(nc_40y$vars$whc_mct_40y)) %>% 
+df_mct_v1 <- nc_to_df("data/whc_mct_20y_v1.nc") %>% rename(return_level_20y = myvar) %>% 
+  left_join(
+    nc_to_df("data/whc_mct_40y_v1.nc") %>% rename(return_level_40y = myvar),
+    by = c("lon", "lat")
+  ) %>% 
   tidyr::drop_na()
 
-## v2 data
-load("data/df_mct_v2.Rdata")
-df_mct_v2 <- df_mct
+## v3 data
+load("data/df_mct_v3.Rdata")
+df_mct_v3 <- df_mct
 rm("df_mct")
 
-df_mct_v2 <- df_mct_v2 %>% 
+df_mct_v3 <- df_mct_v3 %>% 
   mutate(return_level_20y = purrr::map(data, ~slice(., 4))) %>%   # 20-year return period is the 4th row
   mutate(return_level_20y = purrr::map_dbl(return_level_20y, 2)) %>% 
   mutate(return_level_40y = purrr::map(data, ~slice(., 6))) %>%   # 40-year return period is the 6th row
   mutate(return_level_40y = purrr::map_dbl(return_level_40y, 2))
 ```
 
+Plot distribution of water deficits with a 20-year return period.
 ```{r}
-# df_mct_v1 %>% 
-#   ggplot(aes(x = return_level_20y)) +
-#   geom_histogram() +
-#   xlim(0,10)
+df_tmp <- df_mct_v3 %>% 
+  dplyr::select(return_level_20y, return_level_40y) %>% 
+  mutate( version = "v3" ) %>% 
+  bind_rows(df_mct_v1 %>% 
+              mutate( version = "v1" ))
 
-df_tmp <- df_mct_v2 %>%
-  dplyr::select(return_level_20y) %>%
-  mutate(version = "v2") %>%
-  bind_rows(
-    dplyr::select(df_mct_v1, return_level_20y) %>%
-      mutate(version = "v1")
-  )
-
-# only v1 data
 df_tmp %>% 
-  filter(version == "v1") %>% 
   ggplot() +
   geom_histogram(
     aes(x = return_level_20y, fill = version), 
-    color = "black", alpha = 0.3, binwidth = 2, 
+    color = "black", alpha = 0.3, binwidth = 10, 
     position="identity") +
-  xlim(0,200) +
-  scale_fill_manual(name = "", values = c("black", "red"))   #, labels = c("v1", "v2")
-
-# only v2 data
-df_tmp %>% 
-  filter(version == "v2") %>% 
-  ggplot() +
-  geom_histogram(
-    aes(x = return_level_20y, fill = version), 
-    color = "black", alpha = 0.3, binwidth = 0.1, 
-    position="identity") +
-  xlim(0,10) +
-  scale_fill_manual(name = "", values = c("black", "red"))   #, labels = c("v1", "v2")
+  xlim(0,1000) +
+  scale_fill_manual(name = "Version", values = c("black", "red")) + 
+  labs(x = expression(paste("D"[20], " (mm)")))
 ```
 
 
 ```{r}
-## convert to a 2D matrix (grid)
-grid_mct_20y_v2 <- df_mct_v2 %>% 
+## v1 convert to a 2D matrix (grid)
+grid_mct_20y_v1 <- df_mct_v1 %>% 
   df_to_grid(varnam = "return_level_20y", grid = "halfdeg") 
-grid_mct_40y_v2 <- df_mct_v2 %>% 
+grid_mct_40y_v1 <- df_mct_v1 %>% 
+  df_to_grid(varnam = "return_level_40y", grid = "halfdeg")
+
+## v3 convert to a 2D matrix (grid)
+grid_mct_20y_v3 <- df_mct_v3 %>% 
+  df_to_grid(varnam = "return_level_20y", grid = "halfdeg") 
+grid_mct_40y_v3 <- df_mct_v3 %>% 
   df_to_grid(varnam = "return_level_40y", grid = "halfdeg")
 
 ## save as NetCDF
 dirnam <- "/alphadata01/bstocker/sofun/output_nc_global_sofun/"
 write_nc2(
-  var = grid_mct_20y_v2, 
+  var = grid_mct_20y_v3, 
   varnam = "whc_mct_20y", 
   filnam_template = paste0(dirnam, "s1_fapar3g_v3_global.fland.nc"), 
-  outfilnam = "data/whc_mct_20y_v2.nc",
+  outfilnam = "data/whc_mct_20y_v3.nc",
   lonnam_template = "lon", 
   latnam_template = "lat"
   )
 write_nc2(
-  var = grid_mct_40y_v2, 
+  var = grid_mct_40y_v3, 
   varnam = "whc_mct_40y", 
   filnam_template = paste0(dirnam, "s1_fapar3g_v3_global.fland.nc"), 
-  outfilnam = "data/whc_mct_40y_v2.nc",
+  outfilnam = "data/whc_mct_40y_v3.nc",
   lonnam_template = "lon", 
   latnam_template = "lat"
   )
 
 ## create plots
-plot_map(grid_mct_20y_v2, lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="fig/map_mct_20y_v2.pdf")
+# plot_map(grid_mct_20y_v3, lev = c(0,800, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 22000) # , file="fig/map_mct_20y_v3.pdf"
 
-plot_map(grid_mct_40y_v2, lev = c(0,200, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 2000, file="fig/map_mct_40y_v2.pdf")
+# plot_map(grid_mct_40y_v3, lev = c(0,800, 10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 22000) # , file="fig/map_mct_40y_v3.pdf"
+
+gg_v1 <- plot_map2(grid_mct_20y_v1, nbin = 10, maxval = 200)
+gg_v1 + labs(title = "WHC-MCT 20y v1")
+
+gg_v3 <- plot_map2(dplyr::select(df_mct_v3, lon, lat, return_level_20y), nbin = 10, maxval = 800)
+gg_v3 + labs(title = "WHC-MCT 20y v3")
+ggsave("fig/whc_mct_20y_v3.png", width = 10, height = 7)
 ```

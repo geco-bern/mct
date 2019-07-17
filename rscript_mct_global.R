@@ -19,5 +19,6 @@ if (file.exists(gridfile)){
   df_grid <- get_df_landmask(dir)
   save(df_grid, file = gridfile)
 }
-df <- get_plantwhc_mct_global(df_grid, dir)
+#df <- get_plantwhc_mct_global(df_grid, dir, fapar_source = "fAPAR3g_meandoy")
+df <- get_plantwhc_mct_global(df_grid, dir, fapar_source = "fAPAR3g")
 

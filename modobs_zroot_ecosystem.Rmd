@@ -16,84 +16,479 @@ library(ggplot2)
 library(tidyr)
 library(readr)
 library(raster)
+library(rasterVis)
 library(stringr)
+library(forcats)
+library(sf)
 ```
 
-## Comparison of global z$_\text{root}$ estimate with RPGE data
-
-### Data exploration
+# Comparison of global z$_\text{root}$ estimate with RPGE data
 
 The global z$_\text{root}$ estimate can be compared with the ecosystem-level RPGE data.
 
 The figure below shows the distribution of modelled values (bars, where 'Balland' and 'SaxtonRawls' refers to the WHC estimate based on pedotransfer functions from Balland et al., 2008, and Saxton & Rawls, 2006, respectively.). The blue line represents the distribution of depth estimates for the extrapolated 95% quantile of root mass (`D95_extrapolated`) in the RPGE data.
+
+Read data and exclude what's not used in Schenk & Jackson 2002.
 ```{r echo = FALSE}
 # Load data
 # note: re-downloaded data is the same as the one shersingh gave me
 #df_obs2 <- read_csv("/alphadata01/bstocker/data/RPGE_shersing/data/root_profiles_D50D95.csv")
-df_obs <- read_csv("/alphadata01/bstocker/data/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv")
-#all_equal(df_obs, df_obs2)
-```
-
-Exclude from analysis.
-```{r}
-df_obs <- df_obs %>% 
+df_obs <- read_csv("/alphadata01/bstocker/data/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
   dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES")
 ```
 
+Do some data explorations, trying to reproduce analyses in Schenk & Jackson (2002)...
 
+## Rooting depth by vegetation type
 
-Do some data explorations, trying to reproduce analyses in Schenk & Jackson (2002).
-
-Histograms of depth of 95% quantile.
+Problem: Could not identify the classes from Fig. 4 in Schenk & Jackson with the classes given in the dataset. Available vegetation classes are:
 ```{r}
 df_obs$Vegetation %>% unique() %>% print()
-
+```
+Trying to identify similar classes as in Schenk & Jackson by hand:
+```{r}
 df_obs <- df_obs %>% 
   mutate( veg2 = Vegetation ) %>% 
   mutate( veg2 = ifelse(str_detect(Vegetation, "boreal") & str_detect(Vegetation, "forest"), "boreal_forest", veg2) ) %>% 
   mutate( veg2 = ifelse(str_detect(Vegetation, "tem")    & str_detect(Vegetation, "forest"), "temperate_forest", veg2) ) %>% 
   mutate( veg2 = ifelse( str_detect(Vegetation, "EBL forest / trop"), "tropical_evergreen_forest", veg2) ) %>% 
   mutate( veg2 = ifelse( str_detect(Vegetation, "DBL forest / trop"), "tropical_deciduous_forest", veg2) ) %>% 
-  mutate( veg2 = ifelse( str_detect(Vegetation, "Savanna") & abs(Latitude) <= 30.0, "tropical_savanna", veg2) ) %>% 
+  mutate( veg2 = ifelse( str_detect(Vegetation, "Savanna") & abs(Latitude) <= 30.0, "tropical_savanna", veg2) ) %>%
+  mutate( veg2 = ifelse( str_detect(Vegetation, "Savanna") & abs(Latitude) > 30.0, "temp_savanna", veg2) ) %>%
+  # mutate( veg2 = ifelse( Vegetation == "alpine herbaceous", "alpine_herbaceous", veg2)) %>% 
+  # mutate( veg2 = ifelse( Vegetation == "Grassland", "grassland", veg2)) %>% 
+  # mutate( veg2 = ifelse( Vegetation == "Grassland", "grassland", veg2)) %>% 
   mutate( veg2 = as.factor(veg2) )
-
-df_obs %>% 
-  dplyr::filter( veg2 %in% c("Tundra", "boreal_forest", "temperate_forest", "tropical_evergreen_forest", "tropical_deciduous_forest", "tropical_savanna") ) %>% 
-  ggplot() +
-  geom_boxplot(aes(x = veg2, y = D95_extrapolated)) +
-  ylim(0,3)
 ```
 
-Rooting depth vs. latitude.
+Plot histograms of depth of 95% quantile in my similar classes, trying to reproduce something similar to Fig. 4 in Schenk & Jackson, 2002.
+```{r}
+df_obs %>% 
+  dplyr::filter( veg2 %in% c("Tundra", "boreal_forest", "temperate_forest", "alpine herbaceous", "Pasture", "Grassland", "temp_savanna", "Closed shrubland", "open shrubland", "Wooded grassland", "tropical_savanna", "tropical_deciduous_forest", "tropical_evergreen_forest") ) %>%
+  mutate( veg2 = fct_relevel(veg2, c("Tundra", "boreal_forest", "temperate_forest", "alpine herbaceous", "Pasture", "Grassland", "temp_savanna", "Closed shrubland", "open shrubland", "Wooded grassland", "tropical_savanna", "tropical_deciduous_forest", "tropical_evergreen_forest")) ) %>% 
+  ggplot() +
+  geom_boxplot(aes(x = veg2, y = -D95_extrapolated * 100)) +
+  ylim(-300,0) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+```
+
+**Needed:**
+
+- correct classification to reproduce Fig. 4, or...
+- sites classified into some standard vegetation types for which we have global maps (e.g., IGBP). UMD cover is provided. This here is the only classification key I discovered in the internet:
+
+![](fig/umd_key.png)
+
+-> Can this be translated 1:1 into IGBP?
+
+What are viable targets? Given that it's difficult to compare values predicted at sites one by one, can we at least get the distribution of predicted values right, not only globally by across different classes where we expect differences in rooting depth across classes?
+
+- Climate zones (e.g., Koeppen-Geiger)
+- Vegetation classes (tropical evergreen, tropical forests with dry season, savannah, mediterranean forests, mediterranean shrublands, ... )
+
+### My results by vegetation class.
+
+Using UMD classification in the Schenk & Jackson data, and translating it into IGBP:
+```{r}
+df_obs <- df_obs %>% 
+  mutate( igbp = NA ) %>% 
+  mutate( igbp = ifelse(UMD_cover==1, "ENF", igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==2, "EBF", igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==4, "DBF", igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==5, "MF",  igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==6, "SAV", igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==7, "WSA", igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==8, "CSH", igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==9, "OSH", igbp) ) %>% 
+  mutate( igbp = ifelse(UMD_cover==10,"GRA", igbp) ) %>% 
+  mutate( igbp = as.factor(igbp) )
+```
+
+Plot observations by IGBP class:
+```{r}
+df_obs %>% 
+  mutate( igbp = fct_relevel(igbp, c("ENF", "EBF", "DBF", "MF", "SAV", "WSA", "CSH", "OSH", "GRA")) ) %>% 
+  ggplot() +
+  geom_boxplot(aes(x = igbp, y = -D95_extrapolated * 100)) +
+  ylim(-300,0) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+```
+Problem: No clear variations across IGBP classes.
+
+## Rooting depth vs. latitude. 
 ```{r}
 df_obs %>% 
   mutate(tropical = ifelse(abs(Latitude)<30, TRUE, FALSE )) %>% 
-  mutate(D95_extrapolated_neg_log = -log(D95_extrapolated)) %>% 
+  mutate(D95_extrapolated_neg_log = -log(100*D95_extrapolated)) %>% 
   dplyr::filter(abs(Latitude) <= 90) %>% 
   ggplot() +
-  geom_point(aes(x = abs(Latitude), y = D95_extrapolated_neg_log, color = tropical))
+  geom_point(aes(x = abs(Latitude), y = D95_extrapolated_neg_log, color = tropical)) +
+  geom_smooth(aes(x = abs(Latitude), y = D95_extrapolated_neg_log, color = tropical), se = FALSE, method = lm)
 ```
+
+**Issue:**
+
+- Apparently, "Tropical" vs. "Extra-tropical" in Schenk & Jackson is not solely based on latitude.
+
 
 Rooting depth vs. PET
 ```{r}
 df_obs %>% 
   dplyr::filter(PET>0) %>% 
   ggplot() +
-  geom_point(aes(x = PET, y = D95_extrapolated * 100)) +
-  ylim(0, 500)
+  geom_point(aes(x = PET, y = D95_extrapolated * -100)) +
+  ylim(-500, 0)
+```
+
+### My results vs. latitude
+
+Dividing simulated rooting depth by 10!
+```{r}
+load("./data/df_20y_bl_v3.Rdata") # loading df_20y_bl_v3
+df_20y_bl_v3 %>% 
+  mutate(tropical = ifelse(abs(lat)<30, TRUE, FALSE )) %>% 
+  ggplot(aes(x = abs(lat), y = -log(zroot/10), color = tropical)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(se = FALSE, method = lm) + 
+  ylim(-7, -2)
 ```
 
 
-### Distribution of values
+## Rooting depth by climate zone
+
+Complement Schenk & Jackson data with Koeppen-Geiger climate classification. 
+```{r echo = FALSE}
+kgclimate_lores <- raster("/alphadata01/bstocker/data/koeppengeiger/Beck_KG_V1/Beck_KG_V1_present_0p5.tif")
+kgclimate_hires <- raster("/alphadata01/bstocker/data/koeppengeiger/Beck_KG_V1/Beck_KG_V1_present_0p0083.tif")
+# plot(kgclimate_lores)
+
+## complement Schenk & Jackson data with koeppen-geiger climate zone from hi-res file by Beck et al.
+df_obs2 <- extract(kgclimate_hires, SpatialPoints(dplyr::select(df_obs, Longitude, Latitude)), sp = TRUE) %>% 
+  as_tibble() %>% 
+  mutate( kgclimate = NA ) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==1, "Af", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==2, "Am", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==3, "Aw", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==4, "BWh", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==5, "BWk", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==6, "BSh", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==7, "BSk", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==8, "Csa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==9, "Csb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==10, "Csc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==11, "Cwa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==12, "Cwb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==13, "Cwc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==14, "Cfa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==15, "Cfb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==16, "Cfc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==17, "Dsa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==18, "Dsb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==19, "Dsc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==20, "Dsd", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==21, "Dwa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==22, "Dwb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==23, "Dwc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==24, "Dwd", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==25, "Dfa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==26, "Dfb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==27, "Dfc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==28, "Dfd", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==29, "ET", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p0083==30, "EF", kgclimate )) %>% 
+  bind_cols(df_obs, .)
+
+df_obs2 <- df_obs2 %>%   
+  mutate( mykgclimate = kgclimate ) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Af", "Af", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Am", "Am", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Aw", "Aw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BWh", "BW", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BWk", "BW", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BSh", "BS", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BSk", "BS", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Csa", "Cs", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Csb", "Cs", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Csc", "Cs", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cwa", "Cw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cwb", "Cw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cwc", "Cw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cfa", "Cf", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cfb", "Cf", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cfc", "Cf", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsa", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsb", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsc", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsd", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwa", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwb", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwc", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwd", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfa", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfb", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfc", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfd", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "ET", "ET", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "EF", "EF", mykgclimate ))
+
+## complement model output with climate zone classification
+df_20y_bl_v3 <- extract(kgclimate_lores, SpatialPoints(dplyr::select(df_20y_bl_v3, lon, lat)), sp = TRUE) %>% 
+  as_tibble() %>% 
+  mutate( kgclimate = NA ) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==1, "Af", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==2, "Am", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==3, "Aw", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==4, "BWh", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==5, "BWk", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==6, "BSh", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==7, "BSk", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==8, "Csa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==9, "Csb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==10, "Csc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==11, "Cwa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==12, "Cwb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==13, "Cwc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==14, "Cfa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==15, "Cfb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==16, "Cfc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==17, "Dsa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==18, "Dsb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==19, "Dsc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==20, "Dsd", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==21, "Dwa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==22, "Dwb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==23, "Dwc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==24, "Dwd", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==25, "Dfa", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==26, "Dfb", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==27, "Dfc", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==28, "Dfd", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==29, "ET", kgclimate )) %>%
+  mutate( kgclimate = ifelse( Beck_KG_V1_present_0p5==30, "EF", kgclimate )) %>%
+  right_join(df_20y_bl_v3, by = c("lon", "lat")) %>%
+
+  mutate( mykgclimate = kgclimate ) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Af", "Af", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Am", "Am", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Aw", "Aw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BWh", "BW", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BWk", "BW", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BSh", "BS", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "BSk", "BS", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Csa", "Cs", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Csb", "Cs", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Csc", "Cs", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cwa", "Cw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cwb", "Cw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cwc", "Cw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cfa", "Cf", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cfb", "Cf", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Cfc", "Cf", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsa", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsb", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsc", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dsd", "Ds", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwa", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwb", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwc", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dwd", "Dw", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfa", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfb", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfc", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "Dfd", "Df", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "ET", "ET", mykgclimate )) %>%
+  mutate( mykgclimate = ifelse( kgclimate ==  "EF", "EF", mykgclimate ))  
+
+table_kgclimate <- matrix( 
+  c(
+    c(1,'Af','Tropical, rainforest'),
+    c(2,'Am','Tropical, monsoon'),
+    c(3,'Aw','Tropical, savannah'),
+    c(4,'BWh','Arid, desert, hot'),
+    c(5,'BWk','Arid, desert, cold'),
+    c(6,'BSh','Arid, steppe, hot'),
+    c(7,'BSk','Arid, steppe, cold'),
+    c(8,'Csa','Temperate, dry summer, hot summer'),
+    c(9,'Csb','Temperate, dry summer, warm summer'),
+    c(10,'Csc','Temperate, dry summer, cold summer'),
+    c(11,'Cwa','Temperate, dry winter, hot summer'),
+    c(12,'Cwb','Temperate, dry winter, warm summer'),
+    c(13,'Cwc','Temperate, dry winter, cold summer'),
+    c(14,'Cfa','Temperate, no dry season, hot summer'),
+    c(15,'Cfb','Temperate, no dry season, warm summer'),
+    c(16,'Cfc','Temperate, no dry season, cold summer'),
+    c(17,'Dsa','Cold, dry summer, hot summer'),
+    c(18,'Dsb','Cold, dry summer, warm summer'),
+    c(19,'Dsc','Cold, dry summer, cold summer'),
+    c(20,'Dsd','Cold, dry summer, very cold winter'),
+    c(21,'Dwa','Cold, dry winter, hot summer'),
+    c(22,'Dwb','Cold, dry winter, warm summer'),
+    c(23,'Dwc','Cold, dry winter, cold summer'),
+    c(24,'Dwd','Cold, dry winter, very cold winter'),
+    c(25,'Dfa','Cold, no dry season, hot summer'),
+    c(26,'Dfb','Cold, no dry season, warm summer'),
+    c(27,'Dfc','Cold, no dry season, cold summer'),
+    c(28,'Dfd','Cold, no dry season, very cold winter'),
+    c(29,'ET','Polar, tundra'),
+    c(30,'EF','Polar, frost')
+    ), nrow = 30, byrow = TRUE
+  ) %>% 
+  as_tibble() %>% 
+  setNames(c("code_in_file", "kg_code", "description"))
+
+table_kgclimate %>% knitr::kable()
+```
+
+Plot data by climate zone.
+```{r}
+df_obs2 %>% 
+  ggplot() +
+  geom_boxplot(aes(x = mykgclimate, y = -D95_extrapolated * 100)) +
+  ylim(-300,0)
+
+# df_20y_bl_v3 %>% 
+#   ggplot() +
+#   geom_boxplot(aes(x = kgclimate, y = -zroot)) +
+#   ylim(-300,0)
+
+df_obs2 %>% 
+  dplyr::select(zroot = D95_extrapolated, mykgclimate) %>% 
+  mutate(zroot = zroot * 100) %>% 
+  mutate(source = "obs") %>% 
+  bind_rows(
+    dplyr::select(df_20y_bl_v3, zroot, mykgclimate) %>% 
+      mutate( source = "mod") %>% 
+      mutate( zroot = zroot / 10 )) %>% 
+  ggplot() +
+  geom_boxplot(aes(x = mykgclimate, y = -zroot, fill = source)) +
+  ylim(-300,0) 
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+#ggsave("fig/boxplot_zroot_kgclimate.pdf", width = 12, height = 8)
+```
+
+
+## Rooting depth by biome
+
+### NCRS biome map
+
+```{r eval=FALSE}
+# PROBLEM WITH THIS: NOT GEOREFERENCED, JUST A BITMAP
+# data downloaded from https://www.nrcs.usda.gov/wps/portal/nrcs/detail/soils/use/worldsoils/?cid=nrcs142p2_054002
+rasta <- raster("/alphadata01/bstocker/data/biomes/NCRS/biomes_map.bmp")
+plot(rasta)
+levelplot(rasta, margin = F, pretty=TRUE) #, at=cutpts, cuts=11, par.settings = mapTheme, main="test variable -- as raster layer")
+crs(rasta) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
+writeRaster(rasta, "data/biomes_ncrs.nc", overwrite=TRUE, format="CDF", varname="biome", varunit="category", longname="NCRS biome", xname="lon", yname="lat")
+nc <- read_nc_onefile(filn = "data/biomes_ncrs.nc")
+plot_map2(nc)
+```
+
+### Olson et al. 2001 biome map
+
+```{r}
+library(rgdal)
+
+# read in the polygons
+shape <- readOGR("/alphadata01/bstocker/data/biomes/olson2001_teow/wwf_terr_ecos.shp")
+
+# create empty raster
+rasta <- raster(nrows=360, ncols=720, xmx=180, ymn=-90, ymx=90, crs=CRS("+init=EPSG:4326"))
+
+# convert polygons to 1x1 raster
+rasta_biome <- rasterize(shape, rasta, background=NA, field="BIOME")
+#plot(rasta_biome)
+
+# remove no data values
+rasta_biome[rasta_biome %in% c(98, 99)] <- NA
+
+# convert raster to factor
+rasta_biome <- as.factor(rasta_biome)
+
+# save to file
+saveRDS(rasta_biome, "./data/teow_raster.rds")
+
+#plot(rasta_biome$layer) # , col.regions=c("red","orange","darkgreen","grey45")
+
+sf_shape <- sf::st_as_sf(shape)
+st_crs(sf_shape) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+# Extract data at points given by df_obs
+points_df_obs <- SpatialPoints(dplyr::select(df_obs, x = Longitude, y = Latitude)) %>% 
+  sf::st_as_sf()
+st_crs(points_df_obs) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+points_df_obs_st <- sf::st_intersection(points_df_obs, sf_shape)
+
+df_obs <- points_df_obs_st %>% 
+  as_tibble() %>% 
+  mutate( x = purrr::map_dbl(geometry, 1),
+          y = purrr::map_dbl(geometry, 2)) %>% 
+  dplyr::select(Longitude = x, Latitude = y, biome = BIOME) %>% 
+  dplyr::mutate( biome = as.factor(biome) ) %>% 
+  right_join( df_obs, by = c("Longitude", "Latitude"))
+
+## Extract data at points given by global model output (gridcells)
+df_20y_bl_v3 <- extract(rasta_biome, SpatialPoints(dplyr::select(df_20y_bl_v3, lon, lat)), sp = TRUE) %>% 
+  as_tibble() %>% 
+  right_join(df_20y_bl_v3, by = c("lon", "lat")) %>% 
+  rename(biome = layer) %>% 
+  mutate( biome = as.factor(biome) )
+
+biome_key <- tibble(
+  biome = as.factor(1:14),
+  biome_chr = c("Tropical and Subtropical Moist Broadleaf Forests", "Tropical and Subtropicatl Dry Broadleaf Forests", "Tropical and Subtropical Coniferous Forests",
+    "Temperate Broadleaf and Mixed Forests", "Temperate Coniferous Forests", "Boreal Forest/Taiga", "Tropical and Subtropical Grasslands, Savannas, and Shrublands",
+    "Temperate Grasslands, Savannas, and Shrublands", "Flooded Grasslands and Savannas", "Montane Grasslands and Shrublands", "Tundra", "Mediterranean Forests, Woodlands, and Scrub",
+    "Deserts and xeric shrublands", "Mangroves")
+  )
+
+df_obs <- df_obs %>%
+  left_join(biome_key, by = "biome")
+  
+df_20y_bl_v3 <- df_20y_bl_v3 %>%
+  left_join(biome_key, by = "biome")
+```
+
+Plot data by biomes.
+```{r}
+df_obs %>% 
+  ggplot() +
+  geom_boxplot(aes(x = biome_chr, y = -D95_extrapolated * 100)) +
+  ylim(-300,0) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+df_20y_bl_v3 %>%
+  ggplot() +
+  geom_boxplot(aes(x = biome, y = -zroot)) +
+  ylim(-300,0)
+
+df_obs %>% 
+  dplyr::select(zroot = D95_extrapolated, biome_chr) %>% 
+  mutate(zroot = zroot * 100) %>% 
+  mutate(source = "obs") %>% 
+  bind_rows(
+    dplyr::select(df_20y_bl_v3, zroot, biome_chr) %>% 
+      mutate( source = "mod") %>% 
+      mutate( zroot = zroot / 20 )) %>% 
+  ggplot() +
+  geom_boxplot(aes(x = biome_chr, y = -zroot, fill = source)) +
+  ylim(-300,0) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+ggsave("fig/boxplot_zroot_biomes.pdf", width = 12, height = 12)
+```
+
+
+## Distribution of values
 
 ```{r}
 # Look at distribution of global values and values in dataset.
-load("./data/df_40y_sr.Rdata")
-load("./data/df_40y_bl.Rdata")
+# load("./data/df_20y_sr_v2.Rdata")
+# load("./data/df_20y_bl_v2.Rdata")
+load("./data/df_20y_sr_v3.Rdata")
+load("./data/df_20y_bl_v3.Rdata")
 
-df_tmp <- df_40y_sr %>% 
+df_tmp <- df_20y_sr_v3 %>% 
   dplyr::select(lon, lat, zroot_sr = zroot) %>% 
-  left_join(dplyr::select(df_40y_bl, lon, lat, zroot_bl = zroot), by=c("lon", "lat")) %>% 
+  left_join(dplyr::select(df_20y_bl_v3, lon, lat, zroot_bl = zroot), by=c("lon", "lat")) %>% 
   tidyr::gather(method, zroot, c(zroot_bl, zroot_sr))
 
 ggplot() +
@@ -117,19 +512,21 @@ This suggests:
 - The frequency of very shallow rooting (below about 0.5 m) is overestimated by the model, and the frequency of rather deep rooting (values around 2.5 m and above) tends to be underestimated. This may be related to the scale mismatch. The model uses gridcell-average fAPAR to estimate the water demand per unit area, with must be lower than the water demand per unit area of vegetetated land only. This discrepancy is highest in areas with low fAPAR, including arid regions with large dry season water deficits. 
 
 
-### Site-by-site evaluation
+
+
+## Site-by-site evaluation
 
 A site-by-site comparison of modelled vs. observed rooting depth (scatterplot), where modelled is extracted from the global simulation, is done below. 
 
-```{r echo = FALSE}
+```{r echo = FALSE, eval=FALSE}
 # Extract values from the global halfdegree map, complementing the observational data frame. 
 df_obs <- df_obs %>% 
   rowwise() %>% 
   mutate( 
-    zroot_40y_bl = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_40y_bl.nc", varnam = "grid_zroot_40y_bl"),
-    zroot_40y_sr = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_40y_sr.nc", varnam = "grid_zroot_40y_sr"),
-    zroot_20y_bl = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_20y_bl.nc", varnam = "grid_zroot_20y_bl"),
-    zroot_20y_sr = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_20y_sr.nc", varnam = "grid_zroot_20y_sr")
+    zroot_40y_bl = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_40y_bl_v3.nc", varnam = "zroot"),
+    zroot_40y_sr = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_40y_sr_v3.nc", varnam = "zroot"),
+    zroot_20y_bl = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_20y_bl_v3.nc", varnam = "zroot"),
+    zroot_20y_sr = extract_point_nc(lon = Longitude, lat = Latitude, filnam = "data/zroot_mct_20y_sr_v3.nc", varnam = "zroot")
     )
 
 ## Compare observed and modelled in a scatterplot.
@@ -138,7 +535,7 @@ out <- df_obs %>% analyse_modobs2(mod = "zroot_40y_bl", obs = "D95_extrapolated"
 out$gg + labs(title = "Balland, 40y, comparing to 95% quantile", x = "Modelled rooting depth (m)", y = "Observed rooting depth (m)")
 
 ## Saxton & Rawls, 40 y
-out <- df_obs %>% analyse_modobs2(mod = "zroot_40y_sr", obs = "D50_extrapolated")
+out <- df_obs %>% analyse_modobs2(mod = "zroot_40y_sr", obs = "D95_extrapolated")
 out$gg + labs(title = "Saxton & Rawls, 40y", x = "Modelled rooting depth (m)", y = "Observed rooting depth (m)")
 ```
 
@@ -147,7 +544,7 @@ This suggests:
 - A poor model performance.
 - An likely challenge of scale mismatch.
 
-### Rooting depth map
+## Rooting depth map
 
 The values of the points in the RPGE data are overlaid onto the rooting depth map from the model. The question is: Are there broad patterns that we could focus on?
 
@@ -157,18 +554,20 @@ The values of the points in the RPGE data are overlaid onto the rooting depth ma
 # nc <- read_nc_onefile("data/zroot_mct_40y_bl.nc")
 # plot_map( nc, lev = c(0,5,10), color = c( "wheat", "tomato2", "tomato4", "darkorchid4" ), minval = 0, maxval = 10 )
 
-rasta <- brick("data/zroot_mct_40y_bl.nc")
+rasta <- brick("data/zroot_mct_40y_bl_v3.nc")
 nbin <- 10
 
 df_sp <- as(rasta, "SpatialPixelsDataFrame")
 df <- as.data.frame(df_sp)
 names(df) <- c("layer", "x", "y")
-maxval <- quantile(df$layer, 0.99) %>% ceiling()
+# maxval <- quantile(df$layer, 0.99) %>% ceiling()
+maxval <- 15
 
 gg <- plot_map2(
   rasta,
   nbin = nbin,
-  legend_title = expression(paste("z"[root], " (m)"))
+  legend_title = expression(paste("z"[root], " (m)")), 
+  maxval = maxval
   ) +
   labs(title = expression(paste("z"[root])))
 
@@ -177,8 +576,8 @@ df_obs <- df_obs %>%
 
 gg + 
   geom_point(
-    data = df_obs, 
-    aes(Longitude, Latitude, fill = D95_extrapolated),
+    data = df_obs,
+    aes(Longitude, Latitude, fill = D95_extrapolated * 10),
     color='black', shape=21,  size=2, stroke=0.1,
     show.legend = FALSE
     ) +
@@ -187,19 +586,19 @@ gg +
     na.value = 'grey90',
     breaks = seq(0, maxval, length.out = (nbin+1)), limits = c(0,maxval), oob=scales::squish )
 
-#ggsave("fig/zroot_mct_40y_bl.pdf", width = 10, height = 7)
+#ggsave("fig/zroot_mct_40y_bl_v3.pdf", width = 10, height = 7)
 ```
 
 Let's discuss what we can get from this ...
 
-### Addressing the scale mismatch
+## Addressing the scale mismatch
 
 We may argue that we cannot expect a global model that does not account for local topography to accurately simulate rooting depth measured at the site scale. Can we instead require the model to capture known patterns in the rooting depth across some class of vegetation type, climate, biome, ... ? The challenge is to identify such patterns where *a priori* expect rooting depth variations. 
 
 Let's discuss this further ...
 
 Distribution of values within Ahlstroem land classes.
-```{r}
+```{r eval=FALSE}
 df_anders <- nc_to_df(
   "/alphadata01/bstocker/data/landclass_ahlstroem/semiarid_shrub_savannah.nc",
   varnam = "semidry shrub & savannah") %>%
