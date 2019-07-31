@@ -24,16 +24,18 @@ df_flue <- read_csv("~/alphadata01/bstocker/data/fLUE/flue_stocker18nphyt.csv")
 
 fAPAR really doesn't go to zero in drought-affected regions. This has caused an overestimation of GPP in respective sites as identified in an earlier analysis. Therefore, we correct fAPAR data
 ```{r  message=FALSE, warning=FALSE}
+## run vignette 'splash_fluxnet2015.Rmd' in rsofun repo
 load("~/mct/data/obs_eval_v2.RData")
 df_flue_dry <- df_flue %>% filter(cluster %in% c("cGR", "cDD"))
 ddf_obs_dry <- obs_eval$ddf %>% 
   filter(sitename %in% df_flue_dry$site)
 
+fpar_absmin <- 0.15
 ddf_obs_dry %>% 
   ggplot(aes(fapar, stat(density))) +
   geom_histogram( ) +
   geom_density() +
-  geom_vline(xintercept = 0.1, color="red") +
+  geom_vline(xintercept = fpar_absmin, color="red") +
   xlim(0,1)
 ```
 
@@ -45,17 +47,18 @@ obs_eval_evi <- obs_eval
 ddf_obs_dry_evi <- obs_eval_evi$ddf %>% 
   filter(sitename %in% df_flue_dry$site)
 
+evi_absmin <- 0.1
 ddf_obs_dry_evi %>% 
   ggplot(aes(fapar, stat(density))) +
   geom_histogram( ) +
   geom_density() +
-  geom_vline(xintercept = 0.08, color="red") +
+  geom_vline(xintercept = evi_absmin, color="red") +
   xlim(0,1)
 ```
 
 
-Looking at mean fAPAR seasonality by sites it seems like the "absolute minimum" is around 0.1 and not 0.
-```{r  message=FALSE, warning=FALSE, fig.height=18}
+Looking at mean fAPAR seasonality by sites it seems like the "absolute minimum" is around 0.15 and not 0.
+```{r  message=FALSE, warning=FALSE}
 df_meandoy <- ddf_obs_dry %>% 
   mutate(doy = yday(date)) %>% 
   group_by(sitename, doy) %>% 
@@ -78,21 +81,29 @@ df_meandoy <- ddf_obs_dry %>%
     by = c("sitename", "doy")
     )
   
+# what's wrong with ...
+ddf_obs_dry %>% 
+  filter(sitename == "FR-LBr") %>% 
+  dplyr::select(date, fapar) %>% 
+  View()
+  ggplot(aes(x = date, y = fapar)) +
+  geom_line()
+
 df_meandoy %>% 
   ggplot() +
   geom_line(aes(x = doy, y = fapar_mean), color = "black") +
   geom_ribbon(aes(x = doy, ymin = fapar_min, ymax = fapar_max), alpha=0.4) +
   geom_line(aes(x = doy, y = evi_mean), color = "green") +
   geom_ribbon(aes(x = doy, ymin = evi_min, ymax = evi_max), fill = "green", alpha=0.4) +
-  geom_hline(yintercept = 0.1, color="red") +
+  geom_hline(yintercept = 0.15, color="red") +
   facet_wrap( ~sitename, ncol=4 ) +
   ylim(0,1)
 
-ggsave("fig/fapar_seasonality_bysite.pdf", width=10, height = 10)
+ggsave("fig/fapar_seasonality_bysite.pdf", width=10, height = 18)
 ```
 
 
-## ET
+## AET
 
 ET seasonality by site using AET (which included fAPAR in this simulation):
 
@@ -104,16 +115,16 @@ ddf_modobs_dry <- out_eval$aet$fluxnet2015$data$meandoydf %>%
 
 convert_le <- function(x){ x / (60*60*24)}
 
-ddf_modobs_dry %>%
-  mutate_at(vars(starts_with("mod_"), starts_with("obs_")), list(~convert_le)) %>%
-  ggplot(aes(x = doy)) +
-  geom_line(aes(y=obs_mean)) +
-  geom_ribbon(aes(ymin = obs_min, ymax = obs_max), alpha=0.4) +
-  geom_line(aes(y=mod_mean), color="red") +
-  geom_ribbon(aes(ymin = mod_min, ymax = mod_max), alpha=0.4, fill="tomato") +
-  facet_wrap( ~sitename, ncol=5 )
-
-ggsave("fig/aet_seasonality_bysite.pdf", width=10, height = 10)
+# ddf_modobs_dry %>%
+#   mutate_at(vars(starts_with("mod_"), starts_with("obs_")), list(~convert_le)) %>%
+#   ggplot(aes(x = doy)) +
+#   geom_line(aes(y=obs_mean)) +
+#   geom_ribbon(aes(ymin = obs_min, ymax = obs_max), alpha=0.4) +
+#   geom_line(aes(y=mod_mean), color="red") +
+#   geom_ribbon(aes(ymin = mod_min, ymax = mod_max), alpha=0.4, fill="tomato") +
+#   facet_wrap( ~sitename, ncol=5 )
+# 
+# ggsave("fig/aet_seasonality_bysite.pdf", width=10, height = 10)
 ```
 
 Modelled vs. observed ET using PET * fAPAR (red):
@@ -131,7 +142,7 @@ ddf_modobs <- mod$daily %>%
   right_join(
     dplyr::select(ddf_obs_dry, sitename, date, latenth_obs = latenth, netrad_obs = netrad),
     by=c("sitename", "date")) %>%
-  mutate(fpar_corr = (fpar - 0.1)/(1-0.1)) %>% 
+  mutate(fpar_corr = (fpar - fpar_absmin)/(1.0-fpar_absmin)) %>% 
   mutate(fpar_corr = ifelse(fpar_corr<0, 0, fpar_corr)) %>% 
   mutate(pet = convert_le(pet), latenth_obs = convert_le(latenth_obs)) %>% 
   mutate(pet_fpar_corr = pet * fpar_corr) %>% 
@@ -143,7 +154,7 @@ ddf_modobs_evi <- mod_evi$daily %>%
   right_join(
     dplyr::select(ddf_obs_dry, sitename, date, latenth_obs = latenth, netrad_obs = netrad),
     by=c("sitename", "date")) %>%
-  mutate(evi_corr = (evi - 0.08)/(1-0.08)) %>% 
+  mutate(evi_corr = (evi - evi_absmin)/(1.0-evi_absmin)) %>% 
   mutate(evi_corr = ifelse(evi_corr<0, 0, evi_corr)) %>% 
   mutate(pet = convert_le(pet)) %>% 
   mutate(pet_evi_corr = pet * evi_corr) %>% 
@@ -162,6 +173,8 @@ out_modobs_evi$gg +
   labs(x = "Modelled PET * EVI (W m-2)", y = "Observed ET (W m-2)")
 ggsave("fig/modobs_latenth_pet_evi_corr.pdf", width=6, height = 6)
 ```
+
+## PET * fAPAR
 
 Modelled vs. observed ET seasonality by site using PET (dashed red, not shown), AET (blue), and PET * fAPAR (red):
 ```{r}

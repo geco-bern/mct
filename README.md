@@ -8,6 +8,7 @@ Steps of my analysis:
 
 ## ET evaluation
 
+- Run vignette 'splash_fluxnet2015.Rmd' in rsofun repo to prepare input files for FLUXNET 2015 simulations (for PET)
 - Run site-scale simulations (done on my laptop)
 - Analyse results using `eval_et.Rmd`
 

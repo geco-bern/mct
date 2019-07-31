@@ -1,4 +1,4 @@
-calc_zroot <- function(deficit, whc_t, whc_s){
+calc_zroot <- function(deficit, whc_t, whc_s, roots){
   
   ## In whc_t and whc_s refer to plant available WHC in topsoil and subsoil.
   ## WHC is calculated based on HWSD data (https://daac.ornl.gov/SOILS/guides/HWSD.html).
@@ -16,5 +16,20 @@ calc_zroot <- function(deficit, whc_t, whc_s){
   # }
   
   zroot <- zroot_t + zroot_s
+  
+  if (roots == 1){
+    zroot <- min(zroot, 800)
+  } else if (roots == 2){
+    zroot <- min(zroot, 800)
+  } else if (roots == 3){
+    zroot <- min(zroot, 600)
+  } else if (roots == 4){
+    zroot <- min(zroot, 400)
+  } else if (roots == 5){
+    zroot <- min(zroot, 800)
+  } else if (roots == 6){
+    zroot <- min(zroot, 200)
+  }
+  
   return(zroot)
 }

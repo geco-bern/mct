@@ -1,4 +1,4 @@
-mct <- function(df, varname_wbal, method="threshbal", thresh_deficit=0.5){
+mct <- function(df, varname_wbal, method = "threshbal", isohydric = FALSE, thresh_deficit=0.5){
   
   inst <- tibble()
   idx <- 0
@@ -26,7 +26,11 @@ mct <- function(df, varname_wbal, method="threshbal", thresh_deficit=0.5){
       } else if (method=="threshbal"){
         ## continue accumulating deficit as long as the deficit is not recuded by more than (thresh_deficit*100) % 
         while (iidx <= (nrow(df)-1) && (deficit - df[[ varname_wbal ]][iidx] > (1-thresh_deficit) * max_deficit)){
-          deficit <- deficit - df[[ varname_wbal ]][iidx]
+          if (isohydric){
+            deficit <- deficit - df[[ varname_wbal ]][iidx]
+          } else {
+            deficit <- deficit - df[[ varname_wbal ]][iidx]
+          }
           if (deficit>max_deficit) max_deficit <- deficit
           df$deficit[iidx] <- deficit
           iidx <- iidx + 1

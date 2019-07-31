@@ -12,7 +12,8 @@ get_data_fluxnet2015_mct <- function(sitename){
   ## add PET from the model output
   load("./data/list_ddf_mod.RData")
   df <- df %>% 
-    dplyr::left_join( dplyr::select( list_ddf_mod[[sitename]], date, pet ), by="date" )
+    dplyr::left_join( dplyr::select( list_ddf_mod[[sitename]], date, pet ), by="date" ) %>% 
+    dplyr::mutate( wbal = prec - fv * pet )
   
   return(df)
 }

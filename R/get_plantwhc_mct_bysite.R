@@ -1,5 +1,4 @@
-get_plantwhc_mct_bysite <- function( df, varname_wbal = "wbal",
-  settings=list(method_mct="threshbal", thresh_deficit=0.5),
+get_plantwhc_mct_bysite <- function( df, varname_wbal = "wbal", method_mct = "threshbal", thresh_deficit = 0.5,
   return_period=c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800) ){
 
   # ## Get data frame in shape (renaming columns)
@@ -27,7 +26,7 @@ get_plantwhc_mct_bysite <- function( df, varname_wbal = "wbal",
   } else {
 
     ## Get events of consecutive water deficit and accumulated deficit
-    out <- mct(df, varname_wbal = "wbal", method = "threshbal", thresh_deficit=0.5)
+    out <- mct(df, varname_wbal = "wbal", method = method_mct, thresh_deficit = thresh_deficit)
     
     if (nrow(out$inst)>0){
       ## Get N largest deficts

@@ -40,24 +40,45 @@ The steps for the method are:
 Let's try this out for the FLUXNET site 'FR-Pue', for which whe have these variables. 
 ```{r}
 # ## get data
-# load("~/eval_pmodel/data/v3/out_eval_FULL.Rdata")
-# df <- obs_eval_NT$ddf %>% 
-#   as_tibble() %>% 
-#   filter(sitename=="FR-Pue") %>% 
-#   select(date, fv=fapar, prec=prec_fluxnet2015)
-# 
+# load("./data/out_eval_v2.Rdata")
+# df <- obs_eval$ddf %>%
+#   as_tibble() %>%
+#   dplyr::filter(sitename=="US-Ton") %>%
+#   dplyr::select(date, fv=fapar)
+
 # ## add PET from the model output
-# load("~/eval_pmodel/data/mod_FULL.Rdata")
-# df <- df %>% 
-#   left_join( select( mod_FULL$daily$`FR-Pue`, date, pet ), by="date" ) %>% 
-#   cutna_headtail_df("fv") %>% 
+# # load("./data/obs_eval_v2.RData")
+# load("./data/mod.RData")
+# df <- df %>%
+#   left_join( dplyr::select( mod$daily$`US-Ton`, date, pet ), by="date" ) %>%
+#   cutna_headtail_df("fv") %>%
 #   mutate(fv = rbeni::myapprox(fv), pet = rbeni::myapprox(pet), prec=ifelse(is.na(prec),0,prec))
 # save(df, file = "data/df.Rdata")
 
 load("data/df.Rdata")
+df %>%
+  ggplot(aes(date, prec)) +
+  geom_line(color = "royalblue") +
+  labs(x = "Date", y = expression(paste("Precipitation (mm d"^{-1}, ")")) )
+ggsave("fig/prec_example.pdf", width = 6, height = 3)
+
 df %>% 
-  ggplot(aes(date, fv*pet)) +
-  geom_line()
+  ggplot(aes(date, pet)) +
+  geom_line(color = "tomato") +
+  labs(x = "Date", y = expression(paste("PET (mm d"^{-1}, ")")) )
+ggsave("fig/pet_example.pdf", width = 6, height = 3)
+
+df %>% 
+  ggplot(aes(date, fv)) +
+  geom_line(color = "springgreen3") +
+  labs(x = "Date", y = expression(paste("fAPAR (unitless)")) )
+ggsave("fig/fapar_example.pdf", width = 6, height = 3)
+
+df %>% 
+  ggplot(aes(date, prec - fv * pet)) +
+  geom_line(color = "black") +
+  labs(x = "Date", y = expression(paste("Water balance (mm d"^{-1}, ")")) )
+ggsave("fig/wbal_example.pdf", width = 6, height = 3)
 ```
 
 Plot the demand curve, given by cumulative $f_v E_p$.
@@ -68,17 +89,13 @@ df <- df %>%
   mutate(bal = prec - fv*pet) %>% 
   mutate(bal = myapprox(bal)) %>% 
   mutate(bal_cum = cumsum(bal))
-
-# df %>% 
-#   ggplot(aes(date, bal)) +
-#   geom_line()
 ```
 
 Get events of consecutive deficit using the `mct()` function.
 ```{r}
 source("R/mct.R")
-out1 <- mct(df)
-out2 <- mct(df, method = "threshbal", thresh_deficit=0.5)
+out1 <- mct(df, varname_wbal = "bal")
+out2 <- mct(df, varname_wbal = "bal", method = "threshbal", thresh_deficit=0.5 )
 ```
 
 
@@ -95,7 +112,9 @@ ggplot() +
   geom_line(data = out1$df, aes(date, deficit)) +
   geom_line(data = out2$df, aes(date, deficit), color="tomato") +
   coord_cartesian(ylim=c(0, 450), xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))) +
-  theme_classic()
+  theme_classic() +
+  labs(x = "Date", y = "Cumulative water deficit (mm)")
+ggsave("fig/cwd_example.pdf", width = 6, height = 3)
 ```
 
 As an additional illustration, plot cumulative variables.
@@ -128,12 +147,15 @@ nyears <- year(range(out2$df$date)[2]) - year(range(out2$df$date)[1]) + 1
 vals <- out2$inst %>% 
   arrange(desc(deficit)) %>% 
   dplyr::slice(1:nyears) %>% 
-  select(deficit) %>% 
-  unlist() %>% 
-  unname()
+  dplyr::select(deficit) %>% 
+  pull()
 
 gumbi <- extRemes::fevd(x=vals, type="Gumbel", method="MLE")
 summary(gumbi)
+
+pdf("fig/gumbi_example.pdf", width = 8, height = 7)
+pl <- plot(gumbi)
+dev.off()
 
 # extract MLEs (these are needed for the remaining part of the analysis)
 muG <- gumbi$results$par[1]
@@ -189,7 +211,10 @@ df_return %>%
 
 ```{r}
 source("R/get_data_fluxnet2015_mct.R")
-source("R/get_plantwhc_gao.R")
-ddf <- get_data_fluxnet2015_mct("FR-Pue")
-result <- get_plantwhc_mct(ddf)
+source("R/get_plantwhc_mct_bysite.R")
+ddf <- get_data_fluxnet2015_mct("FR-Pue") %>% 
+  tidyr::drop_na()
+
+result <- get_plantwhc_mct_bysite(ddf, varname_wbal = "wbal")
+result
 ```
