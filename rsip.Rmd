@@ -1,0 +1,235 @@
+---
+title: "RSIP data analysis"
+author: "Beni Stocker"
+date: "9/19/2019"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(rbeni)
+library(raster)
+library(tibble)
+```
+
+The data is downloaded from the google spreadsheet [RSIP Working Copy](https://docs.google.com/spreadsheets/d/1IW7CiLaw2xEr3MYuLwZ5mJWEbhAEU_hP9J6od5vb-jk/edit#gid=1200594845), tab 'Analysis sheet', into a CSV (19.9.2019) and saved as `data/RSIP_Analysis_sheet.csv`.
+
+Read the data.
+```{r}
+df <- read_csv("data/RSIP_Analysis_sheet.csv") %>% 
+  rename(lon = Long, lat = Lat) %>% 
+  rowid_to_column(var = "id")
+print(paste("Total number of entries:", nrow(df)))
+```
+
+Bin the data into grid points, summarise, and expand to grid
+```{r}
+## bin
+dlon <- 5.0
+dlat <- 5.0
+lon_breaks <- seq(from = -180, to = 180, by = dlon)
+lat_breaks <- seq(from = -90, to = 90, by = dlat)
+
+df <- df %>%
+  ungroup() %>% 
+  mutate(ilon = cut(lon, 
+                    breaks = lon_breaks
+                    # labels = as.character(seq(length(lon_breaks)-1))
+                    ),
+         ilat = cut(lat, 
+                    breaks = lat_breaks
+                    # labels = as.character(seq(length(lat_breaks)-1))
+                    )
+         ) %>% 
+  mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
+         lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
+         lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )
+         ) %>% 
+  mutate(lon_mid = (lon_lower + lon_upper)/2,
+         lat_mid = (lat_lower + lat_upper)/2)
+
+#View(select(df, lon, lat, ilon, ilat, lon_lower, lon_upper, lat_lower, lat_upper, lon_mid, lat_mid))
+
+df <- df %>% 
+  group_by(lon_mid, lat_mid) %>% 
+  drop_na(lon_mid, lat_mid)
+```
+
+Summarise
+```{r}
+df_agg <- df %>% 
+  summarise(mean_Dr = mean(Dr, na.rm = TRUE)) %>% 
+  left_join(
+    summarise(df, median_Dr = median(Dr, na.rm = TRUE)),
+    by = c("lon_mid", "lat_mid")
+  ) %>% 
+  left_join(
+    summarise(df, max_Dr = max(Dr, na.rm = TRUE)),
+    by = c("lon_mid", "lat_mid")
+  ) %>% 
+  left_join(
+    summarise(df, q75 = quantile(Dr, probs = 0.75, na.rm = TRUE) ),
+    by = c("lon_mid", "lat_mid")
+  ) %>% 
+  left_join(
+    summarise(df, q90 = quantile(Dr, probs = 0.90, na.rm = TRUE) ),
+    by = c("lon_mid", "lat_mid")
+  ) %>% 
+  left_join(
+    summarise(df, q95 = quantile(Dr, probs = 0.95, na.rm = TRUE) ),
+    by = c("lon_mid", "lat_mid")
+  ) %>% 
+  left_join(
+    summarise(df, n_Dr = n()),
+    by = c("lon_mid", "lat_mid")
+  )
+df <- df %>% ungroup()
+```
+
+
+## Plots
+
+### Distribution of values by individual data points.
+```{r}
+df %>% 
+  ggplot(aes(x = Dr)) +
+  geom_histogram(binwidth = 1, fill = "grey70", colour = "black") +
+  lims(x = c(0,125))
+```
+
+
+### Distribution of values by bins.
+```{r}
+df_agg %>% 
+  ggplot(aes(x = max_Dr)) +
+  geom_histogram(binwidth = 2, fill = "grey70", colour = "black")
+```
+
+### Global map
+```{r}
+gg <- plot_map2(
+  df_agg %>% 
+    ungroup %>% 
+    dplyr::filter(n_Dr > 2) %>% 
+    dplyr::rename(lon = lon_mid, lat = lat_mid) %>%
+    dplyr::select(lon, lat, median_Dr),
+  breaks = seq(from = 0, to = 15, length.out = 11),
+  maxval = 125
+  )
+gg
+#ggsave("fig/test.pdf", width = 10, height = 8)
+```
+
+## Analyse by biome
+
+This doesn't seem to work. For almost all the points given in `df` with their `lat` and `lon`, there is no biome information in the raster file. 
+
+First, extract biome information from NCRS biome map.
+```{r}
+add_biome_ncrs <- function(df, path){
+
+ rasta_biome <- raster::raster(path) %>% 
+  subset(1, drop = TRUE)
+
+  ## Extract data at points given by global model output (gridcells)
+  df_biome_ncrs <- extract(rasta_biome, SpatialPoints(dplyr::select(df, lon, lat)), sp = TRUE) %>% 
+    as_tibble()
+
+  df <- df_biome_ncrs %>% 
+    dplyr::select(-lat, -lon) %>% 
+    bind_cols(df) %>% 
+    rename(biome_ncrs = biomes) %>% 
+    mutate(biome_ncrs = as.factor(biome_ncrs))
+
+  biome_key <- tibble(
+    biome_ncrs = as.factor(0:14),
+    biome_ncrs_chr = c(
+      "Ocean",
+      "TUNDRA Permafrost",
+      "TUNDRA Interfrost",
+      "BOREAL Semi-arid",
+      "BOREAL Humid",
+      "TEMPERATE Semi-arid",
+      "TEMPERATE Humid",
+      "MEDITERRANEAN Warm",
+      "MEDITERRANEAN Cold",
+      "DESERT Tropical",
+      "DESERT Temperate",
+      "DESERT Cold",
+      "TROPICAL Semi-arid",
+      "TROPICAL Humid",
+      "Ice"
+      )
+    )
+  df <- df %>%
+    left_join(biome_key, by = "biome_ncrs") 
+  return(df)
+}
+
+df <- add_biome_ncrs(
+  df, 
+  path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
+  )
+
+df_agg <- add_biome_ncrs(
+  df_agg %>% rename(lon = lon_mid, lat = lat_mid), 
+  path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
+  )
+```
+
+Plot data by biomes: Individual-level data
+```{r}
+df %>% 
+  ggplot(aes(x = biome_ncrs_chr, y = -Dr)) +
+  # geom_boxplot() +
+  geom_violin() +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+```
+
+## Add model results
+
+```{r}
+load("./data/df_20y_bl_v3.Rdata") # loading df_20y_bl_v3
+df_20y_bl_v3 <- df_20y_bl_v3 %>% 
+  add_biome_ncrs(path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif")
+
+# df_20y_bl_v3 %>% 
+#   ggplot(aes(x = biome_ncrs_chr, y = -zroot/10000)) +
+#   # geom_boxplot() +
+#   geom_violin() +
+#   theme(axis.text.x = element_text(angle=90, hjust=1))
+
+df %>% 
+  dplyr::select(biome_ncrs_chr, zroot = Dr) %>% 
+  mutate(source = "obs") %>% 
+  bind_rows(
+    df_20y_bl_v3 %>% 
+      dplyr::select(biome_ncrs_chr, zroot) %>% 
+      mutate(zroot = zroot/10000, source = "mod")
+    ) %>% 
+  ggplot(aes(x = biome_ncrs_chr, y = -zroot, fill = source, color = source)) +
+  geom_boxplot() +
+  # geom_violin() +
+  # geom_bar(stat = "summary", fun.ymax = "max", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+df %>% 
+  dplyr::select(biome_ncrs_chr, zroot = Dr) %>% 
+  mutate(source = "obs") %>% 
+  bind_rows(
+    df_20y_bl_v3 %>% 
+      dplyr::select(biome_ncrs_chr, zroot) %>% 
+      mutate(zroot = zroot/10000, source = "mod")
+    ) %>% 
+  ggplot(aes(x = biome_ncrs_chr, fill = source, color = source)) +
+  stat_summary_bin(aes(y = -zroot), fun.y = "min", geom = "bar", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+```

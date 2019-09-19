@@ -79,6 +79,12 @@ df %>%
   geom_line(color = "black") +
   labs(x = "Date", y = expression(paste("Water balance (mm d"^{-1}, ")")) )
 ggsave("fig/wbal_example.pdf", width = 6, height = 3)
+
+df %>% 
+  ggplot(aes(date, -cumsum(prec - fv * pet))) +
+  geom_line(color = "black") +
+  labs(x = "Date", y = expression(paste("Water balance (mm d"^{-1}, ")")) )
+
 ```
 
 Plot the demand curve, given by cumulative $f_v E_p$.
@@ -96,11 +102,13 @@ Get events of consecutive deficit using the `mct()` function.
 source("R/mct.R")
 out1 <- mct(df, varname_wbal = "bal")
 out2 <- mct(df, varname_wbal = "bal", method = "threshbal", thresh_deficit=0.5 )
+out3 <- mct(df, varname_wbal = "bal", method = "threshbal", thresh_surplus=0.5, do_deficit = FALSE )
 ```
 
 
 Plot the cumulative deficit and rain events.
 ```{r}
+## cumulative deficits
 ggplot() +
   geom_rect(
     data=out2$inst, 
@@ -115,6 +123,21 @@ ggplot() +
   theme_classic() +
   labs(x = "Date", y = "Cumulative water deficit (mm)")
 ggsave("fig/cwd_example.pdf", width = 6, height = 3)
+
+## cumulative surplusses
+ggplot() +
+  geom_rect(
+    data=out3$inst, 
+    aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999), 
+    fill=rgb(0,0,0,0.3), 
+    color=NA) +
+  # geom_line(data = out1$df, aes(date, -bal_cum), size = 0.3, color="royalblue") +
+  geom_line(data = out3$df, aes(date, prec), size = 0.3, color="royalblue") +
+  geom_line(data = out3$df, aes(date, surplus)) +
+  geom_line(data = out3$df, aes(date, surplus), color="tomato") +
+  coord_cartesian(ylim=c(0, 1000), xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))) + #
+  theme_classic() +
+  labs(x = "Date", y = "Cumulative water surplus (mm)")
 ```
 
 As an additional illustration, plot cumulative variables.
@@ -214,6 +237,7 @@ source("R/get_data_fluxnet2015_mct.R")
 source("R/get_plantwhc_mct_bysite.R")
 ddf <- get_data_fluxnet2015_mct("FR-Pue") %>% 
   tidyr::drop_na()
+ddf
 
 result <- get_plantwhc_mct_bysite(ddf, varname_wbal = "wbal")
 result

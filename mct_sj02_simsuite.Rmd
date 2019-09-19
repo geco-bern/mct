@@ -305,6 +305,7 @@ df_modobs %>%
     color = "black", alpha = 0.3, position="identity") +
   scale_fill_manual(name = "", values = c("black", "red")) +
   labs(title = "Distribution of rooting depth (mm), v3", x = "Rooting depth (mm)")
+ggsave("fig/hist_zroot_modobs.pdf", height = 4, width = 6)
 ```
 
 ### Comparison by vegetation type.

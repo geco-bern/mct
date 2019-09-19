@@ -25,7 +25,15 @@ Steps of my analysis:
 
 - (On CX1, run global simulation)
 - Calculate optimal rooting zone WHC for each site using `rscript_mct_simsuite.R`.
+- Do analyses of modelled versus observed using `mct_sj02_simsuite.Rmd`.
 
 ## Other analyses
 
 - EVI as fAPAR: `fapar_max_global.Rmd`
+
+## Analyse RSIP data
+
+- Analyse global rooting depth distribution from the RSIP data (Shersing's individual-level data): `rsip.Rmd`
+
+
+

@@ -33,7 +33,7 @@ Read data and exclude what's not used in Schenk & Jackson 2002.
 # Load data
 # note: re-downloaded data is the same as the one shersingh gave me
 #df_obs2 <- read_csv("/alphadata01/bstocker/data/RPGE_shersing/data/root_profiles_D50D95.csv")
-df_obs <- read_csv("/alphadata01/bstocker/data/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
+df_obs <- read_csv("/alphadata01/bstocker/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
   dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES")
 ```
 
@@ -374,9 +374,9 @@ df_obs2 %>%
 ```{r eval=FALSE}
 # PROBLEM WITH THIS: NOT GEOREFERENCED, JUST A BITMAP
 # data downloaded from https://www.nrcs.usda.gov/wps/portal/nrcs/detail/soils/use/worldsoils/?cid=nrcs142p2_054002
-rasta <- raster("/alphadata01/bstocker/data/biomes/NCRS/biomes_map.bmp")
+rasta <- raster("/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif")
 plot(rasta)
-levelplot(rasta, margin = F, pretty=TRUE) #, at=cutpts, cuts=11, par.settings = mapTheme, main="test variable -- as raster layer")
+rasterVis::levelplot(rasta, margin = F, pretty=TRUE) #, at=cutpts, cuts=11, par.settings = mapTheme, main="test variable -- as raster layer")
 crs(rasta) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
 writeRaster(rasta, "data/biomes_ncrs.nc", overwrite=TRUE, format="CDF", varname="biome", varunit="category", longname="NCRS biome", xname="lon", yname="lat")
 nc <- read_nc_onefile(filn = "data/biomes_ncrs.nc")
