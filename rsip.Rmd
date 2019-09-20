@@ -230,6 +230,6 @@ df %>%
       mutate(zroot = zroot/10000, source = "mod")
     ) %>% 
   ggplot(aes(x = biome_ncrs_chr, fill = source, color = source)) +
-  stat_summary_bin(aes(y = -zroot), fun.y = "min", geom = "bar", position=position_dodge()) +
+  stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.01), geom = "bar", position=position_dodge()) +
   theme(axis.text.x = element_text(angle=90, hjust=1))
 ```
