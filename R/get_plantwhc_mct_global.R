@@ -8,7 +8,11 @@
 #' (containing all time steps' data for each gridcell.)
 #' @export
 #'
-get_plantwhc_mct_global <- function(df, dir, fapar_source = "fAPAR3g"){
+get_plantwhc_mct_global <- function(df,
+                                    dir_et, fil_et_pattern, varnam_et, 
+                                    dir_prec, fil_prec_pattern, varnam_prec, 
+                                    dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
+                                    dir_temp, fil_temp_pattern = NA, varnam_temp = NA){
 
   # ## preprocess data: DOES NOT MAKE SENSE!!!
   # ## 1. Convert arrays (lon-lat-time) from annual output files to 
@@ -23,19 +27,121 @@ get_plantwhc_mct_global <- function(df, dir, fapar_source = "fAPAR3g"){
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
-  df <- purrr::map_dfr(as.list(1:length(irow_chunk)), ~get_plantwhc_mct_chunk( slice(df, irow_chunk[[.]]), dir, ., fapar_source = fapar_source))
+  df <- purrr::map_dfr(
+    as.list(500:length(irow_chunk)),  # xxx debug
+    ~get_plantwhc_mct_chunk( slice(ungroup(df), irow_chunk[[.]]), ., 
+                             dir_et, fil_et_pattern, varnam_et, 
+                             dir_prec, fil_prec_pattern, varnam_prec, 
+                             dir_snow, fil_snow_pattern, varnam_snow,
+                             dir_temp, fil_temp_pattern, varnam_temp)
+    )
     
   return(df)
 }
 
-get_plantwhc_mct_chunk <- function(df, dir, idx, fapar_source = "fAPAR3g"){
+get_plantwhc_mct_chunk <- function(df, idx, 
+                                   dir_et, fil_et_pattern, varnam_et, 
+                                   dir_prec, fil_prec_pattern, varnam_prec, 
+                                   dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
+                                   dir_temp, fil_temp_pattern, varnam_temp){
   
   print("----------------")
   print(paste("DOIN IT BY CHUNK", as.character(idx)))
   print("----------------")
   
+  ##-------------------------------------------------
+  ## Read all points' climate data from this chunk at once
+  ##-------------------------------------------------
+
+  ##-------------------------------------------------
+  ## Precipitation
+  ##-------------------------------------------------
+  print("getting precipitation data from WATCH-WFDEI ...")
+  convert_prec_watch <- function(x){ x * 60 * 60 * 24 }  # kg/m2/s -> mm/day
+  list_fil_prec <- list.files(dir_prec, pattern = fil_prec_pattern)
+  
+  df_prec <- extract_points_filelist(df, list_fil_prec, dirnam = dir_prec, fil_pattern = fil_prec_pattern) %>% 
+    dplyr::rename(df_prec = data0) %>% 
+    dplyr::mutate(df_prec = purrr::map(df_prec, ~rename(., prec = V1))) %>% 
+    dplyr::mutate(df_prec = purrr::map(df_prec, ~mutate(., prec = convert_prec_watch(prec)))) %>% 
+    dplyr::mutate(df_prec = purrr::map(df_prec, ~drop_na(.)))
+  
+  ##-------------------------------------------------
+  ## Snow
+  ##-------------------------------------------------
+  print("getting snow data from WATCH-WFDEI ...")
+  list_fil_snow <- list.files(dir_snow, pattern = fil_snow_pattern)
+  
+  df_snow <- extract_points_filelist(df, list_fil_snow, dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>% 
+    dplyr::rename(df_snow = data0) %>% 
+    dplyr::mutate(df_snow = purrr::map(df_snow, ~rename(., snow = V1))) %>% 
+    dplyr::mutate(df_snow = purrr::map(df_snow, ~mutate(., snow = convert_prec_watch(snow)))) %>% 
+    dplyr::mutate(df_snow = purrr::map(df_snow, ~drop_na(.)))
+  
+  ##-------------------------------------------------
+  ## Temperature
+  ##-------------------------------------------------
+  print("getting temperature data from WATCH-WFDEI ...")
+  convert_temp_watch <- function(x){ x - 273.15 }  # K -> degC
+  list_fil_temp <- list.files(dir_temp, pattern = fil_temp_pattern)
+  
+  df_temp <- extract_points_filelist(df, list_fil_temp, dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>% 
+    dplyr::rename(df_temp = data0) %>% 
+    dplyr::mutate(df_temp = purrr::map(df_temp, ~rename(., temp = V1))) %>% 
+    dplyr::mutate(df_temp = purrr::map(df_temp, ~mutate(., temp = convert_temp_watch(temp)))) %>% 
+    dplyr::mutate(df_temp = purrr::map(df_temp, ~drop_na(.)))
+  
+  ##-------------------------------------------------
+  ## Merge prec, snow, and temp
+  ##-------------------------------------------------
+  df <- df_temp %>% 
+    dplyr::left_join(df_prec, by = c("lon", "lat", "idx", "elv")) %>% 
+    dplyr::left_join(df_snow, by = c("lon", "lat", "idx", "elv")) %>% 
+    mutate(df_watch = purrr::map2(df_temp, df_prec, ~left_join(.x, .y, by = "date"))) %>%
+    select(-df_prec, -df_temp) %>% 
+    mutate(df_watch = purrr::map2(df_watch, df_snow, ~left_join(.x, .y, by = "date"))) %>% 
+    select(-df_snow)
+  
+  ##-------------------------------------------------
+  ## ET
+  ##-------------------------------------------------
+  print("getting ET data from PT-JPL ...")
+  list_fil_et <- list.files(dir_et, pattern = fil_et_pattern)
+  
+  df <- extract_points_filelist(df, list_fil_et, dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>% 
+    dplyr::rename(df_et_pt = data0) %>% 
+    dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~rename(., et = V1)))
+    # dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~mutate(., et_mm = convert_et(temp)))) %>% 
+    # dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~drop_na(.)))
+  
+  ##-------------------------------------------------
+  ## Merge ET and WATCH data
+  ##-------------------------------------------------
   df <- df %>% 
-    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, dir, fapar_source = fapar_source)))
+    mutate(df = purrr::map2(df_et_pt, df_watch, ~full_join(.x, .y, by = "date"))) %>%
+    select(-df_et_pt, -df_watch) 
+
+  ##-------------------------------------------------
+  ## Convert ET units
+  ##-------------------------------------------------
+  row_rep <- function(df, n) {
+    df[rep(1:nrow(df), times = n),]
+  }
+  df <- df %>% 
+    nest(df_elv = elv) %>%
+    mutate(df_elv = purrr::map2(df_elv, df, ~row_rep(.x, nrow(.y)))) %>%
+    mutate(df = purrr::map2(df, df_elv, ~bind_cols(.x, .y))) %>%
+    select(-df_elv) %>% 
+    mutate(et_mm = purrr::map(df, ~convert_et(.$et, .$temp, .$elv))) %>% 
+    mutate(et_mm = purrr::map(et_mm, ~tibble(et_mm = .))) %>% 
+    mutate(df = purrr::map2(df, et_mm, ~bind_cols(.x, .y))) %>% 
+    select(-et_mm)
+    
+    
+  #fil_prec <- paste0(dir, "s1_fapar3g_v4_global.d.wbal.nc")
+  
+  df <- df %>% 
+    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, ...)))
   
   # outfil <- "./data/df_plantwhc_mct.Rdata"
   # if (file.exists(outfil)){
@@ -62,13 +168,18 @@ get_plantwhc_mct_chunk <- function(df, dir, idx, fapar_source = "fAPAR3g"){
   return(df)
 }
 
-get_plantwhc_mct_gridcell <- function(ilon, ilat, dir, fapar_source = "fAPAR3g"){
+get_plantwhc_mct_gridcell <- function(ilon, ilat, ...){
   
   print(paste("doin it by gridcell:", as.character(ilon), as.character(ilat)))
   
   ## read daily climate data (prec, PET, fAPAR) for this gridcell
   print("reading nc file...")
-  ddf <- withTimeout(read_nc_gridcell(ilon, ilat, dir, fapar_source = fapar_source), timeout = 60, onTimeout = "warning")
+  ddf <- withTimeout(
+    read_nc_gridcell(
+      ilon, ilat, ...
+      ), 
+    timeout = 60, onTimeout = "warning"
+    )
   if (typeof(ddf)=="character"){
     return_period <- c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800)
     out_plant_whc <- tibble(
@@ -133,58 +244,26 @@ get_plantwhc_mct_gridcell <- function(ilon, ilat, dir, fapar_source = "fAPAR3g")
   
 }
 
-get_df_landmask <- function(dir){
-  
-  ## get land mask (data frame with lon, lat, ilon, and ilat for each land cell)
-  maskfiln <- paste0(dir, "s1_fapar3g_v3_global.fland.nc")
-  
-  nc <- ncdf4::nc_open(maskfiln)
-  {
-    sink(paste0(maskfiln, ".txt"))
-    print(nc)
-    sink()
-    unlink(paste0(maskfiln, ".txt"))
-  }
 
-  out <- list(
-    lon = ncdf4::ncvar_get(nc, nc$dim$lon$name),
-    lat = ncdf4::ncvar_get(nc, nc$dim$lat$name)
-  )
-  
-  df <- expand.grid(out$lon, out$lat) %>%
-    as.matrix() %>%
-    as_tibble() %>%
-    setNames(c("lon", "lat"))
-  
-  fland <- ncdf4::ncvar_get(nc, "fland")
-  ncdf4::nc_close(nc)
-  
-  df <- df %>%
-    bind_cols(tibble(fland = as.vector(fland))) %>%
-    tidyr::drop_na() %>% 
-    mutate(idx = 1:n()) %>% 
-    group_by(idx) %>% 
-    nest() %>% 
-    mutate(out_ilon_ilat = purrr::map(data, ~get_ilon_ilat( .$lon, .$lat, out$lon, out$lat )))
-
-  return(df)  
-}
-
-
-read_nc_gridcell <- function(ilon, ilat, dir, fapar_source = "fAPAR3g"){
-  
+read_nc_gridcell <- function(ilon, ilat, fil_et, varnam_et, fil_prec_pattern, varnam_prec, fil_snow = NA, varnam_snow = NA){
   ##-------------------------------------------------
-  ## WBAL: in SOFUN output it's liquid-water-to-soil 
+  ## Precipitation (accounting for snow vs. rain and 
+  ## snow melt. In SOFUN output it's liquid-water-to-soil 
   ##-------------------------------------------------
-  filn <- paste0(dir, "s1_fapar3g_v4_global.d.wbal.nc")
-
-  nc <- ncdf4::nc_open(filn)
+  #fil_prec <- paste0(dir, "s1_fapar3g_v4_global.d.wbal.nc")
+  list_fil_prec <- list.files("~/data/watch_wfdei/Rainf_daily", pattern = fil_prec_pattern)
+  
+  ## use raster to read point data from file
+  
+  
+  
+  nc <- ncdf4::nc_open(fil_prec)
   # Save the print(nc) dump to a text file
   {
-    sink(paste0(filn, ".txt"))
+    sink(paste0(fil_prec, ".txt"))
     print(nc)
     sink()
-    unlink(paste0(filn, ".txt"))
+    unlink(paste0(fil_prec, ".txt"))
   }
   
   time <- ncdf4::ncvar_get(nc, nc$dim$time$name)
@@ -194,193 +273,32 @@ read_nc_gridcell <- function(ilon, ilat, dir, fapar_source = "fAPAR3g"){
     date <- conv_noleap_to_ymd(time, origin = lubridate::ymd("2001-01-01"))
   }
 
-  wbal <- ncdf4::ncvar_get(nc, "wbal", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
+  wbal <- ncdf4::ncvar_get(nc, varnam_prec, start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
   ncdf4::nc_close(nc)
   
   #-------------------------------------------------
-  # PET
+  # ET
   #-------------------------------------------------
-  filn <- paste0(dir, "s1_fapar3g_v4_global.d.pet.nc")
-
-  nc <- ncdf4::nc_open(filn)
+  nc <- ncdf4::nc_open(fil_et)
   # Save the print(nc) dump to a text file
   {
-    sink(paste0(filn, ".txt"))
+    sink(paste0(fil_et, ".txt"))
     print(nc)
     sink()
-    unlink(paste0(filn, ".txt"))
+    unlink(paste0(fil_et, ".txt"))
   }
 
-  pet <- ncdf4::ncvar_get(nc, "pet", start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
+  et <- ncdf4::ncvar_get(nc, varnam_et, start = c(ilon, ilat, 1, 1), count = c(1,1,1,length(time)))
   ncdf4::nc_close(nc)
 
   # data frame with SOFUN outputs
   df1 <- tibble(
     date = date, 
     water_to_soil = wbal,
-    pet = pet
+    et = et
     ) %>% 
     mutate(year = year(date), doy = yday(date), moy = month(date))
-  
-  if (fapar_source == "EVI"){
-    ##-------------------------------------------------
-    ## fAPAR as EVI (ZMAW data)
-    ##-------------------------------------------------
-    dir2 <- "/alphadata01/bstocker/data/modis_monthly-evi/zmaw_data/halfdeg/"
-    filn <- paste0(dir2, "modis_vegetation__LPDAAC__v5__halfdegMAX_mean2000.nc")
-    
-    nc <- ncdf4::nc_open(filn)
-    # Save the print(nc) dump to a text file
-    {
-      sink(paste0(filn, ".txt"))
-      print(nc)
-      sink()
-      unlink(paste0(filn, ".txt"))
-    }
-    
-    time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
-    ## convert to date
-    if (nc$dim$time$units=="days since 2001-1-1 0:0:0"){
-      date2 <- conv_noleap_to_ymd(time2, origin = lubridate::ymd("2001-01-01"))
-    }
-    
-    ## override
-    date2 <- seq(from = ymd("2000-01-01"), to = ymd("2015-12-01"), by = "months") + days(14)
-    
-    # get evi from NetCDF
-    # evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
-    evi <- ncdf4::ncvar_get(nc, "evi", start = c(ilon, ilat, 1), count = c(1,1,12))
-    
-    ncdf4::nc_close(nc)
-    
-    df2 <- tibble(date = date2, evi = evi) %>% 
-      mutate(year = year(date2), moy = month(date)) #
-    
-    # gg <- ggplot(df2) +
-    #   geom_line(aes(x = date, y = evi)) +
-    #   labs( title = paste("ilon:", as.character(ilon), " ilat:", as.character(ilat)) )
-    # print(gg)
-    
-    ## first take mean seasonality (is stored in year 2000)
-    df2_meandoy <- df2 %>%
-      dplyr::filter(year == 2000) %>%
-      dplyr::select(-date, -year) %>%
-      dplyr::rename(evi_meandoy = evi)
-    
-    ## merge mean seasonality (evi_meandoy) into the main df
-    df <- df1 %>%
-      left_join(dplyr::select(df2_meandoy, -date), by = "moy")
-    
-    ## MEAN SEASONAL CYCLE: take evi as evi_meandoy
-    df <- df %>% 
-      mutate(evi = evi_meandoy)
-    
-    # ## ACTUAL EVI FOR POST-2000: merge actual evi into main df
-    # df <- df %>%
-    #   left_join(dplyr::select(df2, year, moy, evi), by = c("year", "moy")) %>% 
-    #   mutate(dom = mday(date)) %>% 
-    #   
-    #   # fill up years before 2000 with mean seasonality (2000 has already mean seasonality)
-    #   rowwise() %>% 
-    #   mutate(evi = ifelse(is.na(evi), evi_meandoy, evi)) %>% 
-    #   
-    #   # remove again all days data except the 15th of each month
-    #   mutate(evi = ifelse(dom==15, evi, NA)) %>% 
-    #   dplyr::select(-dom, -evi_meandoy, -year, -moy, -doy)    
-    
-  } else if (fapar_source == "fAPAR3g") {
-    ##-------------------------------------------------
-    ## MEAN SEASONAL CYCLE fAPAR from fAPAR3g3g v2
-    ##-------------------------------------------------
-    dir2 <- "~/data/fAPAR/fAPAR3g_v2_halfdeg_max/"
-    filn <- paste0(dir2, "fAPAR3g_v2_halfdeg_max_1982_2011.nc")
-    
-    nc <- ncdf4::nc_open(filn)
-    # Save the print(nc) dump to a text file
-    {
-      sink(paste0(filn, ".txt"))
-      print(nc)
-      sink()
-      unlink(paste0(filn, ".txt"))
-    }
-    
-    time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
-    
-    ## override
-    date2 <- seq(from = ymd("1982-01-01"), to = ymd("2011-12-01"), by = "months") + days(14)
-    
-    # get fapar from NetCDF
-    fapar <- ncdf4::ncvar_get(nc, "fapar", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
 
-    ncdf4::nc_close(nc)
-    
-    df2 <- tibble(date = date2, fapar = fapar) %>% 
-      mutate(year = year(date2), moy = month(date2))
-        
-    ## merge into the main df
-    df <- df1 %>%
-      left_join(dplyr::select(df2, -date), by = c("year", "moy")) %>% 
-
-      # remove again all days data except the 15th of each month
-      mutate(dom = mday(date)) %>%
-      mutate(fapar = ifelse(dom==15, fapar, NA)) %>%
-      dplyr::select(-dom, -moy) %>% 
-      
-      # remove years beyond 2011
-      dplyr::filter(year <= 2011)
-    
-    
-  } else if (fapar_source == "fAPAR3g_meandoy") {
-    ##-------------------------------------------------
-    ## MEAN SEASONAL CYCLE fAPAR from fAPAR3g3g v2
-    ##-------------------------------------------------
-    dir2 <- "~/data/fAPAR/fAPAR3g_v2_halfdeg_max/"
-    filn <- paste0(dir2, "fAPAR3g_v2_halfdeg_max_YMONMEAN.nc")
-    
-    nc <- ncdf4::nc_open(filn)
-    # Save the print(nc) dump to a text file
-    {
-      sink(paste0(filn, ".txt"))
-      print(nc)
-      sink()
-      unlink(paste0(filn, ".txt"))
-    }
-    
-    time2 <- ncdf4::ncvar_get(nc, nc$dim$time$name)
-    
-    ## override
-    date2 <- seq(from = ymd("2000-01-01"), to = ymd("2000-12-01"), by = "months") + days(14)
-    
-    # get fapar from NetCDF
-    fapar <- ncdf4::ncvar_get(nc, "fapar", start = c(ilon, ilat, 1), count = c(1,1,length(time2)))
-    
-    ncdf4::nc_close(nc)
-    
-    df2 <- tibble(date = date2, fapar = fapar) %>% 
-      mutate(moy = month(date))
-    
-    ## merge mean seasonality into the main df
-    df <- df1 %>%
-      left_join(dplyr::select(df2, -date), by = "moy") %>% 
-      mutate(dom = mday(date)) %>%
-      
-      # remove again all days data except the 15th of each month
-      mutate(fapar = ifelse(dom==15, fapar, NA)) %>%
-      dplyr::select(-dom, -moy)
-    
-  }
-
-  return(df)
-}
-
-get_ilon_ilat <- function(lon, lat, lon_vec, lat_vec){
-
-  ## get index to read data only for this index
-  ilon <- which.min(abs(lon - lon_vec))
-  ilat <- which.min(abs(lat - lat_vec))
-  
-  df <- tibble(lon=lon, lat=lat, ilon=ilon, ilat=ilat)
-  
   return(df)
 }
 
