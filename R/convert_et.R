@@ -1,6 +1,10 @@
 ## Adopted from SPLASH
 convert_et <- function(et_e, tc, elv){ 
   
+  ## et_e : ET in energy units (W m-2; representative for mean value over one day)
+  ## tc   : temperature in degrees Celsius
+  ## elv  : eleation above sea level (m)
+  
   par_splash <- list(
 		kTkelvin = 273.15,  # freezing point in K (= 0 deg C) 
 		kTo = 298.15,       # base temperature, K (from P-model)
@@ -169,7 +173,7 @@ calc_psychro <- function( tc, press, par_splash ){
   # Adopted temperature adjustment from SPLASH, Python version
   my_tc <- tc
 
-	my_tc <- min(max(tc, 0), 100)
+	my_tc <- ifelse(tc > 100, 100, ifelse(tc < 0, 0, tc))
 
   # Calculate the specific heat capacity of water, J/kg/K
   # Eq. 47, Tsilingiris (2008)

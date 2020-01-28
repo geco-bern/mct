@@ -22,13 +22,13 @@ get_plantwhc_mct_global <- function(df,
   # list_nc <- purrr::map(list_filn, ~read_nc_onefile(paste0(dir, .)))
   # list_df <- purrr::map(list_nc, ~nc_to_df(., dropna = TRUE, filn = "./test.Rdata"))
 
-  nchunk <- 1000
+  nchunk <- 1   # xxx test: change this back to 1000 (number of chunks)
   nrows_chunk <- ceiling(nrow(df)/nchunk)
   irow <- seq(1:nrow(df))
   irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
   
   df <- purrr::map_dfr(
-    as.list(500:length(irow_chunk)),  # xxx debug
+    as.list(1:length(irow_chunk)),
     ~get_plantwhc_mct_chunk( slice(ungroup(df), irow_chunk[[.]]), ., 
                              dir_et, fil_et_pattern, varnam_et, 
                              dir_prec, fil_prec_pattern, varnam_prec, 
@@ -59,59 +59,61 @@ get_plantwhc_mct_chunk <- function(df, idx,
   print("getting precipitation data from WATCH-WFDEI ...")
   convert_prec_watch <- function(x){ x * 60 * 60 * 24 }  # kg/m2/s -> mm/day
   list_fil_prec <- list.files(dir_prec, pattern = fil_prec_pattern)
-  
-  df_prec <- extract_points_filelist(df, list_fil_prec, dirnam = dir_prec, fil_pattern = fil_prec_pattern) %>% 
-    dplyr::rename(df_prec = data0) %>% 
-    dplyr::mutate(df_prec = purrr::map(df_prec, ~rename(., prec = V1))) %>% 
-    dplyr::mutate(df_prec = purrr::map(df_prec, ~mutate(., prec = convert_prec_watch(prec)))) %>% 
+
+  ## xxx debug: get data for one year only
+  df_prec <- extract_points_filelist(df, list_fil_prec[313:324], dirnam = dir_prec, fil_pattern = fil_prec_pattern) %>%
+    dplyr::rename(df_prec = data0) %>%
+    dplyr::mutate(df_prec = purrr::map(df_prec, ~rename(., prec = V1))) %>%
+    dplyr::mutate(df_prec = purrr::map(df_prec, ~mutate(., prec = convert_prec_watch(prec)))) %>%
     dplyr::mutate(df_prec = purrr::map(df_prec, ~drop_na(.)))
-  
+
   ##-------------------------------------------------
   ## Snow
   ##-------------------------------------------------
   print("getting snow data from WATCH-WFDEI ...")
   list_fil_snow <- list.files(dir_snow, pattern = fil_snow_pattern)
-  
-  df_snow <- extract_points_filelist(df, list_fil_snow, dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>% 
-    dplyr::rename(df_snow = data0) %>% 
-    dplyr::mutate(df_snow = purrr::map(df_snow, ~rename(., snow = V1))) %>% 
-    dplyr::mutate(df_snow = purrr::map(df_snow, ~mutate(., snow = convert_prec_watch(snow)))) %>% 
+
+  df_snow <- extract_points_filelist(df, list_fil_snow[313:324], dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>%
+    dplyr::rename(df_snow = data0) %>%
+    dplyr::mutate(df_snow = purrr::map(df_snow, ~rename(., snow = V1))) %>%
+    dplyr::mutate(df_snow = purrr::map(df_snow, ~mutate(., snow = convert_prec_watch(snow)))) %>%
     dplyr::mutate(df_snow = purrr::map(df_snow, ~drop_na(.)))
-  
+
   ##-------------------------------------------------
   ## Temperature
   ##-------------------------------------------------
   print("getting temperature data from WATCH-WFDEI ...")
   convert_temp_watch <- function(x){ x - 273.15 }  # K -> degC
   list_fil_temp <- list.files(dir_temp, pattern = fil_temp_pattern)
-  
-  df_temp <- extract_points_filelist(df, list_fil_temp, dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>% 
-    dplyr::rename(df_temp = data0) %>% 
-    dplyr::mutate(df_temp = purrr::map(df_temp, ~rename(., temp = V1))) %>% 
-    dplyr::mutate(df_temp = purrr::map(df_temp, ~mutate(., temp = convert_temp_watch(temp)))) %>% 
+
+  df_temp <- extract_points_filelist(df, list_fil_temp[313:324], dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>%
+    dplyr::rename(df_temp = data0) %>%
+    dplyr::mutate(df_temp = purrr::map(df_temp, ~rename(., temp = V1))) %>%
+    dplyr::mutate(df_temp = purrr::map(df_temp, ~mutate(., temp = convert_temp_watch(temp)))) %>%
     dplyr::mutate(df_temp = purrr::map(df_temp, ~drop_na(.)))
-  
+
   ##-------------------------------------------------
   ## Merge prec, snow, and temp
   ##-------------------------------------------------
-  df <- df_temp %>% 
-    dplyr::left_join(df_prec, by = c("lon", "lat", "idx", "elv")) %>% 
-    dplyr::left_join(df_snow, by = c("lon", "lat", "idx", "elv")) %>% 
+  df <- df_temp %>%
+    dplyr::left_join(df_prec, by = c("lon", "lat", "idx", "elv")) %>%
+    dplyr::left_join(df_snow, by = c("lon", "lat", "idx", "elv")) %>%
     mutate(df_watch = purrr::map2(df_temp, df_prec, ~left_join(.x, .y, by = "date"))) %>%
-    select(-df_prec, -df_temp) %>% 
-    mutate(df_watch = purrr::map2(df_watch, df_snow, ~left_join(.x, .y, by = "date"))) %>% 
+    select(-df_prec, -df_temp) %>%
+    mutate(df_watch = purrr::map2(df_watch, df_snow, ~left_join(.x, .y, by = "date"))) %>%
     select(-df_snow)
   
   ##-------------------------------------------------
-  ## ET
+  ## ET (given in W m-2)
   ##-------------------------------------------------
   print("getting ET data from PT-JPL ...")
   list_fil_et <- list.files(dir_et, pattern = fil_et_pattern)
+  convert_et_wm2 <- function(x){ x * 60 * 60 * 24 }  # W m-2 -> J m-2 d-1
   
   df <- extract_points_filelist(df, list_fil_et, dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>% 
     dplyr::rename(df_et_pt = data0) %>% 
-    dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~rename(., et = V1)))
-    # dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~mutate(., et_mm = convert_et(temp)))) %>% 
+    dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~rename(., et = V1))) %>% 
+    dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~mutate(., et = convert_et_wm2(et))))
     # dplyr::mutate(df_et_pt = purrr::map(df_et_pt, ~drop_na(.)))
   
   ##-------------------------------------------------
@@ -137,33 +139,18 @@ get_plantwhc_mct_chunk <- function(df, idx,
     mutate(df = purrr::map2(df, et_mm, ~bind_cols(.x, .y))) %>% 
     select(-et_mm)
     
-    
-  #fil_prec <- paste0(dir, "s1_fapar3g_v4_global.d.wbal.nc")
+  # df <- df %>% 
+  #   mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, ...)))
   
-  df <- df %>% 
-    mutate(data = purrr::map(out_ilon_ilat, ~get_plantwhc_mct_gridcell( .$ilon, .$ilat, ...)))
-  
-  # outfil <- "./data/df_plantwhc_mct.Rdata"
-  # if (file.exists(outfil)){
-  #   load(outfil)
-  # } else {
-  #   df2 <- df
-  # }
-  # df2 <- df2 %>% bind_rows(df)
+  # outfil <- paste0("./data/v3/df_plantwhc_mct", as.character(idx), ".Rdata")
   # print(paste("Saving to", outfil, "..."))
-  # save(df2, file = outfil)
+  # save(df, file = outfil)
   # print("... done.")
-  
-  outfil <- paste0("./data/v3/df_plantwhc_mct", as.character(idx), ".Rdata")
-  print(paste("Saving to", outfil, "..."))
-  save(df, file = outfil)
-  print("... done.")
-  save(idx, file = "./data/idx.Rdata")
-  #rm(list = ls())
-  dir <- "~/sofun/output_nc_global_sofun/"
-  gridfile <- "./data/df_grid.Rdata"
-  load(gridfile)
-  load <- "./data/idx.Rdata"
+  # save(idx, file = "./data/idx.Rdata")
+  # dir <- "~/sofun/output_nc_global_sofun/"
+  # gridfile <- "./data/df_grid.Rdata"
+  # load(gridfile)
+  # load <- "./data/idx.Rdata"
   
   return(df)
 }

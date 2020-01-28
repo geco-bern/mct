@@ -8,10 +8,18 @@ Steps of my analysis:
 
 ## ET evaluation
 
+- `rscript_eval_fluxnet2015.R`: Get ET and precip data for FLUXNET sites and extract from global files (WATCH-WFDEI and LandFlux) at respective sites for comparison. This creates file `data/df_eval.csv` and with aligned data `data/df_alg__df_dday_aggbydday.Rdata`. This is used to evaluate whether ET products can accurately simulate ET during dry rain-free periods (i.e., whether bias w.r.t. EC measurements shows any relationship to the duration of rain-free periods).
+
+**Old:**
 - `calibrate_ET.Rmd` replaces old `calib_mct_fluxnet2015.Rmd`
 - Run vignette 'splash_fluxnet2015.Rmd' in rsofun repo to prepare input files for FLUXNET 2015 simulations (for PET)
 - Run site-scale simulations (done on my laptop)
 - Analyse results using `eval_et.Rmd`
+
+
+## MCT evaluation
+
+
 
 ## Simulate global optimal rooting depth
 
