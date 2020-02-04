@@ -1,18 +1,9 @@
-#' Convert NetCDF contents to a data frame.
-#'
-#' Converts the output of \code{"read_nc_onefile()"} into a data frame (tibble)
-#'
-#' @param out An object returned by the function \link{read_nc_onefile}.
-#' @return A tidy data frame with a row for each gridcell. Contains columns
-#' \code{"lon"} (longitude), \code{"lat"} (latitude), and \code{"data"}
-#' (containing all time steps' data for each gridcell.)
-#' @export
-#'
 get_plantwhc_mct_global <- function(df,
                                     dir_et, fil_et_pattern, varnam_et, 
                                     dir_prec, fil_prec_pattern, varnam_prec, 
                                     dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
-                                    dir_temp, fil_temp_pattern = NA, varnam_temp = NA){
+                                    dir_temp, fil_temp_pattern = NA, varnam_temp = NA,
+                                    do_slice = TRUE){
 
   # ## preprocess data: DOES NOT MAKE SENSE!!!
   # ## 1. Convert arrays (lon-lat-time) from annual output files to 
@@ -22,22 +13,41 @@ get_plantwhc_mct_global <- function(df,
   # list_nc <- purrr::map(list_filn, ~read_nc_onefile(paste0(dir, .)))
   # list_df <- purrr::map(list_nc, ~nc_to_df(., dropna = TRUE, filn = "./test.Rdata"))
 
-  nchunk <- 1   # xxx test: change this back to 1000 (number of chunks)
-  nrows_chunk <- ceiling(nrow(df)/nchunk)
-  irow <- seq(1:nrow(df))
-  irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
-  
-  df <- purrr::map_dfr(
-    as.list(1:length(irow_chunk)),
-    ~get_plantwhc_mct_chunk( slice(ungroup(df), irow_chunk[[.]]), ., 
-                             dir_et, fil_et_pattern, varnam_et, 
-                             dir_prec, fil_prec_pattern, varnam_prec, 
-                             dir_snow, fil_snow_pattern, varnam_snow,
-                             dir_temp, fil_temp_pattern, varnam_temp)
-    )
+  if (do_slice){
+    ##-------------------------------------------------
+    ## Slice up grid data frame into chunks
+    ##-------------------------------------------------
+    nchunk <- 1   # xxx test: change this back to 1000 (number of chunks)
+    nrows_chunk <- ceiling(nrow(df)/nchunk)
+    irow <- seq(1:nrow(df))
+    irow_chunk <- split(irow, ceiling(seq_along(irow)/nrows_chunk))
     
+    df <- purrr::map_dfr(
+      as.list(1:length(irow_chunk)),
+      ~get_plantwhc_mct_chunk( slice(ungroup(df), irow_chunk[[.]]), ., 
+                               dir_et, fil_et_pattern, varnam_et, 
+                               dir_prec, fil_prec_pattern, varnam_prec, 
+                               dir_snow, fil_snow_pattern, varnam_snow,
+                               dir_temp, fil_temp_pattern, varnam_temp)
+      )
+
+  } else {
+    ##-------------------------------------------------
+    ## Pass entire data frame
+    ##-------------------------------------------------
+    df <- purrr::map_dfr(
+      as.list(seq(nrow(df))),
+      ~get_plantwhc_mct_chunk( slice(ungroup(df), .), ., 
+                               dir_et, fil_et_pattern, varnam_et, 
+                               dir_prec, fil_prec_pattern, varnam_prec, 
+                               dir_snow, fil_snow_pattern, varnam_snow,
+                               dir_temp, fil_temp_pattern, varnam_temp)
+      )
+  }
+
   return(df)
 }
+
 
 get_plantwhc_mct_chunk <- function(df, idx, 
                                    dir_et, fil_et_pattern, varnam_et, 

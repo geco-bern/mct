@@ -9,18 +9,11 @@
 #' @export
 #'
 get_data_mct_global <- function(df,
-                                    dir_et_ptjpl, fil_et_ptjpl_pattern, 
+                                    dir_et, fil_et_pattern, 
                                     dir_prec, fil_prec_pattern, varnam_prec, 
                                     dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
                                     dir_temp, fil_temp_pattern = NA, varnam_temp = NA){
 
-  # ## preprocess data: DOES NOT MAKE SENSE!!!
-  # ## 1. Convert arrays (lon-lat-time) from annual output files to 
-  # ##    nested data frames and save as Rdata files.
-  # #filn <- paste0(dir, "s1_fapar3g_v3_global.", as.character(year), ".d.wbal.nc")
-  # list_filn <- list.files(path = dir, pattern = "s1_fapar3g_v4_global.*.d.wbal.nc")
-  # list_nc <- purrr::map(list_filn, ~read_nc_onefile(paste0(dir, .)))
-  # list_df <- purrr::map(list_nc, ~nc_to_df(., dropna = TRUE, filn = "./test.Rdata"))
 
   nchunk <- 1   # xxx test: change this back to 1000 (number of chunks)
   nrows_chunk <- ceiling(nrow(df)/nchunk)
@@ -30,7 +23,7 @@ get_data_mct_global <- function(df,
   df <- purrr::map_dfr(
     as.list(1:length(irow_chunk)),
     ~get_data_mct_chunk( slice(ungroup(df), irow_chunk[[.]]), ., 
-                             dir_et_ptjpl, fil_et_ptjpl_pattern, 
+                             dir_et, fil_et_pattern, 
                              dir_prec, fil_prec_pattern, varnam_prec, 
                              dir_snow, fil_snow_pattern, varnam_snow,
                              dir_temp, fil_temp_pattern, varnam_temp)
@@ -40,7 +33,7 @@ get_data_mct_global <- function(df,
 }
 
 get_data_mct_chunk <- function(df, idx, 
-                                   dir_et_ptjpl, fil_et_ptjpl_pattern, 
+                                   dir_et, fil_et_pattern, 
                                    dir_prec, fil_prec_pattern, varnam_prec, 
                                    dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
                                    dir_temp, fil_temp_pattern, varnam_temp){
@@ -107,18 +100,18 @@ get_data_mct_chunk <- function(df, idx,
   ## ET from LandFlux data (given in W m-2), components individually
   ##-------------------------------------------------
   print("getting ET data from LandFlux ...")
-  list_fil_et <- list.files(dir_et_ptjpl, pattern = fil_et_ptjpl_pattern)
+  list_fil_et <- list.files(dir_et, pattern = fil_et_pattern)
   convert_et_wm2 <- function(x){ x * 60 * 60 * 24 }  # W m-2 -> J m-2 d-1
   
   ## transpiration ("ET_tran")
-  df <- extract_points_filelist(df, list_fil_et, varnam = "ET_tran", dirnam = dir_et_ptjpl, fil_pattern = fil_et_ptjpl_pattern, filetype = "landflux") %>% 
+  df <- extract_points_filelist(df, list_fil_et, varnam = "ET_tran", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>% 
     dplyr::rename(df_et = data0) %>% 
     dplyr::mutate(df_et = purrr::map(df_et, ~rename(., transp = V1))) %>% 
     dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., transp = convert_et_wm2(transp))))
 
   ## soil evaportation ("ET_soil")
   df <- df %>% 
-    extract_points_filelist(list_fil_et, varnam = "ET_soil", dirnam = dir_et_ptjpl, fil_pattern = fil_et_ptjpl_pattern, filetype = "landflux") %>% 
+    extract_points_filelist(list_fil_et, varnam = "ET_soil", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>% 
     dplyr::mutate(data0 = purrr::map(data0, ~rename(., evap_soil = V1))) %>% 
     dplyr::mutate(df_et = purrr::map2(df_et, data0, ~left_join(.x, .y, by = "date"))) %>% 
     dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., evap_soil = convert_et_wm2(evap_soil)))) %>% 
@@ -126,7 +119,7 @@ get_data_mct_chunk <- function(df, idx,
 
   ## (wet) canopy evaporation ("can_evap")
   df <- df %>% 
-    extract_points_filelist(list_fil_et, varnam = "can_evap", dirnam = dir_et_ptjpl, fil_pattern = fil_et_ptjpl_pattern, filetype = "landflux") %>%
+    extract_points_filelist(list_fil_et, varnam = "can_evap", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>%
     dplyr::mutate(data0 = purrr::map(data0, ~dplyr::rename(., evap_canop = V1))) %>% 
     dplyr::mutate(df_et = purrr::map2(df_et, data0, ~left_join(.x, .y, by = "date"))) %>% 
     dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., evap_canop = convert_et_wm2(evap_canop)))) %>% 
@@ -147,6 +140,7 @@ get_data_mct_chunk <- function(df, idx,
   ##-------------------------------------------------
   ## Convert ET units to mm d-1
   ##-------------------------------------------------
+  print("converting ET units to mm d-1 ...")
   row_rep <- function(df, n) {
     df[rep(1:nrow(df), times = n),]
   }
