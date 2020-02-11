@@ -13,9 +13,9 @@ extract_points_filelist <- function(df, list, varnam, dirnam = "", fil_pattern =
     
     ## for watch-wfdei, construct data from file name
     if (filetype=="watch"){
-      tmp <- stringr::str_remove(ifil, fil_pattern) %>% 
-        stringr::str_remove(., "_") %>% 
-        stringr::str_remove(., ".nc")
+      tmp <- stringr::str_replace(ifil, fil_pattern, "") %>% 
+        stringr::str_replace(., "_", "") %>% 
+        stringr::str_replace(., ".nc", "")
       year <- tmp %>% 
         stringr::str_sub(., start = 1, end = 4)
       moy <- tmp %>% 
