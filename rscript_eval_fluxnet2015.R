@@ -39,49 +39,13 @@ df_grid <- siteinfo %>%
 ## df_grid must contain columns lon, lat, elv, and idx 
 
 ## PT-JPL
-filn <- "data/df_pt_jpl.Rdata"
-if (!file.exists(filn)){
-  df_pt_jpl <- get_data_mct_global(
-    df_grid, 
-    dir_et = "~/data/landflux/et_prod/",    fil_et_pattern = "ET_PT-SRB-PU_daily_", 
-    dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
-    dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-    dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI"
-    )
-  save(df_pt_jpl, file = filn)
-} else {
-  load(filn)
-}
+load("data/df_pt_jpl.Rdata")
 
 ## PM
-filn <- "data/df_pm_mod.Rdata"
-if (!file.exists(filn)){
-  df_pm_mod <- get_data_mct_global(
-    df_grid, 
-    dir_et = "~/data/landflux/et_prod/", fil_et_pattern = "ET_PM-SRB-PU_daily_", 
-    dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
-    dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-    dir_temp = "~/data/watch_wfdei/Tair_daily/", fil_temp_pattern = "Tair_daily_WFDEI"
-    )
-  save(df_pm_mod, file = filn)
-} else {
-  load(filn)
-}
+load("data/df_pm_mod.Rdata")
 
 ## SEBS
-filn <- "data/df_sebs.Rdata"
-if (!file.exists(filn)){
-  df_sebs <- get_data_mct_global(
-    df_grid, 
-    dir_et = "~/data/landflux/et_prod/", fil_et_pattern = "ET_SEBS-SRB-PU_daily_", 
-    dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
-    dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-    dir_temp = "~/data/watch_wfdei/Tair_daily/", fil_temp_pattern = "Tair_daily_WFDEI"
-    )
-  save(df_sebs, file = filn)
-} else {
-  load(filn)
-}
+load("data/df_sebs.Rdata")
 
 # ## example plots for one site
 # ggplot() +
