@@ -54,7 +54,7 @@ get_data_mct_chunk <- function(df, idx,
   list_fil_prec <- list.files(dir_prec, pattern = fil_prec_pattern)
 
   ## xxx debug: get data for one year only. 2007: [337:348]
-  df_prec <- extract_points_filelist(df, list_fil_prec[337:348], varnam = "Rainf", dirnam = dir_prec, fil_pattern = fil_prec_pattern) %>%
+  df_prec <- extract_points_filelist(df, list_fil_prec, varnam = "Rainf", dirnam = dir_prec, fil_pattern = fil_prec_pattern) %>%
     dplyr::rename(df_prec = data0) %>%
     dplyr::mutate(df_prec = purrr::map(df_prec, ~rename(., prec = V1))) %>%
     dplyr::mutate(df_prec = purrr::map(df_prec, ~mutate(., prec = convert_prec_watch(prec)))) %>%
@@ -66,7 +66,7 @@ get_data_mct_chunk <- function(df, idx,
   print("getting snow data from WATCH-WFDEI ...")
   list_fil_snow <- list.files(dir_snow, pattern = fil_snow_pattern)
 
-  df_snow <- extract_points_filelist(df, list_fil_snow[337:348], varnam = "Snowf", dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>%
+  df_snow <- extract_points_filelist(df, list_fil_snow, varnam = "Snowf", dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>%
     dplyr::rename(df_snow = data0) %>%
     dplyr::mutate(df_snow = purrr::map(df_snow, ~rename(., snow = V1))) %>%
     dplyr::mutate(df_snow = purrr::map(df_snow, ~mutate(., snow = convert_prec_watch(snow)))) %>%
@@ -79,7 +79,7 @@ get_data_mct_chunk <- function(df, idx,
   convert_temp_watch <- function(x){ x - 273.15 }  # K -> degC
   list_fil_temp <- list.files(dir_temp, pattern = fil_temp_pattern)
 
-  df_temp <- extract_points_filelist(df, list_fil_temp[337:348], varnam = "Tair", dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>%
+  df_temp <- extract_points_filelist(df, list_fil_temp, varnam = "Tair", dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>%
     dplyr::rename(df_temp = data0) %>%
     dplyr::mutate(df_temp = purrr::map(df_temp, ~rename(., temp = V1))) %>%
     dplyr::mutate(df_temp = purrr::map(df_temp, ~mutate(., temp = convert_temp_watch(temp)))) %>%
