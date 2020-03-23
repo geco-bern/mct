@@ -9,12 +9,13 @@
 #' @export
 #'
 get_data_mct_global <- function(df,
-                                    dir_et, fil_et_pattern, 
-                                    dir_prec, fil_prec_pattern, varnam_prec, 
-                                    dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
-                                    dir_temp, fil_temp_pattern = NA, varnam_temp = NA,
-                                    get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE){
-
+                                dir_et, fil_et_pattern, 
+                                dir_prec, fil_prec_pattern, varnam_prec, 
+                                dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
+                                dir_temp, fil_temp_pattern = NA, varnam_temp = NA,
+                                get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE,
+                                year_start_watch = 1979, year_end_watch = 2018){
+  
 
   nchunk <- 1   # xxx test: change this back to 1000 (number of chunks)
   nrows_chunk <- ceiling(nrow(df)/nchunk)
@@ -24,11 +25,12 @@ get_data_mct_global <- function(df,
   df <- purrr::map_dfr(
     as.list(1:length(irow_chunk)),
     ~get_data_mct_chunk( slice(ungroup(df), irow_chunk[[.]]), ., 
-                             dir_et, fil_et_pattern, 
-                             dir_prec, fil_prec_pattern, varnam_prec, 
-                             dir_snow, fil_snow_pattern, varnam_snow,
-                             dir_temp, fil_temp_pattern, varnam_temp,
-                             get_watch = get_watch, get_landeval = get_landeval, get_alexi = get_alexi)
+                         dir_et, fil_et_pattern, 
+                         dir_prec, fil_prec_pattern, varnam_prec, 
+                         dir_snow, fil_snow_pattern, varnam_snow,
+                         dir_temp, fil_temp_pattern, varnam_temp,
+                         get_watch = get_watch, get_landeval = get_landeval, get_alexi = get_alexi,
+                         year_start_watch = year_start_watch, year_end_watch = year_end_watch)
   )
     
   return(df)
@@ -39,7 +41,8 @@ get_data_mct_chunk <- function(df, idx,
                                dir_prec = NULL, fil_prec_pattern = NULL, varnam_prec = NULL, 
                                dir_snow = NULL, fil_snow_pattern = NULL, varnam_snow = NULL,
                                dir_temp = NULL, fil_temp_pattern = NULL, varnam_temp = NULL,
-                               get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE){
+                               get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE,
+                               year_start_watch = 1979, year_end_watch = 2018){
   
   print("----------------")
   print(paste("DOIN IT BY CHUNK", as.character(idx)))
@@ -57,6 +60,15 @@ get_data_mct_chunk <- function(df, idx,
     convert_prec_watch <- function(x){ x * 60 * 60 * 24 }  # kg/m2/s -> mm/day
     list_fil_prec <- list.files(dir_prec, pattern = fil_prec_pattern)
     
+    ## hard-coded list:
+    list_fil_prec <- expand.grid(year_start_watch:year_end_watch, 1:12) %>% 
+      as_tibble() %>% 
+      setNames(c("year", "month")) %>% 
+      mutate(year = as.character(year), month = str_pad(as.character(month), width = 2, pad = "0")) %>% 
+      mutate(combi = paste0(year, month)) %>% 
+      pull(combi)
+    list_fil_prec <- paste0("Rainf_daily_WFDEI_CRU_", list_fil_prec, ".nc")
+    
     ## xxx debug: get data for one year only. 2007: [337:348]
     df_prec <- extract_points_filelist(df, list_fil_prec, varnam = "Rainf", dirnam = dir_prec, fil_pattern = fil_prec_pattern) %>%
       dplyr::rename(df_prec = data0) %>%
@@ -70,6 +82,16 @@ get_data_mct_chunk <- function(df, idx,
     print("getting snow data from WATCH-WFDEI ...")
     list_fil_snow <- list.files(dir_snow, pattern = fil_snow_pattern)
     
+    ## hard-coded list:
+    list_fil_prec <- expand.grid(year_start_watch:year_end_watch, 1:12) %>% 
+      as_tibble() %>% 
+      setNames(c("year", "month")) %>% 
+      mutate(year = as.character(year), month = str_pad(as.character(month), width = 2, pad = "0")) %>% 
+      mutate(combi = paste0(year, month)) %>% 
+      pull(combi)
+    list_fil_prec <- paste0("Snowf_daily_WFDEI_CRU_", list_fil_prec, ".nc")
+    
+    
     df_snow <- extract_points_filelist(df, list_fil_snow, varnam = "Snowf", dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>%
       dplyr::rename(df_snow = data0) %>%
       dplyr::mutate(df_snow = purrr::map(df_snow, ~rename(., snow = V1))) %>%
@@ -82,6 +104,16 @@ get_data_mct_chunk <- function(df, idx,
     print("getting temperature data from WATCH-WFDEI ...")
     convert_temp_watch <- function(x){ x - 273.15 }  # K -> degC
     list_fil_temp <- list.files(dir_temp, pattern = fil_temp_pattern)
+    
+    ## hard-coded list:
+    list_fil_prec <- expand.grid(year_start_watch:year_end_watch, 1:12) %>% 
+      as_tibble() %>% 
+      setNames(c("year", "month")) %>% 
+      mutate(year = as.character(year), month = str_pad(as.character(month), width = 2, pad = "0")) %>% 
+      mutate(combi = paste0(year, month)) %>% 
+      pull(combi)
+    list_fil_prec <- paste0("Tair_daily_WFDEI_", list_fil_prec, ".nc")
+    
     
     df_temp <- extract_points_filelist(df, list_fil_temp, varnam = "Tair", dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>%
       dplyr::rename(df_temp = data0) %>%

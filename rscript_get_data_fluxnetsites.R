@@ -138,10 +138,11 @@ if (!file.exists(filn)){
     df_alexi <- get_data_mct_global(
       df_grid, 
       dir_et   = "~/data/alexi_tir/netcdf/",        fil_et_pattern   = "EDAY_CERES_", 
-      dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU_2003", 
-      dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU_2003",
-      dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI_2003",
-      get_watch = TRUE, get_landeval = FALSE, get_alexi = TRUE
+      dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
+      dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
+      dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
+      get_watch = TRUE, get_landeval = FALSE, get_alexi = TRUE,
+      year_start_watch = 2003, year_end_watch = 2018
     )
     save(df_alexi, file = filn)
     df_alexi %>% 
