@@ -1,0 +1,543 @@
+---
+title: "Calibrate ET"
+author: "Beni Stocker"
+date: "`r Sys.Date()`"
+# output:
+#   html_document:
+#     toc: true
+#     toc_float: true
+#     toc_depth: 4
+#     number_sections: true
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+header-includes:
+   - \usepackage{amsmath}
+bibliography: bibliography.bib
+---
+
+## Rationale
+
+```{r setup, include=FALSE}
+library(rsofun)
+load_dependencies_rsofun()
+```
+
+ET is simulated for the MCT-zroot study as:
+$$
+ET = a\; \text{fAPAR} \; \text{PET} \; G_s(D)
+$$
+
+Where the function $G_s(D)$ is taken from Oren et al. (2001) as
+$$
+G_s(D) = b - m \ln(D)
+$$
+This requires three additional model parameters for SPLASH/SOFUN: $a, b, m$.
+
+```{r}
+a <- 1
+b <- 70
+m <- 35
+
+# from calibration, using RMSE:
+a <- 0.1
+b <- 3.841307
+m <- 1.368163
+
+# from calibration, using chi-squared:
+a <- 0.100000        
+b <- 2.444468        
+m <- 0.010000 
+
+# from calibration, using RMSE
+a <- 0.9420240       
+b <- 0.4974496       
+m <- 0.0001000 
+
+a <- 0.5       
+b <- 0.4    
+m <- 1
+
+calc_vpd_stress <- function(vpd, a, b, m){
+  out <- a * (b - m * (log(0.001) + log(vpd)))
+  out <- ifelse(out>1, 1, out)
+  out <- ifelse(out<0, 0, out)
+  return(out)
+}
+
+data.frame(x = c(0, 2000)) %>% 
+ggplot(aes(x = x)) +
+        stat_function(fun = calc_vpd_stress, args = list(a=a, b=b, m=m)) +
+  lims(y=c(0, 1)) +
+  # geom_point(data = df, aes(x, y)) +
+  labs(x = "VPD (Pa)", y = "Stress factor")
+```
+
+## Using rsofun
+
+### Simulation settings
+
+Create a site meta info table that contains all the site-specific information that is used to force site-simulations (e.g. starting year, number of simulations years, elevation, etc.). For FLUXNET2015 data, required meta info is provided by the `rsofun` package (data frame `rsofun::metainfo_Tier1_sites_kgclimate_fluxnet2015`).
+```{r}
+path_siteinfo <- "~/mct/siteinfo_mct_fluxnet2015.csv"
+siteinfo <- rsofun::metainfo_Tier1_sites_kgclimate_fluxnet2015 %>% 
+  dplyr::filter(!(sitename %in% c("DE-Akm", "IT-Ro1"))) %>%  # excluded because fapar data could not be downloaded (WEIRD)
+  dplyr::filter(sitename != "FI-Sod") %>%  # excluded because some temperature data is missing
+  dplyr::filter( c4 %in% c(FALSE, NA) & classid != "CRO" & classid != "WET" ) %>% 
+  write_csv(path = path_siteinfo)
+```
+
+Now specify the simulation parameters that are identical for all site-scale simulations.
+```{r}
+params_siml <- list(
+  spinup            = TRUE,
+  spinupyears       = 10,
+  recycle           = 1,
+  soilmstress       = FALSE,
+  tempstress        = FALSE,
+  calc_aet_fapar_vpd = TRUE,
+  in_ppfd           = TRUE,
+  in_netrad         = FALSE,
+  const_clim_year   = -9999,
+  const_lu_year     = -9999,
+  const_co2_year    = -9999,
+  const_ndep_year   = -9999,
+  const_nfert_year  = -9999,
+  outdt             = 1,
+  ltre              = FALSE,
+  ltne              = FALSE,
+  ltrd              = FALSE,
+  ltnd              = FALSE,
+  lgr3              = TRUE,
+  lgn3              = FALSE,
+  lgr4              = FALSE
+  )
+```
+
+Run `prepare_setup_sofun()` to define the simulation settings that contain all the information specified by the two steps above (meta info, and simulation parameters).
+```{r}
+settings_sims <- prepare_setup_sofun(siteinfo = siteinfo, params_siml = params_siml)
+```
+
+### Define model parameters
+
+First, let's do it by hand (calibration of parameters is shown later).
+```{r}
+params_modl <- list(
+  kphio           = 0.04997714009213085,
+  soilm_par_a     = 1.0,
+  soilm_par_b     = 0.0,
+  vpdstress_par_a = 0.1,
+  vpdstress_par_b = 3.841307,
+  vpdstress_par_m = 1.368163
+  )
+```
+
+### Define soil parameters
+
+For now, this is implemented as an illustration. Should be made site-specific. Is obsolete for now since soil moisture has no effect on ET, and since WHC is prescribed anyways.
+```{r}
+df_soiltexture <- bind_rows(
+  top    = tibble(layer = "top",    fsand = 0.4, fclay = 0.3, forg = 0.1, fgravel = 0.1),
+  bottom = tibble(layer = "bottom", fsand = 0.4, fclay = 0.3, forg = 0.1, fgravel = 0.1)
+)
+```
+
+### Get input
+
+First, define input settings.
+```{r}
+settings_input <-  list(
+    data                     = NA,
+    temperature              = "fluxnet2015",
+    precipitation            = "fluxnet2015",
+    vpd                      = "fluxnet2015",
+    ppfd                     = "fluxnet2015",
+    netrad                   = "fluxnet2015",  #  c("fluxnet2015", "watch_wfdei"),
+    patm                     = "fluxnet2015",
+    netrad                   = NA,
+    cloudcover               = "cru",
+    path_input               = "~/sofun_inputs/",
+    path_watch_wfdei         = "~/data/watch_wfdei/",
+    path_cru                 = "~/data/cru/ts_4.01/",
+    path_MODIS_FPAR_MCD15A3H = "~/data/fluxnet_subsets/fapar_MODIS_FPAR_MCD15A3H_gee_MCD15A3H_fluxnet2015_gee_subset/",
+    path_co2                 = "~/data/co2/cCO2_rcp85_const850-1765.csv",
+    path_fluxnet2015         = "~/data/FLUXNET-2015_Tier1/20191024/DD/",
+    path_fluxnet2015_hh      = "~/data/FLUXNET-2015_Tier1/20191024/HH/",
+    get_from_remote          = FALSE,
+    settings_gee             = get_settings_gee( 
+      bundle      = "fpar", 
+      python_path = "/Users/benjaminstocker/Library/Enthought/Canopy_64bit/User/bin/python",
+      gee_path    = "~/gee_subset/gee_subset/"
+      ),
+  fapar = "MODIS_FPAR_MCD15A3H",
+  splined_fapar = TRUE
+  )
+```
+
+Then, get the input data.
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+ddf_input <- prepare_input_sofun(
+  settings_input             = settings_input,
+  settings_sims              = settings_sims,
+  overwrite_csv_climate_lev1 = FALSE,
+  overwrite_csv_climate_lev2 = FALSE,
+  overwrite_csv_climate_lev3 = FALSE,
+  overwrite_rdata_climate    = FALSE,
+  overwrite_csv_fapar        = FALSE,
+  verbose                    = FALSE
+  )
+```
+
+### Run the model
+
+Run the model for all the sites specified in the first step.
+```{r}
+df_drivers <- collect_drivers_sofun( 
+  settings       = settings_sims, 
+  forcing        = ddf_input, 
+  df_soiltexture = df_soiltexture
+  )
+
+mod <- runread_sofun_f(
+  df_drivers, 
+  params_modl = params_modl, 
+  makecheck = TRUE,
+  parallel = FALSE
+  )
+
+mod$out_sofun[[1]] %>% 
+  ggplot(aes(x=date, y=latenth)) +
+  geom_line() + 
+  labs(title = mod$sitename[[1]], subtitle = "SOFUN output")
+```
+
+### Calibrate
+
+Define calibration settings.
+```{r}
+c4sites <- siteinfo %>% 
+  dplyr::filter(c4) %>% 
+  pull(sitename)
+
+calibsites <- readr::read_csv( "~/data/flue/flue_stocker18nphyt.csv" ) %>%
+              dplyr::select(site, cluster) %>% 
+              dplyr::distinct() %>% 
+              dplyr::filter( !is.na(cluster) ) %>%
+              dplyr::filter( !(site %in% c4sites) ) %>%  # additionally exclude C4
+              dplyr::filter(site %in% df_drivers$sitename) %>% 
+              dplyr::pull(site)
+
+settings_calib <- list(
+  name             = "MCT",
+  par              = list( vpdstress_par_a = list( lower=0.1,    upper=2,      init=1.0 ),
+                           vpdstress_par_b = list( lower=0.1,    upper=1,      init=1 ),
+                           vpdstress_par_m = list( lower=0.01,    upper=1,      init=0.5 ) ),
+  method           = "gensa",
+  targetvars       = c("latenth"),
+  datasource       = list( latenth = "fluxnet2015" ),
+  timescale        = list( latenth = "d" ),
+  path_fluxnet2015 = "~/data/FLUXNET-2015_Tier1/20191024/DD/",
+  maxit            = 10,
+  sitenames        = calibsites,
+  metric           = "rmse",
+  dir_results      = "~/mct/calib_results/"
+)
+```
+ 
+Get calibration target data.
+```{r warning=FALSE, messge=FALSE}
+filn <- "./data/ddf_obs_calib.Rdata"
+if (!file.exists(filn)){
+  ddf_obs_calib <- get_obs_calib( 
+    settings_calib = settings_calib, 
+    dplyr::select(df_drivers, sitename, siteinfo) %>% tidyr::unnest(siteinfo), 
+    settings_input
+    )
+  save(ddf_obs_calib, file = filn)
+} else {
+  load(filn)
+}
+```
+
+First, as a test, calibrate using data from one site at a time and evaluate at that site, using the same data. To do this, we first need to define evaluation settings and get evaluation benchmarking data.
+```{r}
+mylist <- readr::read_csv("~/eval_pmodel/myselect_fluxnet2015.csv") %>% 
+  dplyr::filter( use==1 ) %>% 
+  dplyr::pull( Site )
+
+settings_eval <- list(
+  sitenames = settings_sims$sitename,
+  sitenames_siteplots = mylist,
+  agg = 8,
+  path_fluxnet2015_d = "~/data/FLUXNET-2015_Tier1/20160128/point-scale_none_1d/original/unpacked/",
+  path_fluxnet2015_w = "~/data/FLUXNET-2015_Tier1/20160128/point-scale_none_7d/original/unpacked/",
+  path_fluxnet2015_m = "~/data/FLUXNET-2015_Tier1/20160128/point-scale_none_1m/original/unpacked/",
+  path_fluxnet2015_y = "~/data/FLUXNET-2015_Tier1/20160128/point-scale_none_1y/original/unpacked/",
+  path_gepisat_d     = "~/data/gepisat/v3_fluxnet2015/daily_gpp/",
+  benchmark = list( latenth = c("fluxnet2015") ),
+  remove_premodis = TRUE
+  )
+```
+
+Get evaluation data (benchmarking data).
+```{r}
+filn <- "./obs_eval.Rdata"
+if (file.exists(filn)){
+  load(filn)
+} else {
+  obs_eval  <- get_obs_eval( 
+    settings_eval = settings_eval, 
+    settings_sims = settings_sims, 
+    overwrite     = TRUE, 
+    light         = TRUE,
+    add_forcing   = FALSE
+  )
+  save(obs_eval, file = filn)
+} 
+```
+
+#### Calibrate/evaluate by site
+
+Site-by-site calibration/evaluation (not out-of-bag!)
+```{r}
+filn <- "./data/out_sitebysite.Rdata"
+if (file.exists(filn)){
+  load(filn)
+} else {
+  out_sitebysite <- sbs_calib_eval_sofun( 
+    settings_calib, 
+    settings_eval, 
+    settings_sims, 
+    df_drivers = df_drivers,
+    ddf_obs_calib = ddf_obs_calib, 
+    obs_eval = obs_eval,
+    overwrite = TRUE
+    )
+  save(out_sitebysite, file = filn)
+}
+```
+
+Extract site-level parameter values and metrics and plot.
+```{r}
+
+## extract metrics from individual left-out calibrations/evaluations
+source("~/eval_pmodel/extract_metric_oob.R")
+df_metrics <- extract_metric_oob(out_sitebysite, metric = "rsq", benchmarkvar = "latenth") %>% 
+  left_join(extract_metric_oob(out_sitebysite, metric = "rmse", benchmarkvar = "latenth"), by = "sitename")
+
+# get parameters from individual left-out calibrations
+source("~/eval_pmodel/extract_params_oob.R")
+df_params <- extract_params_oob(param = "vpdstress_par_a", path = "~/mct/calib_results/sitebysite_MCT", sitenames = df_metrics$sitename)
+
+# a parameter
+gg_a <- df_params %>% 
+  ggplot() +
+  geom_histogram(aes(x=vpdstress_par_a, y = ..count..),
+    color = "black", alpha = 0.3, 
+    position="identity") +
+  geom_vline(aes(xintercept = mean(df_params$kphio)), col = "red", linetype = "dashed") +  # Mean across out-of-bag evaluations
+  theme_classic() +
+  labs(x = latex2exp::TeX("$\\widehat{a}$"), y = "Count")  # bquote(varphi[0])
+
+## b-parameter
+gg_b <- df_params %>% 
+  ggplot() +
+  geom_histogram(aes(x=vpdstress_par_b, y = ..count..),
+    color = "black", alpha = 0.3, 
+    position="identity") +
+  geom_vline(aes(xintercept = mean(df_params$kphio)), col = "red", linetype = "dashed") +  # Mean across out-of-bag evaluations
+  theme_classic() +
+  labs(x = latex2exp::TeX("$\\widehat{b}$"), y = "Count")  # bquote(varphi[0])
+
+## m-parameter
+gg_m <- df_params %>% 
+  ggplot() +
+  geom_histogram(aes(x=vpdstress_par_m, y = ..count..),
+    color = "black", alpha = 0.3, 
+    position="identity") +
+  geom_vline(aes(xintercept = mean(df_params$kphio)), col = "red", linetype = "dashed") +  # Mean across out-of-bag evaluations
+  theme_classic() +
+  labs(x = latex2exp::TeX("$\\widehat{m}$"), y = "Count")  # bquote(varphi[0])
+
+## R2
+gg_rsq <- df_metrics %>% 
+  ggplot() +
+  geom_histogram(aes(x = rsq, y = ..count..),
+    color = "black", alpha = 0.3, binwidth = 0.05, 
+    position="identity") +
+  # geom_vline(aes(xintercept = out_eval_FULL$latenth$fluxnet2015$metrics$xdaily_pooled$rsq), col = "red") +  # All sites simultaneously
+  geom_vline(aes(xintercept = mean(df_metrics$rsq)), col = "red", linetype = "dashed") +  # Mean across out-of-bag evaluations
+  theme_classic() +
+  labs(x = bquote(italic(R)^2), y = "Count")
+  # scale_linetype_manual(name = "", values = c(all = "solid", mean = "dashed"), labels = c(all = "All sites simultaneously", mean = "Mean across out-of-bag evaluations")) +
+  # theme(legend.position="top")
+
+## RMSE
+gg_rmse <- df_metrics %>% 
+  ggplot() +
+  geom_histogram(aes(x = rmse, y = ..count..),
+    color = "black", alpha = 0.3, 
+    position="identity") +
+  # geom_vline(aes(xintercept = out_eval_FULL$gpp$fluxnet2015$metrics$xdaily_pooled$rmse, linetype = "all"), col = "red") +
+  geom_vline(aes(xintercept = mean(df_metrics$rmse), linetype = "mean"), col = "red") + 
+  theme_classic() +
+  labs(x = expression( paste("RMSE (g C m"^-2, " d"^-1, ")" ) ), y = "Count") +
+  scale_linetype_manual(name = "", values = c(all = "solid", mean = "dashed"), labels = c(all = "All sites simultaneously", mean = "Mean across out-of-bag evaluations"))
+  # theme(legend.position = c(0.6,0.85))
+
+toprow <- cowplot::plot_grid(gg_a, gg_b, gg_m, labels = "auto", ncol = 3)
+bottomrow <- cowplot::plot_grid(gg_rsq, gg_rmse, labels = c("d", "e"), ncol = 2, rel_widths = c(1,2))
+
+cowplot::plot_grid(toprow, bottomrow, nrow = 2)
+```
+
+Plot the VPD-stress function for the different sites.
+```{r}
+plot_vpdstress_bysite <- function(a, b, m, sitename){
+  df <- tibble(
+    x = seq(0, 2000, by = 20)
+    ) %>% 
+    mutate(y = calc_vpd_stress(x, a, b, m) )
+  
+  gg <- data.frame(x = c(0, 2000)) %>% 
+    ggplot(aes(x = x)) +
+          stat_function(fun = calc_vpd_stress, args = list(a=a, b=b, m=m)) +
+    lims(y=c(0, 1)) +
+    geom_point(data = df, aes(x, y)) +
+    labs(x = "VPD (Pa)", y = "Stress factor", title = sitename)
+  return(gg)
+}
+out_vpdstress <- df_params %>% 
+  rename(a = vpdstress_par_a, b = vpdstress_par_b, m = vpdstress_par_m) %>% 
+  mutate(out_gg = purrr::pmap(., plot_vpdstress_bysite))
+out_vpdstress$out_gg
+```
+
+Some seasonal plots.
+```{r}
+plot_meandoy <- function(sitename, out_sitebysite){
+  gg <- out_sitebysite[[sitename]]$latenth$fluxnet2015$data$meandoydf %>% 
+    ggplot() +
+    geom_ribbon(
+      aes(x = doy, ymin = obs_min, ymax = obs_max), fill = "black", alpha = 0.3
+      ) +
+    geom_line(aes(x = doy, y = mod_mean), size = 0.4) +
+    theme_gray() +
+    labs(title = sitename)
+  return(gg)
+}
+gg_list <- purrr::map(
+  as.list(names(out_sitebysite)),
+  plot_meandoy(., out_sitebysite)
+  )
+gg_list[[1]]
+gg_list[[2]]
+gg_list[[3]]
+gg_list[[4]]
+gg_list[[5]]
+```
+
+#### Calibrate with pooled data
+
+```{r}
+set.seed(1982)
+settings_calib <- calib_sofun( 
+  settings_calib, 
+  df_drivers, 
+  ddf_obs = ddf_obs_calib 
+  )
+```
+
+The calibrated parameters are returned by `calib_sofun()` as part of the list:
+```{r}
+print(settings_calib$par_opt)
+```
+
+This gives a stress function that looks like this:
+```{r}
+df <- tibble(
+  x = seq(0, 2000, by = 20)
+  ) %>% 
+  mutate(y = calc_vpd_stress(x, a, b, m) )
+
+data.frame(x = c(0, 2000)) %>% 
+  ggplot(aes(x = x)) +
+        stat_function(fun = calc_vpd_stress, args = list(a=settings_calib$par_opt["vpdstress_par_a"], b=settings_calib$par_opt["vpdstress_par_b"], m=settings_calib$par_opt["vpdstress_par_m"])) +
+  lims(y=c(0, 1)) +
+  labs(x = "VPD (Pa)", y = "Stress factor", title = "ALL")
+```
+
+### Evaluate
+
+Run the model once again with these parameters and evaluate results.
+
+Now run the model with calibrated parameters.
+```{r}
+params_modl <- list(
+  kphio           = 0.04997714009213085,
+  soilm_par_a     = 1.0,
+  soilm_par_b     = 0.0,
+  vpdstress_par_a = settings_calib$par_opt[["vpdstress_par_a"]],
+  vpdstress_par_b = settings_calib$par_opt[["vpdstress_par_b"]],
+  vpdstress_par_m = settings_calib$par_opt[["vpdstress_par_m"]]
+  )
+
+mod <- runread_sofun_f(
+  df_drivers, 
+  params_modl = params_modl, 
+  makecheck = TRUE
+  ) %>% 
+  rename(id = sitename) %>% 
+  mutate(ntsteps = purrr::map_int(out_sofun, ~nrow(.))) %>% 
+  filter(ntsteps>1) %>% 
+  unnest(out_sofun)
+```
+
+Get evaluation
+```{r}
+out_eval <- eval_sofun( 
+  mod, 
+  settings_eval, 
+  settings_sims, 
+  obs_eval = obs_eval, 
+  overwrite = TRUE, 
+  light = FALSE 
+  )
+```
+
+Modelled vs. Observed
+```{r}
+out_modobs <- out_eval$latenth$fluxnet2015$data$xdf %>% rbeni::analyse_modobs2("mod", "obs", type = "heat")
+out_modobs$gg
+```
+
+Some seasonal plots.
+```{r}
+plot_meandoy <- function(mysitename, out_eval){
+  gg <- out_eval$latenth$fluxnet2015$data$meandoydf %>% 
+    dplyr::filter(sitename==mysitename) %>% 
+    ggplot() +
+    geom_ribbon(
+      aes(x = doy, ymin = obs_min, ymax = obs_max), fill = "black", alpha = 0.3
+      ) +
+    geom_line(aes(x = doy, y = mod_mean), size = 0.4) +
+    theme_gray() +
+    labs(title = mysitename)
+  return(gg)
+}
+
+gg_list <- purrr::map(
+  as.list(out_eval$latenth$fluxnet2015$data$meandoydf %>% pull(sitename) %>% unique()),
+  ~plot_meandoy(., out_eval)
+  )
+
+gg_list[[1]]
+gg_list[[2]]
+gg_list[[3]]
+gg_list[[4]]
+gg_list[[5]]
+```
+
