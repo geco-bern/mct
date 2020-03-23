@@ -252,26 +252,33 @@ df_alg <- df_eval %>%
     do_norm        = TRUE
     )
 
-df_alg$df_dday_aggbydday %>% 
+gg_alg_pt_jpl <- df_alg$df_dday_aggbydday %>% 
   ggplot(aes(x = dday)) + 
+  geom_ribbon(aes(ymin = et_bias_pt_jpl_q33, ymax = et_bias_pt_jpl_q66), fill = "black", alpha = 0.3) +
   geom_line(aes(y = et_bias_pt_jpl_median)) +
   geom_smooth(aes(y = et_bias_pt_jpl_median), color = 'red', method = 'loess', se = FALSE) +
-  geom_ribbon(aes(ymin = et_bias_pt_jpl_q33, ymax = et_bias_pt_jpl_q66), fill = "black", alpha = 0.3) +
   labs(title = "PT-JPL")
 
-df_alg$df_dday_aggbydday %>% 
+gg_alg_pm <- df_alg$df_dday_aggbydday %>% 
   ggplot(aes(x = dday)) + 
   geom_ribbon(aes(ymin = et_bias_pm_mod_q33, ymax = et_bias_pm_mod_q66), fill = "black", alpha = 0.3) +
   geom_line(aes(y = et_bias_pm_mod_median)) +
   geom_smooth(aes(y = et_bias_pm_mod_median), color = 'red', method = 'loess', se = FALSE) +
   labs(title = "PM-MOD")
 
-df_alg$df_dday_aggbydday %>% 
+gg_alg_sebs <- df_alg$df_dday_aggbydday %>% 
   ggplot(aes(x = dday)) + 
   geom_ribbon(aes(ymin = et_bias_sebs_q33, ymax = et_bias_sebs_q66), fill = "black", alpha = 0.3) +
   geom_line(aes(y = et_bias_sebs_median)) +
   geom_smooth(aes(y = et_bias_sebs_median), color = 'red', method = 'loess', se = FALSE) +
   labs(title = "SEBS")
+
+library(cowplot)
+plot_grid(gg_alg_pt_jpl, gg_alg_pm, gg_alg_sebs)
+ggsave("fig/bias_et.pdf", width = 8, height = 7)
+
+library(patchwork)
+gg_alg_pt_jpl + gg_alg_pm + gg_alg_sebs + plot_layout(nrow = 2)
 
 save(df_alg, file = "data/df_alg.Rdata")
 write_csv(df_alg$df_dday_aggbydday, path = "data/df_alg__df_dday_aggbydday.Rdata")

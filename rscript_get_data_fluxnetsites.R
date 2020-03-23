@@ -49,6 +49,9 @@ if (!file.exists(filn)){
   save(df_pt_jpl, file = filn)
 } else {
   load(filn)
+  df_pt_jpl %>% 
+    tidyr::unnest(df) %>%
+    write_csv(path = "data/df_pt_jpl.csv")
 }
 
 ## PM
@@ -64,6 +67,9 @@ if (!file.exists(filn)){
   save(df_pm_mod, file = filn)
 } else {
   load(filn)
+  df_pm_mod %>% 
+    tidyr::unnest(df) %>%
+    write_csv(path = "data/df_pm_mod.csv")
 }
 
 ## SEBS
@@ -77,6 +83,10 @@ if (!file.exists(filn)){
     dir_temp = "~/data/watch_wfdei/Tair_daily/", fil_temp_pattern = "Tair_daily_WFDEI"
     )
   save(df_sebs, file = filn)
+  
 } else {
   load(filn)
+  df_sebs %>% 
+    tidyr::unnest(df) %>%
+    write_csv(path = "data/df_sebs.csv")
 }
