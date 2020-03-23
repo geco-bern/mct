@@ -8,6 +8,7 @@ library(ggplot2)
 library(readr)
 library(rsofun)
 library(ingestr)
+library(stringr)
 
 source("R/get_data_mct_global.R")
 source("R/extract_points_filelist.R")
