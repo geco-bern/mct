@@ -179,7 +179,7 @@ get_data_mct_chunk <- function(df, idx,
     convert_et_MJ <- function(x){ x * 1e6 }  # MJ m-2 d-1 -> J m-2 d-1
     
     ## total ET
-    df <- extract_points_filelist(df, list_fil_et, varnam = "et", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "alexi") %>% 
+    df <- extract_points_filelist(df, list_fil_et[1:365], varnam = "et", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "alexi") %>% 
       dplyr::rename(df_et = data0) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~rename(., et = V1))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., et = convert_et_MJ(et)))) 
