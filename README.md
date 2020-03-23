@@ -22,8 +22,6 @@ Steps of my analysis:
 
 ## MCT evaluation
 
-
-
 ## Simulate global optimal rooting depth
 
 - On CX1, run global simulation.

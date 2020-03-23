@@ -28,8 +28,8 @@ siteinfo <- read_csv("~/data/FLUXNET-2015_Tier1/siteinfo_fluxnet2015_sofun+whc.c
   mutate(date_end = lubridate::ymd(paste0(year_end, "-12-31")))
 
 df_grid <- siteinfo %>% 
-  select(sitename, lon, lat, elv) %>% 
-  rename(idx = sitename)
+  dplyr::select(sitename, lon, lat, elv) %>% 
+  dplyr::rename(idx = sitename)
 
 ##------------------------------------------------------------------------
 ## Get data from global fields (WATCH-WFDEI and LandFlux)
@@ -39,14 +39,17 @@ df_grid <- siteinfo %>%
 ## PT-JPL
 filn <- "data/df_pt_jpl.Rdata"
 if (!file.exists(filn)){
-  df_pt_jpl <- get_data_mct_global(
-    df_grid, 
-    dir_et = "~/data/landflux/et_prod/",    fil_et_pattern = "ET_PT-SRB-PU_daily_", 
-    dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
-    dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-    dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI"
+  filn_csv <- str_replace(filn, "Rdata", "csv")
+  if (!file.exists(filn)){
+    df_pt_jpl <- get_data_mct_global(
+      df_grid, 
+      dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern = "ET_PT-SRB-PU_daily_", 
+      dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
+      dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
+      dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI"
     )
-  save(df_pt_jpl, file = filn)
+    save(df_pt_jpl, file = filn)
+  }
 } else {
   load(filn)
 }
@@ -56,10 +59,10 @@ filn <- "data/df_pm_mod.Rdata"
 if (!file.exists(filn)){
   df_pm_mod <- get_data_mct_global(
     df_grid, 
-    dir_et = "~/data/landflux/et_prod/", fil_et_pattern = "ET_PM-SRB-PU_daily_", 
+    dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern = "ET_PM-SRB-PU_daily_", 
     dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
     dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-    dir_temp = "~/data/watch_wfdei/Tair_daily/", fil_temp_pattern = "Tair_daily_WFDEI"
+    dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI"
     )
   save(df_pm_mod, file = filn)
 } else {
@@ -71,10 +74,10 @@ filn <- "data/df_sebs.Rdata"
 if (!file.exists(filn)){
   df_sebs <- get_data_mct_global(
     df_grid, 
-    dir_et = "~/data/landflux/et_prod/", fil_et_pattern = "ET_SEBS-SRB-PU_daily_", 
+    dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern = "ET_SEBS-SRB-PU_daily_", 
     dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU", 
     dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-    dir_temp = "~/data/watch_wfdei/Tair_daily/", fil_temp_pattern = "Tair_daily_WFDEI"
+    dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI"
     )
   save(df_sebs, file = filn)
 } else {

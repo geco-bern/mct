@@ -33,10 +33,10 @@ get_data_mct_global <- function(df,
 }
 
 get_data_mct_chunk <- function(df, idx, 
-                                   dir_et, fil_et_pattern, 
-                                   dir_prec, fil_prec_pattern, varnam_prec, 
-                                   dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
-                                   dir_temp, fil_temp_pattern, varnam_temp){
+                               dir_et, fil_et_pattern, 
+                               dir_prec, fil_prec_pattern, varnam_prec, 
+                               dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
+                               dir_temp, fil_temp_pattern, varnam_temp){
   
   print("----------------")
   print(paste("DOIN IT BY CHUNK", as.character(idx)))
@@ -163,19 +163,19 @@ get_data_mct_chunk <- function(df, idx,
     ## soil evaporation
     mutate(evap_soil_mm = purrr::map(df, ~convert_et(.$evap_soil, .$temp, .$elv))) %>% 
     mutate(evap_soil_mm = purrr::map(evap_soil_mm, ~tibble(evap_soil_mm = .))) %>% 
-    mutate(df        = purrr::map2(df, evap_soil_mm, ~bind_cols(.x, .y))) %>% 
+    mutate(df           = purrr::map2(df, evap_soil_mm, ~bind_cols(.x, .y))) %>% 
     select(-evap_soil_mm) %>% 
 
     ## (wet) canopy evaporation
     mutate(evap_canop_mm = purrr::map(df, ~convert_et(.$evap_canop, .$temp, .$elv))) %>% 
     mutate(evap_canop_mm = purrr::map(evap_canop_mm, ~tibble(evap_canop_mm = .))) %>% 
-    mutate(df        = purrr::map2(df, evap_canop_mm, ~bind_cols(.x, .y))) %>% 
+    mutate(df            = purrr::map2(df, evap_canop_mm, ~bind_cols(.x, .y))) %>% 
     select(-evap_canop_mm) %>% 
 
     ## total ET
     mutate(et_mm = purrr::map(df, ~convert_et(.$et, .$temp, .$elv))) %>% 
     mutate(et_mm = purrr::map(et_mm, ~tibble(et_mm = .))) %>% 
-    mutate(df        = purrr::map2(df, et_mm, ~bind_cols(.x, .y))) %>% 
+    mutate(df    = purrr::map2(df, et_mm, ~bind_cols(.x, .y))) %>% 
     select(-et_mm)
     
   # df <- df %>% 
