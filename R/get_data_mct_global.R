@@ -83,13 +83,13 @@ get_data_mct_chunk <- function(df, idx,
     list_fil_snow <- list.files(dir_snow, pattern = fil_snow_pattern)
     
     ## hard-coded list:
-    list_fil_prec <- expand.grid(year_start_watch:year_end_watch, 1:12) %>% 
+    list_fil_snow <- expand.grid(year_start_watch:year_end_watch, 1:12) %>% 
       as_tibble() %>% 
       setNames(c("year", "month")) %>% 
       mutate(year = as.character(year), month = str_pad(as.character(month), width = 2, pad = "0")) %>% 
       mutate(combi = paste0(year, month)) %>% 
       pull(combi)
-    list_fil_prec <- paste0("Snowf_daily_WFDEI_CRU_", list_fil_prec, ".nc")
+    list_fil_snow <- paste0("Snowf_daily_WFDEI_CRU_", list_fil_snow, ".nc")
     
     
     df_snow <- extract_points_filelist(df, list_fil_snow, varnam = "Snowf", dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>%
@@ -106,13 +106,13 @@ get_data_mct_chunk <- function(df, idx,
     list_fil_temp <- list.files(dir_temp, pattern = fil_temp_pattern)
     
     ## hard-coded list:
-    list_fil_prec <- expand.grid(year_start_watch:year_end_watch, 1:12) %>% 
+    list_fil_temp <- expand.grid(year_start_watch:year_end_watch, 1:12) %>% 
       as_tibble() %>% 
       setNames(c("year", "month")) %>% 
       mutate(year = as.character(year), month = str_pad(as.character(month), width = 2, pad = "0")) %>% 
       mutate(combi = paste0(year, month)) %>% 
       pull(combi)
-    list_fil_prec <- paste0("Tair_daily_WFDEI_", list_fil_prec, ".nc")
+    list_fil_temp <- paste0("Tair_daily_WFDEI_", list_fil_temp, ".nc")
     
     
     df_temp <- extract_points_filelist(df, list_fil_temp, varnam = "Tair", dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>%
@@ -179,7 +179,7 @@ get_data_mct_chunk <- function(df, idx,
     convert_et_MJ <- function(x){ x * 1e6 }  # MJ m-2 d-1 -> J m-2 d-1
     
     ## total ET
-    df <- extract_points_filelist(df, list_fil_et[1:365], varnam = "et", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "alexi") %>% 
+    df <- extract_points_filelist(df, list_fil_et, varnam = "et", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "alexi") %>% 
       dplyr::rename(df_et = data0) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~rename(., et = V1))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., et = convert_et_MJ(et)))) 
