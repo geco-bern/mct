@@ -184,19 +184,6 @@ get_data_mct_chunk <- function(df, idx,
       dplyr::mutate(df_et = purrr::map(df_et, ~rename(., et = V1))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., et = convert_et_MJ(et)))) 
     
-    #   tidyr::unnest(df_et)
-    # 
-    # ## get WATCH meteo data from df_sebs
-    # filn <- "data/df_sebs.Rdata"
-    # filn_csv <- str_replace(filn, "Rdata", "csv")
-    # df_sebs <- read_csv(file = filn_csv) %>% 
-    #   group_by(idx, lon, lat) %>% 
-    #   dplyr::rename(et_sebs = et)
-    # 
-    # df <- df_sebs %>% 
-    #   right_join(df, by = c("lon", "lat", "elv", "idx", "date")) %>% 
-    #   dplyr::select(idx, date, lon, lat, elv, et, temp, prec, snow)
-    
   }
   
   if (get_watch && get_landeval){
