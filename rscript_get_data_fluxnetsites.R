@@ -162,3 +162,9 @@ if (!file.exists(filn)){
     tidyr::unnest(df) %>%
     write_csv(path = "data/df_alexi.csv")
 }
+
+## compare
+ggplot() + 
+  geom_line(data = df_pt_jpl$df[[29]], aes(x = date, y = et_mm)) +
+  geom_line(data = df_alexi$df[[70]],  aes(x = date, y = et_mm), col = 'red')
+  
