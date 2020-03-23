@@ -143,7 +143,7 @@ if (!file.exists(filn)){
       dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
       dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
       get_watch = TRUE, get_landeval = FALSE, get_alexi = TRUE,
-      year_start_watch = 2003, year_end_watch = 2018
+      year_start_watch = 2003, year_end_watch = 2003
     )
     save(df_alexi, file = filn)
     df_alexi %>% 
