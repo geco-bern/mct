@@ -238,7 +238,7 @@ get_data_mct_chunk <- function(df, idx,
       dplyr::mutate(evap_canop_mm = purrr::map(df, ~convert_et(.$evap_canop, .$temp, .$elv))) %>% 
       dplyr::mutate(evap_canop_mm = purrr::map(evap_canop_mm, ~tibble(evap_canop_mm = .))) %>% 
       dplyr::mutate(df            = purrr::map2(df, evap_canop_mm, ~bind_cols(.x, .y))) %>% 
-      dplyr::elect(-evap_canop_mm) %>% 
+      dplyr::select(-evap_canop_mm) %>% 
       
       ## total ET
       dplyr::mutate(et_mm = purrr::map(df, ~convert_et(.$et, .$temp, .$elv))) %>% 
