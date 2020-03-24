@@ -62,7 +62,7 @@ if (!file.exists(filn)){
   load(filn)
   df_pt_jpl %>%
     tidyr::unnest(df) %>%
-    write_csv(path = "data/df_pt_jpl.csv")
+    write_csv(path = "data/df_pt_jpl_sj02.csv")
 }
 
 
@@ -95,7 +95,7 @@ if (!file.exists(filn)){
   load(filn)
   df_pm_mod %>%
     tidyr::unnest(df) %>%
-    write_csv(path = "data/df_pm_mod.csv")
+    write_csv(path = "data/df_pm_mod_sj02.csv")
 }
 
 
@@ -128,7 +128,7 @@ if (!file.exists(filn)){
   load(filn)
   df_sebs %>%
     tidyr::unnest(df) %>%
-    write_csv(path = "data/df_sebs.csv")
+    write_csv(path = "data/df_sebs_sj02.csv")
 }
 
 ##------------------------------------------------------------------------
@@ -162,7 +162,7 @@ if (!file.exists(filn)){
   load(filn)
   df_alexi %>%
     tidyr::unnest(df) %>%
-    write_csv(path = "data/df_alexi.csv")
+    write_csv(path = "data/df_alexi_sj02.csv")
 }
 
 # ## compare
