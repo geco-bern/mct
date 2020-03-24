@@ -16,7 +16,7 @@ source("R/convert_et.R")
 source("R/align_events.R")
 
 ## Get meta info of sites (lon, lat)
-df_sites <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
+siteinfo <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
   dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
   dplyr::rename(sitename = ID, lat = Latitude, lon = Longitude) %>% 
   dplyr::mutate(elv = ifelse(elv==-999, NA, elv)) %>% 
@@ -24,6 +24,9 @@ df_sites <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/roo
   dplyr::mutate(year_start = 1982, year_end = 2011) %>% 
   dplyr::select(sitename, lon, lat, elv, year_start, year_end)
 
+df_grid <- siteinfo %>% 
+  dplyr::select(sitename, lon, lat, elv) %>% 
+  dplyr::rename(idx = sitename)
 
 ##------------------------------------------------------------------------
 ## Get data from global fields (WATCH-WFDEI and LandFlux)
