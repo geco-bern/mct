@@ -33,103 +33,103 @@ df_grid <- siteinfo %>%
 ##------------------------------------------------------------------------
 ## df_grid must contain columns lon, lat, elv, and idx
 
-## PT-JPL
-filn <- "data/df_pt_jpl_sj02.Rdata"
-filn_csv <- str_replace(filn, "Rdata", "csv")
-if (!file.exists(filn)){
-  if (!file.exists(filn_csv)){
-    df_pt_jpl <- get_data_mct_global(
-      df_grid,
-      dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern   = "ET_PT-SRB-PU_daily_",
-      dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
-      dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-      dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
-      get_watch = TRUE, get_landeval = TRUE, get_alexi = FALSE,
-      year_start_watch = 1984, year_end_watch = 2007
-    )
-    save(df_pt_jpl, file = filn)
-    df_pt_jpl %>%
-      tidyr::unnest(df) %>%
-      write_csv(path = filn_csv)
-  } else {
-    df_pt_jpl <- read_csv(file = filn_csv) %>%
-      group_by(idx, lon, lat) %>%
-      tidyr::nest() %>%
-      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
-      dplyr::rename(df = data)
-  }
-} else {
-  load(filn)
-  df_pt_jpl %>%
-    tidyr::unnest(df) %>%
-    write_csv(path = "data/df_pt_jpl_sj02.csv")
-}
-
-
-## PM
-filn <- "data/df_pm_mod_sj02.Rdata"
-filn_csv <- str_replace(filn, "Rdata", "csv")
-if (!file.exists(filn)){
-  if (!file.exists(filn_csv)){
-    df_pm_mod <- get_data_mct_global(
-      df_grid,
-      dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern   = "ET_PM-SRB-PU_daily_",
-      dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
-      dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-      dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
-      get_watch = TRUE, get_landeval = TRUE, get_alexi = FALSE,
-      year_start_watch = 1984, year_end_watch = 2007
-    )
-    save(df_pm_mod, file = filn)
-    df_pm_mod %>%
-      tidyr::unnest(df) %>%
-      write_csv(path = filn_csv)
-  } else {
-    df_pm_mod <- read_csv(file = filn_csv) %>%
-      group_by(idx, lon, lat) %>%
-      tidyr::nest() %>%
-      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
-      dplyr::rename(df = data)
-  }
-} else {
-  load(filn)
-  df_pm_mod %>%
-    tidyr::unnest(df) %>%
-    write_csv(path = "data/df_pm_mod_sj02.csv")
-}
-
-
-## SEBS
-filn <- "data/df_sebs_sj02.Rdata"
-filn_csv <- str_replace(filn, "Rdata", "csv")
-if (!file.exists(filn)){
-  if (!file.exists(filn_csv)){
-    df_sebs <- get_data_mct_global(
-      df_grid,
-      dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern   = "ET_SEBS-SRB-PU_daily_",
-      dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
-      dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
-      dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
-      get_watch = TRUE, get_landeval = TRUE, get_alexi = FALSE,
-      year_start_watch = 1984, year_end_watch = 2007
-    )
-    save(df_sebs, file = filn)
-    df_sebs %>%
-      tidyr::unnest(df) %>%
-      write_csv(path = filn_csv)
-  } else {
-    df_sebs <- read_csv(file = filn_csv) %>% 
-      group_by(idx, lon, lat) %>%
-      tidyr::nest() %>% 
-      dplyr::mutate(data = purrr::map(data, ~as_tibble(.)))%>% 
-      dplyr::rename(df = data)
-  }
-} else {
-  load(filn)
-  df_sebs %>%
-    tidyr::unnest(df) %>%
-    write_csv(path = "data/df_sebs_sj02.csv")
-}
+# ## PT-JPL
+# filn <- "data/df_pt_jpl_sj02.Rdata"
+# filn_csv <- str_replace(filn, "Rdata", "csv")
+# if (!file.exists(filn)){
+#   if (!file.exists(filn_csv)){
+#     df_pt_jpl <- get_data_mct_global(
+#       df_grid,
+#       dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern   = "ET_PT-SRB-PU_daily_",
+#       dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
+#       dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
+#       dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
+#       get_watch = TRUE, get_landeval = TRUE, get_alexi = FALSE,
+#       year_start_watch = 1984, year_end_watch = 2007
+#     )
+#     save(df_pt_jpl, file = filn)
+#     df_pt_jpl %>%
+#       tidyr::unnest(df) %>%
+#       write_csv(path = filn_csv)
+#   } else {
+#     df_pt_jpl <- read_csv(file = filn_csv) %>%
+#       group_by(idx, lon, lat) %>%
+#       tidyr::nest() %>%
+#       dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+#       dplyr::rename(df = data)
+#   }
+# } else {
+#   load(filn)
+#   df_pt_jpl %>%
+#     tidyr::unnest(df) %>%
+#     write_csv(path = "data/df_pt_jpl_sj02.csv")
+# }
+# 
+# 
+# ## PM
+# filn <- "data/df_pm_mod_sj02.Rdata"
+# filn_csv <- str_replace(filn, "Rdata", "csv")
+# if (!file.exists(filn)){
+#   if (!file.exists(filn_csv)){
+#     df_pm_mod <- get_data_mct_global(
+#       df_grid,
+#       dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern   = "ET_PM-SRB-PU_daily_",
+#       dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
+#       dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
+#       dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
+#       get_watch = TRUE, get_landeval = TRUE, get_alexi = FALSE,
+#       year_start_watch = 1984, year_end_watch = 2007
+#     )
+#     save(df_pm_mod, file = filn)
+#     df_pm_mod %>%
+#       tidyr::unnest(df) %>%
+#       write_csv(path = filn_csv)
+#   } else {
+#     df_pm_mod <- read_csv(file = filn_csv) %>%
+#       group_by(idx, lon, lat) %>%
+#       tidyr::nest() %>%
+#       dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+#       dplyr::rename(df = data)
+#   }
+# } else {
+#   load(filn)
+#   df_pm_mod %>%
+#     tidyr::unnest(df) %>%
+#     write_csv(path = "data/df_pm_mod_sj02.csv")
+# }
+# 
+# 
+# ## SEBS
+# filn <- "data/df_sebs_sj02.Rdata"
+# filn_csv <- str_replace(filn, "Rdata", "csv")
+# if (!file.exists(filn)){
+#   if (!file.exists(filn_csv)){
+#     df_sebs <- get_data_mct_global(
+#       df_grid,
+#       dir_et   = "~/data/landflux/et_prod/",        fil_et_pattern   = "ET_SEBS-SRB-PU_daily_",
+#       dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
+#       dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
+#       dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
+#       get_watch = TRUE, get_landeval = TRUE, get_alexi = FALSE,
+#       year_start_watch = 1984, year_end_watch = 2007
+#     )
+#     save(df_sebs, file = filn)
+#     df_sebs %>%
+#       tidyr::unnest(df) %>%
+#       write_csv(path = filn_csv)
+#   } else {
+#     df_sebs <- read_csv(file = filn_csv) %>% 
+#       group_by(idx, lon, lat) %>%
+#       tidyr::nest() %>% 
+#       dplyr::mutate(data = purrr::map(data, ~as_tibble(.)))%>% 
+#       dplyr::rename(df = data)
+#   }
+# } else {
+#   load(filn)
+#   df_sebs %>%
+#     tidyr::unnest(df) %>%
+#     write_csv(path = "data/df_sebs_sj02.csv")
+# }
 
 ##------------------------------------------------------------------------
 ## WATCH-WFDEI and ALEXI
