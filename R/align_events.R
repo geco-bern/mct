@@ -6,6 +6,10 @@
 #' named \code{"isevent"}, specifying whether respective dates satisfy a user-defined condition that is used to define events. 
 #' Events are determined by the function based on consecutive dates, where this condition is satisfied (minimum length for 
 #' defining an event is given by \code{leng_threshold}).
+#' @param events An object returned by function \link{get_consecutive}. Defaults to \code{NULL}, which triggers a function 
+#' call to \link{get_consecutive}, using the data frame provided through argument \code{df}. The data frame \code{events}
+#' contains a column \code{idx_start} and a column \code{len}, specifying the start and length of an event, relating to the 
+#' row index of \code{df}.
 #' @param dovars A vector of character strings specifying which columns of \code{df} to re-arrange.
 #' @param before An integer specifying the number of days before the event onset to be retained in re-arranged data 
 #' @param after An integer specifying the number of days after the event onset to be retained in re-arranged data 
@@ -17,14 +21,10 @@
 #'
 #' @examples df_alg <- align_events( df, before=30, after=300 )
 #' 
-align_events <- function( df, dovars, leng_threshold, before, after, nbins, do_norm=FALSE, normbin = 1 ){
+align_events <- function( df, events = NULL, dovars, leng_threshold, before, after, nbins, do_norm=FALSE, normbin = 1 ){
 
   require( dplyr )
   require( tidyr )
-
-  if (!("isevent" %in% names(df))){
-    rlang::abort("align_events(): Column named isevent is missing in data frame df.")
-  }
 
   # ## Bins for different variables XXX a bit weird with default values
   # bins  <- seq( from=-before, to=after, by=(after+before)/nbins )
@@ -32,14 +32,19 @@ align_events <- function( df, dovars, leng_threshold, before, after, nbins, do_n
   ## merge df_isevent into df
   df <- df %>% mutate( idx_df = 1:n() )
 
-  ##--------------------------------------------------------
-  ## Identify events ()
-  ##--------------------------------------------------------
-  events <- get_consecutive( 
-              df$isevent, 
-              leng_threshold = leng_threshold, 
-              do_merge       = FALSE
-              )
+  if (is.null(events)){
+    ##--------------------------------------------------------
+    ## Identify events ()
+    ##--------------------------------------------------------
+    if (!("isevent" %in% names(df))){
+      rlang::abort("align_events(): Column named isevent is missing in data frame df.")
+    }
+    events <- get_consecutive( 
+      df$isevent, 
+      leng_threshold = leng_threshold, 
+      do_merge       = FALSE
+    )
+  }
 
   ##--------------------------------------------------------
   ## Re-arrange data, aligning by beginning of events

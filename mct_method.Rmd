@@ -19,6 +19,8 @@ library(survival)
 library(SPREDA)
 library(extRemes)
 source("R/eva_max.R")
+source("R/mct.R")
+source("R/get_plantwhc_mct_bysite.R")
 ```
 
 Code for this is available on [my github](https://github.com/stineb/mct).
@@ -31,145 +33,250 @@ The approach implemented here (function `mct()`) considers temporal variations i
 
 The steps for the method are:
 
-1. Identify events where the water deficit ($f_v E_p - P$) is accumulating. 
+1. Identify events where the water deficit ($ET - P$) is accumulating. 
 2. Fit a gumbel distribution to the largest $N$ events.
 3. Extract the estimated water deficit for a given return period $T$.
 
-### Identify events
+## Identify CWD events
 
-Let's try this out for the FLUXNET site 'FR-Pue', for which whe have these variables. 
+### Get FLUXNET data
+
+Let's try this out for the FLUXNET site 'FR-Pue', for which whe have these variables. Read FLUXNET meteo data from FLUXNET stations (and  years), written by `rscript_eval_fluxnet2015.R`.
 ```{r}
-# ## get data
-# load("./data/out_eval_v2.Rdata")
-# df <- obs_eval$ddf %>%
-#   as_tibble() %>%
-#   dplyr::filter(sitename=="US-Ton") %>%
-#   dplyr::select(date, fv=fapar)
+## meteo data 
+load("./data/ddf_meteo.Rdata")
 
-# ## add PET from the model output
-# # load("./data/obs_eval_v2.RData")
-# load("./data/mod.RData")
-# df <- df %>%
-#   left_join( dplyr::select( mod$daily$`US-Ton`, date, pet ), by="date" ) %>%
-#   cutna_headtail_df("fv") %>%
-#   mutate(fv = rbeni::myapprox(fv), pet = rbeni::myapprox(pet), prec=ifelse(is.na(prec),0,prec))
-# save(df, file = "data/df.Rdata")
+## re-read ET data from FLUXNET and don't remove (filter) any data
+filn <- "data/ddf_eval_all.Rdata"
+if (!file.exists(filn)){
+  ddf_eval <- ingest(
+    siteinfo = siteinfo,
+    source    = "fluxnet", 
+    getvars   = list(latenth = "LE_F_MDS", latenth_qc = "LE_F_MDS_QC", gpp = "GPP_NT_VUT_REF"),
+    dir       = "~/data/FLUXNET-2015_Tier1/20191024/DD/",
+    settings  = list(threshold_GPP = 0.8, threshold_LE = 0.0, getswc = FALSE, filter_ntdt = TRUE, remove_neg = FALSE),
+    timescale = "d"
+  )
+  save(ddf_eval, file = filn)
+} else {
+  load(filn)
+}
 
-load("data/df.Rdata")
-df %>%
+## combine FLUXNET meteo and ET data
+ddf_fluxnet <- ddf_meteo %>% 
+  unnest(data) %>% 
+  left_join(ddf_eval %>% 
+              unnest(data), 
+            by = c("sitename", "date")
+            ) %>% 
+  group_by(sitename) %>% 
+  nest() %>% 
+  
+  ## nest elv into data frame
+  left_join(
+    readr::read_csv("~/ingestr/siteinfo_fluxnet2015.csv") %>% 
+      dplyr::select(sitename, elv),
+    by = "sitename"
+  ) %>% 
+  unnest(data) %>% 
+  group_by(sitename) %>% 
+  nest() %>% 
+  
+  ## convert units: get ET in mm d-1
+  dplyr::mutate(latenth_mm = purrr::map(data, ~convert_et(.$latenth, .$temp, .$elv))) %>% 
+  dplyr::mutate(latenth_mm = purrr::map(latenth_mm, ~tibble(latenth_mm = .))) %>% 
+  dplyr::mutate(data       = purrr::map2(data, latenth_mm, ~bind_cols(.x, .y))) %>% 
+  dplyr::select(-latenth_mm)
+```
+ 
+### Get ALEXI/WATCH-WFDEI data
+
+Read ALEXI ET and WATCH-WFDEI data at FLUXNET sites, written by `rscript_get_data_fluxnetsites.R`.
+```{r}
+load("data/df_alexi.Rdata")
+```
+
+### Plot water balance components
+
+```{r}
+ddf_fluxnet %>%
+  filter(sitename == "US-Ton") %>% 
+  unnest(data) %>% 
   ggplot(aes(date, prec)) +
   geom_line(color = "royalblue") +
   labs(x = "Date", y = expression(paste("Precipitation (mm d"^{-1}, ")")) )
-ggsave("fig/prec_example.pdf", width = 6, height = 3)
+#ggsave("fig/prec_example.pdf", width = 6, height = 3)
 
-df %>% 
-  ggplot(aes(date, pet)) +
+ddf_fluxnet %>% 
+  filter(sitename == "US-Ton") %>% 
+  unnest(data) %>% 
+  ggplot(aes(date, latenth_mm)) +
   geom_line(color = "tomato") +
-  labs(x = "Date", y = expression(paste("PET (mm d"^{-1}, ")")) )
-ggsave("fig/pet_example.pdf", width = 6, height = 3)
+  labs(x = "Date", y = expression(paste("ET (J m"^{-2}, "d"^{-1}, ")")) )
+#ggsave("fig/pet_example.pdf", width = 6, height = 3)
 
-df %>% 
-  ggplot(aes(date, fv)) +
-  geom_line(color = "springgreen3") +
-  labs(x = "Date", y = expression(paste("fAPAR (unitless)")) )
-ggsave("fig/fapar_example.pdf", width = 6, height = 3)
-
-df %>% 
-  ggplot(aes(date, prec - fv * pet)) +
+ddf_fluxnet %>% 
+  filter(sitename == "US-Ton") %>% 
+  unnest(data) %>% 
+  mutate(latenth_mm = ifelse(is.na(latenth_mm), 0, latenth_mm)) %>% 
+  ggplot(aes(date, -cumsum(prec - latenth_mm))) +
   geom_line(color = "black") +
   labs(x = "Date", y = expression(paste("Water balance (mm d"^{-1}, ")")) )
-ggsave("fig/wbal_example.pdf", width = 6, height = 3)
-
-df %>% 
-  ggplot(aes(date, -cumsum(prec - fv * pet))) +
-  geom_line(color = "black") +
-  labs(x = "Date", y = expression(paste("Water balance (mm d"^{-1}, ")")) )
-
 ```
 
-Plot the demand curve, given by cumulative $f_v E_p$.
+Calculate daily water balance and add to test data frame for site US-Ton. 
 ```{r}
-df <- df %>% 
-  mutate(demand_cum = cumsum(fv * pet),
-         supply_cum = cumsum(prec)) %>% 
-  mutate(bal = prec - fv*pet) %>% 
+df_example_fluxnet <- ddf_fluxnet %>% 
+  filter(sitename == "US-Ton") %>% 
+  unnest(data) %>% 
+  mutate(latenth_mm = ifelse(is.na(latenth_mm), 0, latenth_mm)) %>% 
+  mutate(bal = prec - latenth_mm) %>% 
   mutate(bal = myapprox(bal)) %>% 
-  mutate(bal_cum = cumsum(bal))
+  mutate(bal_cum    = cumsum(bal)) %>% 
+  mutate(demand_cum = cumsum(latenth_mm)) %>% 
+  mutate(supply_cum = cumsum(prec))
+
+df_example_alexi <- df_alexi %>% 
+  filter(idx == "US-Ton") %>% 
+  unnest(df) %>% 
+  mutate(et_mm = ifelse(is.na(et_mm), 0, et_mm)) %>% 
+  mutate(bal = prec - et_mm) %>% 
+  mutate(bal = myapprox(bal)) %>% 
+  mutate(bal_cum    = cumsum(bal)) %>% 
+  mutate(demand_cum = cumsum(et_mm)) %>% 
+  mutate(supply_cum = cumsum(prec)) %>% 
+  drop_na(bal)
 ```
+
+
+### Algorithm to identify CWD events
 
 Get events of consecutive deficit using the `mct()` function.
 ```{r}
-source("R/mct.R")
-out1 <- mct(df, varname_wbal = "bal")
-out2 <- mct(df, varname_wbal = "bal", method = "threshbal", thresh_deficit=0.5 )
-out3 <- mct(df, varname_wbal = "bal", method = "threshbal", thresh_surplus=0.5, do_deficit = FALSE )
+out_mct_fluxnet <- mct(df_example_fluxnet, varname_wbal = "bal", method = "threshbal", thresh_deficit=1.0 )
+out_mct_alexi   <- mct(df_example_alexi,   varname_wbal = "bal", method = "threshbal", thresh_deficit=1.0 )
 ```
-
 
 Plot the cumulative deficit and rain events.
 ```{r}
 ## cumulative deficits
+## FLUXNET data
 ggplot() +
   geom_rect(
-    data=out2$inst, 
+    data=out_mct_fluxnet$inst, 
     aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999), 
     fill=rgb(0,0,0,0.3), 
     color=NA) +
-  # geom_line(data = out1$df, aes(date, -bal_cum), size = 0.3, color="royalblue") +
-  geom_line(data = out1$df, aes(date, prec), size = 0.3, color="royalblue") +
-  geom_line(data = out1$df, aes(date, deficit)) +
-  geom_line(data = out2$df, aes(date, deficit), color="tomato") +
-  coord_cartesian(ylim=c(0, 450), xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))) +
+  geom_line(data = out_mct_fluxnet$df, aes(date, prec), size = 0.3, color="royalblue") +
+  geom_line(data = out_mct_fluxnet$df, aes(date, deficit), color="tomato") +
+  coord_cartesian(ylim=c(0, 200), xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))) +
   theme_classic() +
-  labs(x = "Date", y = "Cumulative water deficit (mm)")
-ggsave("fig/cwd_example.pdf", width = 6, height = 3)
+  labs(title = "FLUXNET 2015 data", x = "Date", y = "Cumulative water deficit (mm)")
+ggsave("fig/cwd_example_fluxnet.pdf", width = 6, height = 3)
 
-## cumulative surplusses
+## ALEXI data
 ggplot() +
   geom_rect(
-    data=out3$inst, 
+    data=out_mct_alexi$inst, 
     aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999), 
     fill=rgb(0,0,0,0.3), 
     color=NA) +
-  # geom_line(data = out1$df, aes(date, -bal_cum), size = 0.3, color="royalblue") +
-  geom_line(data = out3$df, aes(date, prec), size = 0.3, color="royalblue") +
-  geom_line(data = out3$df, aes(date, surplus)) +
-  geom_line(data = out3$df, aes(date, surplus), color="tomato") +
-  coord_cartesian(ylim=c(0, 1000), xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))) + #
+  geom_line(data = out_mct_alexi$df, aes(date, prec), size = 0.3, color="royalblue") +
+  geom_line(data = out_mct_alexi$df, aes(date, deficit), color="tomato") +
+  coord_cartesian(ylim=c(0, 400)) + # , xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))
   theme_classic() +
-  labs(x = "Date", y = "Cumulative water surplus (mm)")
+  labs(title = "ALEXI and WATCH-WFDEI", x = "Date", y = "Cumulative water deficit (mm)")
+ggsave("fig/cwd_example_alexi.pdf", width = 6, height = 3)
+
+## ALEXI and FLUXNET data on top of each other
+ggplot() +
+  geom_line(data = out_mct_fluxnet$df, aes(date, deficit), color="black") +
+  geom_line(data = out_mct_alexi$df, aes(date, deficit), color="tomato")
+
+# ## cumulative surplusses
+# ggplot() +
+#   geom_rect(
+#     data=out3$inst, 
+#     aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999), 
+#     fill=rgb(0,0,0,0.3), 
+#     color=NA) +
+#   # geom_line(data = out1$df, aes(date, -bal_cum), size = 0.3, color="royalblue") +
+#   geom_line(data = out3$df, aes(date, prec), size = 0.3, color="royalblue") +
+#   geom_line(data = out3$df, aes(date, surplus)) +
+#   geom_line(data = out3$df, aes(date, surplus), color="tomato") +
+#   coord_cartesian(ylim=c(0, 1000), xlim = c(ymd("2002-01-01"), ymd("2010-12-01"))) + #
+#   theme_classic() +
+#   labs(x = "Date", y = "Cumulative water surplus (mm)")
+```
+
+### Evaluate ALEXI ET and WATCH-WFDEI ET
+
+Apparently, at least for this site, ALEXI-based data appears to be biased high compared to FLUXNET data. Check whether this is due to precipitation or ET.
+```{r}
+df_example_alexi %>% 
+  rename(sitename = idx, prec_watch = prec) %>% 
+  inner_join(
+    df_example_fluxnet %>% 
+      rename(prec_fluxnet = prec),
+    by = c("sitename", "date")
+  ) %>% 
+  rbeni::analyse_modobs2("prec_fluxnet", "prec_watch")
+
+df_example_alexi %>% 
+  rename(sitename = idx, prec_watch = prec) %>% 
+  inner_join(
+    df_example_fluxnet %>% 
+      rename(prec_fluxnet = prec),
+    by = c("sitename", "date")
+  ) %>% 
+  rbeni::analyse_modobs2("latenth_mm", "et_mm")
 ```
 
 As an additional illustration, plot cumulative variables.
 ```{r}
 ggplot() +
   geom_rect(
-    data=out2$inst, 
+    data=out$`US-Ton`$inst, 
     aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999), 
     fill=rgb(0,0,0,0.3), 
     color=NA) + 
-  geom_line(data=df, aes(date, demand_cum)) +
-  geom_line(data=df, aes(date, supply_cum, color="supply_cum"), color="tomato") +
-  labs(y=expression(integral(f[v] ~ E[p])), x="Date") +
+  geom_line(data=df_example_alexi, aes(date, demand_cum)) +
+  geom_line(data=df_example_alexi, aes(date, cumsum(prec), color="supply_cum"), color="tomato") +
+  # labs(y=expression(integral(f[v] ~ E[p])), x="Date") +
+  labs(y=expression(integral(ET)), x="Date") +
   coord_cartesian(ylim=c(0, 10000)) +
   theme_classic()
 ```
 
+### Distribution of CWD events
+
 Plot the distribution of cumulative deficits
 ```{r}
-ggplot(out2$inst, aes(deficit)) +
-  geom_histogram()
+ggplot() +
+  geom_histogram(
+    data = out_mct_fluxnet$inst,
+    aes(x = deficit, y = ..density..),
+    color = "black", alpha = 0.5, fill = "black",
+    position="identity") +
+  geom_histogram(
+    data = out_mct_alexi$inst,
+    aes(x = deficit, y = ..density..),
+    color = "black", alpha = 0.5, fill = "tomato", 
+    position="identity") +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)")
+
+  scale_fill_manual(name = "", values = c("black", "tomato"), labels = c("FLUXNET", "ALEXI/WATCH-WFDEI"))
 ```
 
-### Fit a distribution
+## Fit an extreme value distribution
 
 To estimate the probability of extreme values, we fit a Gumbel distribution following [this link](http://blogs2.datall-analyse.nl/2016/02/17/extreme_value_analysis_maxima/#more-120). A paper on the R package [extRemes](file:///Users/benjaminstocker/Downloads/v72i08.pdf).
 ```{r}
 ## Take only the N largest instances (deficits), where N is given by the number of years available in the data
-nyears <- year(range(out2$df$date)[2]) - year(range(out2$df$date)[1]) + 1
-vals <- out2$inst %>% 
+nyears <- year(range(out_mct_alexi$df$date)[2]) - year(range(out_mct_alexi$df$date)[1]) + 1
+vals <- out_mct_alexi$inst %>% 
   arrange(desc(deficit)) %>% 
-  dplyr::slice(1:nyears) %>% 
+  dplyr::slice(1:nyears) %>%  # use all data!
   dplyr::select(deficit) %>% 
   pull()
 
@@ -230,15 +337,157 @@ df_return %>%
   geom_point()
 ```
 
-### Nice function
+### Nice functions
 
+Fitting the extreme value distribution and estimating the event size with return period $T$ is done in one single function.
 ```{r}
-source("R/get_data_fluxnet2015_mct.R")
-source("R/get_plantwhc_mct_bysite.R")
-ddf <- get_data_fluxnet2015_mct("FR-Pue") %>% 
-  tidyr::drop_na()
-ddf
-
-result <- get_plantwhc_mct_bysite(ddf, varname_wbal = "wbal")
+result <- get_plantwhc_mct_bysite(df_example_alexi, varname_wbal = "bal")
 result
+
+result <- get_plantwhc_mct_bysite(df_example_fluxnet, varname_wbal = "bal")
+result
+```
+
+Let's visualise the estimated event size with a return period of $T = 20$ y on top of the distribution of cumulative water deficit events.
+```{r}
+mct_alexi   <- get_plantwhc_mct_bysite(df_example_alexi,   varname_wbal = "bal", thresh_deficit = 1.0)
+mct_fluxnet <- get_plantwhc_mct_bysite(df_example_fluxnet, varname_wbal = "bal", thresh_deficit = 1.0)
+
+ggplot() +
+  geom_histogram(
+    data = out_mct_fluxnet$inst,
+    aes(x = deficit, y = ..density..),
+    color = "black", alpha = 0.5, fill = "black",
+    position="identity") +
+  geom_histogram(
+    data = out_mct_alexi$inst,
+    aes(x = deficit, y = ..density..),
+    color = "black", alpha = 0.5, fill = "tomato", 
+    position="identity") +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)") +
+  geom_vline(xintercept = mct_fluxnet %>% filter(return_period == 20) %>% pull(return_level), col = "black") +
+  geom_vline(xintercept = mct_alexi %>% filter(return_period == 20) %>% pull(return_level), col = "tomato")
+
+  scale_fill_manual(name = "", values = c("black", "tomato"), labels = c("FLUXNET", "ALEXI/WATCH-WFDEI"))
+```
+
+## GPP vs. CWD
+
+We expect that GPP, or GPP$/$PAR declines with increasing CWD. Let's align GPP at the onset of the largest few CWD events for one site.
+
+### FLUXNET data
+```{r}
+## get into standard format, with 'idx_start' and 'len' as columns
+events_fluxnet <- out_mct_fluxnet$df %>%  
+  ungroup() %>% 
+  dplyr::mutate( idx = 1:n() ) %>% 
+  dplyr::select(date_start = date, idx) %>% 
+  right_join(
+    out_mct_fluxnet$inst,
+    by = "date_start"
+  ) %>% 
+  dplyr::select(idx_start = idx, len) %>% 
+  filter(len > 14)
+
+## add CWD to data frame
+df_example_fluxnet <- df_example_fluxnet %>% 
+  left_join(
+    out_mct_fluxnet$df %>% 
+      ungroup() %>% 
+      dplyr::select(date, deficit),
+    by = "date"
+  )
+
+## retain only data that is in a CWD event
+df_alg_fluxnet <- df_example_fluxnet %>%
+  dplyr::ungroup() %>% 
+  align_events(
+    events         = events_fluxnet,
+    dovars         = c("gpp", "deficit"), 
+    leng_threshold = 14, 
+    before         = 10, 
+    after          = 30, 
+    nbins          = 4, 
+    do_norm        = FALSE
+    )
+
+df_alg_fluxnet$df_dday %>% 
+  dplyr::filter(dday>2) %>% 
+  ggplot(aes(x = deficit, y = gpp/ppfd)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET") +
+  geom_smooth(aes(y =  gpp/ppfd), color = 'tomato', method = 'loess', se = TRUE) +
+  geom_vline(xintercept = mct_fluxnet %>% filter(return_period == 20) %>% pull(return_level), col = "tomato")
+```
+
+### ALEXI/WATCH-WFDEI data
+```{r}
+## get into standard format, with 'idx_start' and 'len' as columns
+events_alexi <- out_mct_alexi$df %>%  
+  ungroup() %>% 
+  dplyr::mutate( idx = 1:n() ) %>% 
+  dplyr::select(date_start = date, idx) %>% 
+  right_join(
+    out_mct_alexi$inst,
+    by = "date_start"
+  ) %>% 
+  dplyr::select(idx_start = idx, len) %>% 
+  filter(len > 14)
+
+## merge CWD to alexi data frame
+df_example_alexi_tmp <- df_example_alexi %>% 
+  left_join(
+    out_mct_alexi$df %>%
+      ungroup() %>%
+      dplyr::select(date, deficit),
+    by = "date"
+  ) %>%
+  ## merge FLUXNET GPP data into the alexi data frame
+  left_join(
+    df_example_fluxnet %>% 
+      ungroup() %>% 
+      dplyr::select(date, gpp, ppfd),
+    by = "date"
+  )
+
+## retain only data that is in a CWD event
+df_alg_alexi <- df_example_alexi_tmp %>%
+  dplyr::ungroup() %>% 
+  align_events(
+    events         = events_alexi,
+    dovars         = c("gpp", "deficit"), 
+    leng_threshold = 20, 
+    before         = 10, 
+    after          = 30, 
+    nbins          = 4, 
+    do_norm        = FALSE
+    )
+
+df_alg_alexi$df_dday %>% 
+  # dplyr::filter(dday>2) %>% 
+  ggplot(aes(x = deficit, y = gpp/ppfd)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
+  geom_smooth(aes(y =  gpp/ppfd), color = 'tomato', method = 'loess', se = TRUE) +
+  geom_vline(xintercept = mct_alexi %>% filter(return_period == 20) %>% pull(return_level), col = "tomato")
+```
+
+## Methods evaluation at all sites
+
+All of the above evaluated steps are implemented in one function, producing plot files for each site separately.
+```{r}
+## for some reason, purrr::map() did not work here.
+allsites <- ddf_fluxnet %>% pull(sitename)
+out <- list()
+for (site in allsites){
+  print(site)
+  out[[site]] <- test_mct_bysite(
+    site,
+    ddf_fluxnet %>% 
+     filter(sitename == site), 
+    df_alexi %>% 
+      filter(idx == site),
+    method = "posbal"
+  )
+}
 ```

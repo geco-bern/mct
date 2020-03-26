@@ -71,6 +71,7 @@ ddf_meteo <- ingest(
   settings  = list(dir_hh = "~/data/FLUXNET-2015_Tier1/20191024/HH/", getswc = FALSE),
   timescale = "d"
   )
+save(ddf_meteo, file = "./data/ddf_meteo.Rdata")
 
 ## get data for idfferent time scales separately
 filn <- "data/ddf_eval.Rdata"
@@ -256,6 +257,10 @@ out_modobs_pt_jpl$gg
 out_modobs_pm_mod <- out_eval_pm_mod$latenth$fluxnet$data$ddf %>%
   analyse_modobs2("mod", "obs", type = "heat")
 out_modobs_pm_mod$gg
+
+out_modobs_alexi <- out_eval_alexi$latenth$fluxnet$data$ddf %>%
+  analyse_modobs2("mod", "obs", type = "heat")
+out_modobs_alexi$gg
 
 ##------------------------------------------------------------------------
 ## Align along rain-free periods of >= 14 days
