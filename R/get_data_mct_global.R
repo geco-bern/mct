@@ -9,11 +9,12 @@
 #' @export
 #'
 get_data_mct_global <- function(df,
-                                dir_et, fil_et_pattern, 
-                                dir_prec, fil_prec_pattern, varnam_prec, 
-                                dir_snow, fil_snow_pattern = NA, varnam_snow = NA,
-                                dir_temp, fil_temp_pattern = NA, varnam_temp = NA,
-                                get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE,
+                                dir_et = NA, fil_et_pattern = NA, 
+                                dir_prec = NA, fil_prec_pattern = NA, varnam_prec = NA, 
+                                dir_snow = NA, fil_snow_pattern = NA, varnam_snow = NA,
+                                dir_temp = NA, fil_temp_pattern = NA, varnam_temp = NA,
+                                dir_sif = NA, fil_sif_pattern = NA,
+                                get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE, get_sif = TRUE,
                                 year_start_watch = 1979, year_end_watch = 2018){
   
 
@@ -29,7 +30,8 @@ get_data_mct_global <- function(df,
                          dir_prec, fil_prec_pattern, varnam_prec, 
                          dir_snow, fil_snow_pattern, varnam_snow,
                          dir_temp, fil_temp_pattern, varnam_temp,
-                         get_watch = get_watch, get_landeval = get_landeval, get_alexi = get_alexi,
+                         dir_sif = dir_sif, fil_sif_pattern = fil_sif_pattern,
+                         get_watch = get_watch, get_landeval = get_landeval, get_alexi = get_alexi, get_sif = get_sif,
                          year_start_watch = year_start_watch, year_end_watch = year_end_watch)
   )
     
@@ -37,11 +39,12 @@ get_data_mct_global <- function(df,
 }
 
 get_data_mct_chunk <- function(df, idx, 
-                               dir_et, fil_et_pattern, 
-                               dir_prec = NULL, fil_prec_pattern = NULL, varnam_prec = NULL, 
-                               dir_snow = NULL, fil_snow_pattern = NULL, varnam_snow = NULL,
-                               dir_temp = NULL, fil_temp_pattern = NULL, varnam_temp = NULL,
-                               get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE,
+                               dir_et = NA, fil_et_pattern = NA, 
+                               dir_prec = NA, fil_prec_pattern = NA, varnam_prec = NA, 
+                               dir_snow = NA, fil_snow_pattern = NA, varnam_snow = NA,
+                               dir_temp = NA, fil_temp_pattern = NA, varnam_temp = NA,
+                               dir_sif = NA, fil_sif_pattern = NA,
+                               get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE, get_sif = TRUE,
                                year_start_watch = 1979, year_end_watch = 2018){
   
   print("----------------")
@@ -183,6 +186,16 @@ get_data_mct_chunk <- function(df, idx,
       dplyr::rename(df_et = data0) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~rename(., et = V1))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., et = convert_et_MJ(et)))) 
+    
+  }
+  
+  if (get_sif){
+    ##-------------------------------------------------
+    ## SiF, here from Duveiller et al. (GOME2-SiF-downscaled)
+    ##-------------------------------------------------
+    print("getting SiF from Duveiller et al. (GOME2-SiF-downscaled) ...")
+    list_fil_sif <- list.files(dir_sif, pattern = fil_sif_pattern, recursive = FALSE)
+    df <- extract_points_filelist(df, list_fil_sif, varnam = "SIF", dirnam = dir_sif, fil_pattern = fil_sif_pattern, filetype = "sif")
     
   }
   
