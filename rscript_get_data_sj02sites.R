@@ -131,28 +131,62 @@ df_grid <- siteinfo %>%
 #     write_csv(path = "data/df_sebs_sj02.csv")
 # }
 
+# ##------------------------------------------------------------------------
+# ## WATCH-WFDEI and ALEXI
+# ##------------------------------------------------------------------------
+# filn <- "data/df_alexi_sj02.Rdata"
+# filn_csv <- str_replace(filn, "Rdata", "csv")
+# if (!file.exists(filn)){
+#   if (!file.exists(filn_csv)){
+#     df_alexi <- get_data_mct_global(
+#       df_grid,
+#       dir_et   = "~/data/alexi_tir/netcdf/",        fil_et_pattern   = "EDAY_CERES_",
+#       dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
+#       dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
+#       dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
+#       get_watch = TRUE, get_landeval = FALSE, get_alexi = TRUE,
+#       year_start_watch = 2003, year_end_watch = 2018
+#     )
+#     save(df_alexi, file = filn)
+#     df_alexi %>%
+#       tidyr::unnest(df) %>%
+#       write_csv(path = filn_csv)
+#   } else {
+#     df_alexi <- read_csv(file = filn_csv) %>%
+#       group_by(idx, lon, lat) %>%
+#       tidyr::nest() %>%
+#       dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+#       dplyr::rename(df = data)
+#   }
+# } else {
+#   load(filn)
+#   df_alexi %>%
+#     tidyr::unnest(df) %>%
+#     write_csv(path = "data/df_alexi_sj02.csv")
+# }
+
 ##------------------------------------------------------------------------
-## WATCH-WFDEI and ALEXI
+## SiF-downscaled from Duveiller
 ##------------------------------------------------------------------------
-filn <- "data/df_alexi_sj02.Rdata"
+filn <- "data/df_sif_sj02.Rdata"
 filn_csv <- str_replace(filn, "Rdata", "csv")
 if (!file.exists(filn)){
   if (!file.exists(filn_csv)){
-    df_alexi <- get_data_mct_global(
+    df_sif <- get_data_mct_global(
       df_grid,
-      dir_et   = "~/data/alexi_tir/netcdf/",        fil_et_pattern   = "EDAY_CERES_",
+      dir_et   = "~/data/sif_tir/netcdf/", fil_et_pattern = "EDAY_CERES_",
       dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
       dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
       dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
-      get_watch = TRUE, get_landeval = FALSE, get_alexi = TRUE,
-      year_start_watch = 2003, year_end_watch = 2018
+      dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_",
+      get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
     )
-    save(df_alexi, file = filn)
-    df_alexi %>%
+    save(df_sif, file = filn)
+    df_sif %>%
       tidyr::unnest(df) %>%
       write_csv(path = filn_csv)
   } else {
-    df_alexi <- read_csv(file = filn_csv) %>%
+    df_sif <- read_csv(file = filn_csv) %>%
       group_by(idx, lon, lat) %>%
       tidyr::nest() %>%
       dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
@@ -160,10 +194,11 @@ if (!file.exists(filn)){
   }
 } else {
   load(filn)
-  df_alexi %>%
+  df_sif %>%
     tidyr::unnest(df) %>%
-    write_csv(path = "data/df_alexi_sj02.csv")
+    write_csv(path = "data/df_sif_sj02.csv")
 }
+
 
 # ## compare
 # ggplot() +
