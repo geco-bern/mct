@@ -179,9 +179,13 @@ if (!file.exists(filn)){
       dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_",
       get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
     )
+  # ## correct xxx  
+  # df_sif <- df_sif %>%     
+  #   dplyr::rename(data = data0) %>%
+  #   dplyr::mutate(data = purrr::map(data, ~rename(., sif = V1)))
     save(df_sif, file = filn)
     df_sif %>%
-      tidyr::unnest(df) %>%
+      tidyr::unnest(data) %>%
       write_csv(path = filn_csv)
   } else {
     df_sif <- read_csv(file = filn_csv) %>%

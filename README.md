@@ -1,5 +1,23 @@
 # mct
 
+## Approach
+
+- **Hypothesis 1**: Plants should be acclimated to the maximum cumulative water deficit with a return period of *N* years (CWD*N).
+- **Test data 1:** Reliability of ALEXI and WATCH-WFDEI for estimating CWD, data: FLUXNET. ALEXI captures ET during dry periods → Use this in combination with precipitation estimates to estimate the apparent rooting zone water storage capacity.
+- **Test H1:** CWD*N ~ zroot95, data: SJ02 → CWD*N governs maximum rooting depth variations across the globe (across biomes). Do a similar analysis with Shersingh's data.
+- **Global application 1:**
+    - Map of CWD*N and implied (estimated) rooting depth (accounting for soil texture).
+    - CWD'N ~ (aridity index **x** seasonality index) → largest rooting depth at intermediate aridity with pronounced seasonality.
+- **Challenge**: Rooting depth measurements are sparse. → Is there a way to "sense" rooting depth from above?
+- **Hypothesis 2:** CWD*N to which rooting depth is acclimated should also be reflected by the CWD at which LUE drops to zero. → Alternative approach to estimate CWD*N, and CWD*N determines sensitivity to drought.
+- **Test H2:** CWD'N ~ CWD_LUE0 (CWD at which LUE is zero), data: FLUXNET sites → Analyze correlation of CWD'N ~ CWD_LUE0.
+- **Test data 2**: Reliability of SiF data for estimating GPP, and SiF/PAR and ALEXI/WATCH-WFDEI -based CWD'N ~ CWD_LUE0 analysis.
+- **Global application 2:**
+    - Map of CWD_LUE0
+    - Same pattern across globe? biomes? (aridity index **x** seasonality index)-space?
+- (Hopefully) **conclusion**: Rooting depth is acclimated to the hydro-climate and determines the global distribution of drought impact thresholds on vegetation productivity.
+
+
 Steps of my analysis:
 
 ## Steps

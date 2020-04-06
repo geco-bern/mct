@@ -21,7 +21,7 @@ library(R.utils)
 library(readr)
 library(ggplot2)
 
-source("R/mct.R")
+source("R/mct2.R")
 source("R/get_plantwhc_mct_bysite.R")
 source("R/get_plantwhc_mct_simsuite.R")
 source("R/calc_soilparams.R")
@@ -35,7 +35,7 @@ dir_fapar <- "~/sofun/input_sj02zroot_sofun/sitedata/fapar/"
 ## Prepare data
 Get meta info of sites (lon, lat)
 ```{r}
-df_sites <- read_csv("/alphadata01/bstocker/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
+df_sites <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
   dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
   dplyr::rename(sitename = ID, lat = Latitude, lon = Longitude) %>% 
   dplyr::mutate(elv = ifelse(elv==-999, NA, elv)) %>% 

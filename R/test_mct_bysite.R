@@ -93,26 +93,72 @@ test_mct_bysite <- function(sitename, df_fluxnet, df_alexi, thresh_terminate = 0
     slice(1:nyears) %>% 
     pull(iinst)
   
+  mct_fluxnet$df <- mct_fluxnet$df %>% 
+    mutate(lue = gpp/ppfd) 
+  
+  ## get linear fit with outliers
+  linmod <- try(lm(lue ~ deficit, data = mct_fluxnet$df))
+  if (class(linmod) != "try-error"){
+    idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+    mct_fluxnet$df$lue[idx_drop] <- NA
+    
+    ## git linear fit without outliers
+    linmod <- try(lm(lue ~ deficit, data = mct_fluxnet$df))
+    
+    if (class(linmod) != "try-error"){
+      ## test: is slope negative?
+      is_neg <- coef(linmod)["deficit"] < 0.0
+      
+      if (is_neg){
+        ## test: is slope significantly (5% level) different from zero (t-test)?
+        is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+        if (is_sign){
+          ## get x-axis cutoff
+          lue0_fluxnet <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+          df_fit <- tibble(y = predict(linmod, newdata = mct_fluxnet$df), x = mct_fluxnet$df$deficit)
+        } else {
+          lue0_fluxnet <- NA
+        }
+      } else {
+        is_sign <- FALSE
+        lue0_fluxnet <- NA
+      }
+    } else {
+      is_sign <- FALSE
+      lue0_fluxnet <- NA
+    }
+  } else {
+    is_sign <- FALSE
+    lue0_fluxnet <- NA
+  }
+  
+  ## plot
   out <- mct_fluxnet$df %>% 
     filter(iinst %in% biginstances) %>% 
-    ggplot(aes(x = deficit, y = gpp/ppfd)) +
+    ggplot(aes(x = deficit, y = lue)) +
     geom_point(alpha = 0.5) +
-    labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET") +
-    geom_smooth(aes(y = gpp/ppfd), color = 'red', method = 'lm', se = TRUE)
+    labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET")
+
+  if (is_sign){
+    out <- out +
+      geom_vline(xintercept = lue0_fluxnet, linetype = "dotted") +
+      geom_line(data = df_fit, aes(x, y), col = "red")
+  }  
   if (!identical(gumbi_fluxnet, NA)){
-    mct20 <- gumbi_fluxnet %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
+    mct20_fluxnet <- gumbi_fluxnet %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mct20_fluxnet)){
       out +
-        geom_vline(xintercept = mct20, col = "black")
+        geom_vline(xintercept = mct20_fluxnet, col = "black")
     } else {
       rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
     }
   } else {
     rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
+    mct20_fluxnet <- NA
   }
   out
   ggsave(paste0("fig/lue_cwd_fluxnet/lue_cwd_fluxnet_", sitename, ".pdf"), width = 6, height = 4)
-  
+
   
   ## LUE vs CWD: ALEXI/WATCH-WFDEI
   nyears <- mct_alexi$df %>% 
@@ -124,23 +170,69 @@ test_mct_bysite <- function(sitename, df_fluxnet, df_alexi, thresh_terminate = 0
     arrange(-deficit) %>% 
     slice(1:nyears) %>% 
     pull(iinst)
+
+  mct_alexi$df <- mct_alexi$df %>% 
+    mutate(lue = gpp/ppfd) 
+  
+  ## get linear fit with outliers
+  linmod <- try(lm(lue ~ deficit, data = mct_alexi$df))
+  
+  if (class(linmod) != "try-error"){
+    idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+    mct_alexi$df$lue[idx_drop] <- NA
+    
+    ## git linear fit without outliers
+    linmod <- try(lm(lue ~ deficit, data = mct_alexi$df))
+    
+    if (class(linmod) != "try-error"){
+      ## test: is slope negative?
+      is_neg <- coef(linmod)["deficit"] < 0.0
+      
+      if (is_neg){
+        ## test: is slope significantly (5% level) different from zero (t-test)?
+        is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+        if (is_sign){
+          ## get x-axis cutoff
+          lue0_alexi <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+          df_fit <- tibble(y = predict(linmod, newdata = mct_alexi$df), x = mct_alexi$df$deficit)
+        } else {
+          lue0_alexi <- NA
+        }
+      } else {
+        is_sign <- FALSE
+        lue0_alexi <- NA
+      }
+    } else {
+      is_sign <- FALSE
+      lue0_fluxnet <- NA
+    }
+  } else {
+    is_sign <- FALSE
+    lue0_fluxnet <- NA
+  }
   
   out <- mct_alexi$df %>% 
     filter(iinst %in% biginstances) %>% 
-    ggplot(aes(x = deficit, y = gpp/ppfd)) +
+    ggplot(aes(x = deficit, y = lue)) +
     geom_point(alpha = 0.5) +
-    labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
-    geom_smooth(aes(y =  gpp/ppfd), color = 'red', method = 'lm', se = TRUE)
+    labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET")
+  
+  if (is_sign){
+    out <- out +
+      geom_vline(xintercept = lue0_alexi, linetype = "dotted") +
+      geom_line(data = df_fit, aes(x, y), col = "red")
+  }
   if (!identical(gumbi_alexi, NA)){
-    mct20 <- gumbi_alexi %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
+    mct20_alexi <- gumbi_alexi %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mct20_alexi)){
       out +
-        geom_vline(xintercept = mct20, col = "tomato")
+        geom_vline(xintercept = mct20_alexi, col = "tomato")
     } else {
       rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
     }
   } else {
     rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
+    mct20_alexi <- NA
   }
   out
   ggsave(paste0("fig/lue_cwd_alexi/lue_cwd_alexi_", sitename, ".pdf"), width = 6, height = 4)
@@ -230,10 +322,10 @@ test_mct_bysite <- function(sitename, df_fluxnet, df_alexi, thresh_terminate = 0
     labs(title = sitename, x = "Cumulative water deficit (mm)")
   
   if (!identical(gumbi_fluxnet, NA)){
-    mct20 <- gumbi_fluxnet %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
+    mct20_fluxnet <- gumbi_fluxnet %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mct20_fluxnet)){
       out +
-        geom_vline(xintercept = mct20, col = "black")
+        geom_vline(xintercept = mct20_fluxnet, col = "black")
     } else {
       rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
     }
@@ -241,10 +333,10 @@ test_mct_bysite <- function(sitename, df_fluxnet, df_alexi, thresh_terminate = 0
     rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
   }
   if (!identical(gumbi_alexi, NA)){
-    mct20 <- gumbi_alexi %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
+    mct20_alexi <- gumbi_alexi %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mct20_alexi)){
       out +
-        geom_vline(xintercept = mct20, col = "tomato")
+        geom_vline(xintercept = mct20_alexi, col = "tomato")
     } else {
       rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
     }
@@ -255,6 +347,6 @@ test_mct_bysite <- function(sitename, df_fluxnet, df_alexi, thresh_terminate = 0
   ggsave(paste0("./fig/hist/hist_cwd_", sitename, ".pdf"), width = 6, height = 3)
   
 
-  return(mct_alexi)
+  return(list(mct_alexi = mct_alexi, mct_fluxnet = mct_fluxnet, gumbi_fluxnet = gumbi_fluxnet, gumbi_alexi = gumbi_alexi, mct20_fluxnet = mct20_fluxnet, mct20_alexi = mct20_alexi, lue0_fluxnet = lue0_fluxnet, lue0_alexi = lue0_alexi))
   
 }
