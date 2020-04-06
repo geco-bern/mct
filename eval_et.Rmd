@@ -30,7 +30,7 @@ df_flue_dry <- df_flue %>% filter(cluster %in% c("cGR", "cDD"))
 ddf_obs_dry <- obs_eval$ddf %>% 
   filter(sitename %in% df_flue_dry$site)
 
-fpar_absmin <- 0.15
+fpar_absmin <- 0.12
 ddf_obs_dry %>% 
   ggplot(aes(fapar, stat(density))) +
   geom_histogram( ) +
