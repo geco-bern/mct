@@ -1,4 +1,4 @@
-get_plantwhc_mct_bysite <- function( df, varname_wbal = "wbal", method_mct = "threshbal", thresh_deficit = 0.5,
+get_plantwhc_mct_bysite <- function( df, varname_wbal = "wbal", thresh_terminate = 0.2, thresh_drop = 0.8,
   return_period=c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800) ){
 
   # ## Get data frame in shape (renaming columns)
@@ -26,7 +26,8 @@ get_plantwhc_mct_bysite <- function( df, varname_wbal = "wbal", method_mct = "th
   } else {
 
     ## Get events of consecutive water deficit and accumulated deficit
-    out <- mct(df, varname_wbal = "wbal", method = method_mct, thresh_deficit = thresh_deficit)
+    out <- mct(df, varname_wbal = varname_wbal, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
+    
     
     if (nrow(out$inst)>0){
       ## Get N largest deficts
@@ -42,17 +43,24 @@ get_plantwhc_mct_bysite <- function( df, varname_wbal = "wbal", method_mct = "th
       if (length(vals)>3){
         
         ## Fit an extreme value distribution (Gumbel)
-        gumbi <- extRemes::fevd(x=vals, type="Gumbel", method="MLE")
+        gumbi <- try(
+          extRemes::fevd(x=vals, type="Gumbel", method="MLE")
+        )
         
-        ## Get values for return periods and constructi data frame with it
-        return_level <- extRemes::return.level(
-          gumbi, 
-          return.period = return_period )
+        if (class(gumbi) != "try-error"){
+          ## Get values for return periods and constructi data frame with it
+          return_level <- extRemes::return.level(
+            gumbi, 
+            return.period = return_period )
+          
+          df_return <- tibble( 
+            return_period = return_period, 
+            return_level = unname(c(return_level))
+          ) 
+        } else {
+          failed <- TRUE
+        }
         
-        df_return <- tibble( 
-          return_period = return_period, 
-          return_level = unname(c(return_level))
-        ) 
         
       } else {
         

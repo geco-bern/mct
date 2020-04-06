@@ -9,7 +9,7 @@ output:
     toc_float: true
 ---
 
-See `/alphadata01/bstocker/rsofun/vignettes/splash.Rmd` for how site-scale simulations were done.
+See `~/rsofun/vignettes/splash.Rmd` for how site-scale simulations were done.
 
 ```{r message=FALSE, warning=FALSE}
 library(dplyr)
@@ -17,7 +17,7 @@ library(readr)
 library(ggplot2)
 library(lubridate)
 library(rbeni)
-df_flue <- read_csv("~/alphadata01/bstocker/data/fLUE/flue_stocker18nphyt.csv")
+df_flue <- read_csv("~/data/fLUE/flue_stocker18nphyt.csv")
 ```
 
 ## "Correcting fAPAR data"
