@@ -20,6 +20,7 @@ library(extRemes)
 library(R.utils)
 library(readr)
 library(ggplot2)
+library(ingestr)
 
 source("R/mct2.R")
 source("R/get_plantwhc_mct_bysite.R")
@@ -27,144 +28,258 @@ source("R/get_plantwhc_mct_simsuite.R")
 source("R/calc_soilparams.R")
 source("R/calc_zroot.R")
 source("R/extract_return_level.R")
+source("R/convert_et.R")
+source("R/extract_pointdata_allsites.R")
+
 dir_climate <- "/Users/benjaminstocker/sofun/output_nc_global_sofun"
 dir_fapar <- "~/sofun/input_sj02zroot_sofun/sitedata/fapar/"
 ```
 
 
-## Prepare data
-Get meta info of sites (lon, lat)
+## Load data
+
+Load ALEXI-ET and WATCH-WFDEI precipitation data for each site. This is prepared by `rscript_get_data_sj02sites.R`. This loads an object called `df_alexi`.
 ```{r}
-df_sites <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
-  dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
-  dplyr::rename(sitename = ID, lat = Latitude, lon = Longitude) %>% 
-  dplyr::mutate(elv = ifelse(elv==-999, NA, elv)) %>% 
-  dplyr::filter(lon!=-999 & lat!=-999) %>% 
-  dplyr::mutate(year_start = 1982, year_end = 2011) %>% 
-  dplyr::select(sitename, lon, lat, elv, year_start, year_end)
+load("data/df_alexi_sj02.Rdata")
 ```
 
-Extract all the climate data (sofun output)
-```{r eval=FALSE}
-df <- tibble( year = 1982:2011 ) %>% 
-  rowwise() %>%
-  dplyr::mutate(filn_pet  = paste0( dir_climate, "/s1_fapar3g_v4_global.d.pet",  year, ".nc"),
-                filn_wbal = paste0( dir_climate, "/s1_fapar3g_v4_global.d.wbal", year, ".nc")) %>%
-  dplyr::mutate(data_pet  = purrr::map(filn_pet,  ~extract_pointdata_allsites(., df_sites, get_time = TRUE)),
-                data_wbal = purrr::map(filn_wbal, ~extract_pointdata_allsites(., df_sites, get_time = TRUE)))
+## Look at the data
+
+Some ET data seems to be missing. Is it really?
+```{r}
+plot_et <- function(df){
+  gg <- df %>% 
+    ggplot(aes(date, et_mm)) + 
+    geom_line() 
+  return(gg)
+}
+test_gg <- df_alexi %>% 
+  dplyr::mutate( gg = purrr::map(df, ~plot_et(.)))
 ```
 
-Re-arrange data to a flat table
-```{r eval=FALSE}
-ddf <- df %>% 
-  dplyr::select(-filn_pet, -filn_wbal) %>% 
-  tidyr::unnest(data_pet) %>% 
-  dplyr::select(-year_start, -year_end, -year) %>% 
-  tidyr::unnest(data) %>% 
-  dplyr::rename(pet = V1) %>% 
-  left_join(
-    df %>% 
-      dplyr::select(-filn_pet, -filn_wbal) %>% 
-      tidyr::unnest(data_wbal) %>% 
-      dplyr::select(-year_start, -year_end, -year) %>% 
-      tidyr::unnest(data) %>% 
-      dplyr::rename(water_to_soil = V1),
-    by = c("lon", "lat", "sitename", "elv", "date")
+Problem: The first row in `df_alexi$df` is always NA. This is a bug. Drop the row.
+```{r}
+df_alexi <- df_alexi %>% 
+  mutate(df = purrr::map(df, ~drop_na(., date)))
+```
+
+More problem: For some sites, elevation data is missing. How many sites are affected?
+```{r}
+df_missing <- df_alexi %>% 
+  tidyr::unnest(df) %>% 
+  dplyr::select(idx, elv) %>% 
+  dplyr::distinct() %>% 
+  dplyr::filter(is.na(elv))
+```
+
+Ingest elevation data for sites from ETOPO1 where it's missing in the original data.
+```{r}
+df_etopo <- ingest(
+  df_alexi %>% 
+    dplyr::select(sitename = idx, lon, lat),
+  source = "etopo1",
+  dir = "~/data/etopo/"
   ) %>% 
-  dplyr::select(-lon, -lat, -elv)
-
+  tidyr::unnest(data) %>% 
+  rename(idx = sitename, elv_etopo = elv)
 ```
 
-Read all the fapar data (interpolated to daily)
-```{r eval=FALSE}
-myread_csv <- function(filn){
-  if (file.exists(filn)){
-    df <- read_csv(filn) %>% 
-      dplyr::select(date, fapar = modisvar_interpol )
-  } else {
-    df <- tibble(date = NA, fapar = NA)
-  }
-  return(df)
-}
-ddf <- df_sites %>% 
-  # slice(1:10) %>%
-  dplyr::mutate( filn = paste0( dir_fapar, "/", sitename, "dfapar_MODIS_FPAR_MCD15A3H_gee_MCD15A3H_", sitename, "_gee_subset.csv" ) ) %>% 
-  dplyr::mutate( data_fapar = purrr::map(filn, ~myread_csv(.)) ) %>% 
-  tidyr::unnest( data_fapar ) %>% 
-  tidyr::drop_na(fapar) %>% 
-  dplyr::select(sitename, date, fapar) %>% 
-  dplyr::right_join(ddf, by = c("sitename", "date"))
-```
-
-
-Set fapar to zero where pet is zero (arctic night?)
-```{r eval=FALSE}
-ddf <- ddf %>%
-  rowwise() %>% 
-  dplyr::mutate(fapar = ifelse(pet==0 & is.na(fapar), 0, fapar))
-
-# library(ggplot2)
-# ddf %>% 
-#   dplyr::filter(lubridate::year(date) %in% 2000:2005) %>% 
-#   ggplot(aes(x=date, y=wbal - fapar * pet)) +
-#   geom_line()
-
-```
-
-Add daytime VPD and calculate VPD-stress functions.
+Add ETOPO1 elevation to df_alexi and compare with data for which elevation is given.
 ```{r}
-f_vpd_oren01 <- function(q, D){
-  q/(q+a) * (b + m *ln(D))
-}
-f_vpd_bigleaf <- function(D){
-  g0 + 1.6 * (1 + g1/sqrt(D))
-}
-bigleaf::stomatal.sensitivity
+df_alexi <- df_alexi %>% 
+  tidyr::unnest(df) %>% 
+  dplyr::group_by(lon, lat, elv, idx) %>% 
+  tidyr::nest() %>% 
+  dplyr::rename(df = data) %>% 
+  left_join(
+    df_etopo,
+    by = "idx"
+  )
+df_alexi %>% 
+  analyse_modobs2("elv", "elv_etopo")  
+```
+Looks ok. Let's fill gaps with this, wrap it inside the data column and re-calculate ET conversion.
+```{r}
+df_alexi_repaired <- df_alexi %>%
+  ungroup() %>% 
+  dplyr::mutate(elv = ifelse(is.na(elv), elv_etopo, elv)) %>% 
+  dplyr::select(-elv_etopo) %>% 
+
+  ## add elevation to the nested dataframes (repeating same value for each time step)
+  tidyr::unnest(df) %>% 
+  dplyr::group_by(lon, lat, idx) %>% 
+  tidyr::nest() %>% 
+  dplyr::rename(df = data) %>% 
+  
+  ## convert units: get ET in mm d-1
+  ## total ET
+  dplyr::mutate(et_mm = purrr::map(df, ~convert_et(.$et, .$temp, .$elv))) %>% 
+  dplyr::mutate(et_mm = purrr::map(et_mm, ~tibble(et_mm = .))) %>% 
+  dplyr::mutate(df    = purrr::map2(df, et_mm, ~bind_cols(.x, .y))) %>% 
+  dplyr::select(-et_mm) %>% 
+  
+  ## correct unwanted renaming
+  dplyr::mutate(df = purrr::map(df, ~dplyr::select(., -et_mm))) %>% 
+  dplyr::mutate(df = purrr::map(df, ~dplyr::rename(., et_mm = et_mm1)))
+
+save(df_alexi_repaired, file = "data/df_alexi_repaired.Rdata")
 ```
 
+Check if all is correct for a site where elevation data was given already before and `et_mm` calculated and now re-calculated - should yield identical results.
+```{r}
+## data for a site where elevation was now recalculated
+df1 <- df_alexi %>% 
+  dplyr::filter(idx == "AC01a") %>% 
+  unnest(df)
+df2 <- df_alexi_repaired %>% 
+  dplyr::filter(idx == "AC01a") %>% 
+  unnest(df)
 
-Calculate wbal and nest data frames per site
-```{r eval=FALSE}
-ddf <- ddf %>% 
-  dplyr::mutate(wbal = water_to_soil - fapar * pet) %>% 
-  tidyr::drop_na(wbal) %>% 
-  group_by(sitename) %>% 
-  tidyr::nest() 
+## ok!
+df1 %>%
+  ungroup() %>% 
+  dplyr::select(idx, date, et_mm_orig = et_mm) %>% 
+  left_join(
+    df2 %>% 
+      ungroup() %>% 
+      dplyr::select(idx, date, et_mm_repaired = et_mm),
+    by = c("idx", "date")
+  ) %>% 
+  ggplot() +
+  geom_point(aes(x = et_mm_orig, y = et_mm_repaired))
+
+# ## data for a site where elevation was not available before
+# df1 <- df_alexi %>% 
+#   dplyr::filter(idx == "BF03a") %>% 
+#   unnest(df)
+# df2 <- df_alexi_repaired %>% 
+#   dplyr::filter(idx == "BF03a") %>% 
+#   unnest(df)
 ```
 
-Remove sites where not the full time series is available
-```{r eval=FALSE}
-ddf <- ddf %>%
-  dplyr::mutate(len = purrr::map_int(data, ~nrow(.))) %>% 
-  dplyr::filter(len == 10948)
+Some sites have exact same locations. Number of rows could be halved if only distinct lon and lat were used:
+```{r}
+df_alexi_repaired %>% 
+  ungroup() %>% 
+  dplyr::select(idx, lon, lat) %>% 
+  distinct() %>% 
+  dim()
+df_alexi_repaired %>% 
+  ungroup() %>% 
+  dplyr::select(lon, lat) %>% 
+  distinct() %>% 
+  dim()
+```
+
+Do some otherwise identical sites differ by elevation? Yes. Some do. -> Might be necessary to use higer resolution precipitation data...
+```{r}
+df_alexi_repaired %>% 
+  ungroup() %>% 
+  unnest(df) %>% 
+  dplyr::select(idx, lon, lat, elv) %>% 
+  dplyr::group_by(idx, lon, lat, elv) %>% 
+  nest() %>% 
+  dplyr::select(idx, lon, lat, elv) %>% 
+  distinct() %>% 
+  dim()
+
+df_unique_lon_lat_evl <- df_alexi_repaired %>% 
+  ungroup() %>% 
+  unnest(df) %>% 
+  dplyr::select(lon, lat, elv) %>% 
+  dplyr::group_by(lon, lat, elv) %>% 
+  nest() %>% 
+  dplyr::select(lon, lat, elv) %>% 
+  distinct()
+df_unique_lon_lat_evl %>% 
+  dim()
+```
+
+Identify duplicated rows (that have identical lon, lat, and elv).
+```{r}
+df_alexi_repaired <- df_alexi_repaired %>% 
+  ungroup() %>% 
+  dplyr::select(lon, lat) %>% 
+  mutate(dupl = duplicated(.)) %>% 
+  dplyr::select(dupl) %>% 
+  bind_cols(
+    df_alexi_repaired,
+    .
+  )
+```
+
+Look at some duplicated rows (that have identical lon, lat, and elv): Data should be identical. Yes, for this one it is (didn't check other duplicates).
+```{r}
+df1 <- df_alexi_repaired %>% 
+  dplyr::filter(idx=="AC01b") %>% 
+  pull(df)
+df2 <- df_alexi_repaired %>% 
+  dplyr::filter(idx=="AC01c") %>% 
+  pull(df)
+all.equal(df1, df2)
 ```
 
 
 ## Apply the MCT function
 
-Apply the MCT function in different configurations to get plant-adjusted WHC across the rooting zone WCH$^\ast$.
+Calculate the daily water balance and apply the MCT function to get CWD events in different configurations.
 ```{r eval=FALSE}
-ddf <- ddf %>% 
-  dplyr::mutate( out_mct_50 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.5)) ) %>%
-  dplyr::mutate( out_mct_75 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.25)) ) %>% 
-  dplyr::mutate( out_mct_90 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.1)) ) %>% 
-  dplyr::mutate( out_mct_95 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.05)) )
+clean_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
+  
+  ## remove NAs at head and tail      
+  df <- rbeni::cutna_headtail_df(df, varnam_bal)
+  
+  if (any(is.na(df[varnam_bal]))){
+    ## linearly interpolate ET
+    df[varnam_et] <- rbeni::myapprox(df[varnam_et])
+    
+    ## re-calculate daily water balance
+    df[varnam_bal] <- df[varnam_prec] - df[varnam_et]
+  }
+  
+  return(df)
+}
+
+avl_et <- function(df, varnam_et){
+  any(!is.na(df[varnam_et]))
+}
+
+df_alexi_repaired <- df_alexi_repaired %>%
+  dplyr::mutate( df = purrr::map(df, ~mutate(., bal = prec - et_mm))) %>%
+  dplyr::mutate( avl_et = purrr::map_lgl(df, ~avl_et(., varnam_et = "et_mm"))) %>%
+  dplyr::filter( avl_et ) %>% 
+  dplyr::mutate( df = purrr::map(df, ~clean_bal(., varnam_bal = "bal", varnam_prec = "prec", varnam_et = "et_mm"))) %>%
+  dplyr::mutate( out_mct_20_80 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.2, thresh_drop = 0.8)))
+  # dplyr::mutate( out_mct_10_90 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.1, thresh_drop = 0.9)))
+
+# list_test <- list()
+# sites <- df_alexi_repaired %>% pull(idx)
+# for (idx_site in sites){
+#   print(idx_site)
+#   # idx_site <- "AC08"
+#   list_test[[idx_site]] test <- df_alexi_repaired %>% 
+#     dplyr::filter(idx == idx_site) %>% 
+#     dplyr::mutate( df = purrr::map(df, ~mutate(., bal = prec - et_mm))) %>%
+#     dplyr::mutate( avl_et = purrr::map_lgl(df, ~avl_et(., varnam_et = "et_mm"))) %>%
+#     dplyr::filter(avl_et) %>% 
+#     dplyr::mutate( df = purrr::map(df, ~clean_bal(., varnam_bal = "bal", varnam_prec = "prec", varnam_et = "et_mm"))) %>%
+#     
+#     dplyr::mutate( out_mct_20_80 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.2, thresh_drop = 0.8)))
+# }
+  
+save(df_alexi_repaired, file = "data/df_alexi_repaired.Rdata")
 ```
 
-Write to file
-```{r eval=FALSE}
-save(ddf, file = "data/ddf_mct_simsuite.Rdata")
-```
 
 The following figure shows the distribution of WHC* values:
 ```{r}
 load("data/ddf_mct_simsuite.Rdata")
-ddf %>% 
-  dplyr::select(sitename, out_mct_95) %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_95, ~extract_return_level(., 10))) %>% 
+df_alexi_repaired %>% 
+  dplyr::select(idx, out_mct_20_80) %>% 
+  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_20_80, ~extract_return_level(., 10))) %>% 
   ggplot(aes(x = whc_mct, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
-  labs(title = "Plant rooting zone WHC*", subtitle = "10 y return period, 95% reduction of D", x = "WHC* (mm)")
+  labs(title = "Plant rooting zone WHC*", subtitle = "10 y return period, 80% reduction of CWD", x = "WHC* (mm)")
 ```
 
 
@@ -173,7 +288,6 @@ ddf %>%
 
 Extract soil information from hi-res HWSD raster files (ideally should extract from shapefiles).
 ```{r}
-source("R/extract_pointdata_allsites.R")
 vars <- c("ROOTS", "T_SAND", "T_OC", "T_GRAVEL", "T_CLAY", "S_SAND", "S_OC", "S_GRAVEL", "S_CLAY")
 df_lonlat <- df_sites %>% 
   distinct(lon, lat, .keep_all = TRUE) %>% 

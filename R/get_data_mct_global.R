@@ -270,12 +270,6 @@ get_data_mct_chunk <- function(df, idx,
       tidyr::nest() %>% 
       dplyr::rename(df = data) %>% 
       
-      # ## add elevation to the nested dataframes (repeating same value for each time step)
-      # nest(df_elv = elv) %>%
-      # dplyr::mutate(df_elv = purrr::map2(df_elv, df, ~row_rep(.x, nrow(.y)))) %>%
-      # dplyr::mutate(df     = purrr::map2(df, df_elv, ~bind_cols(.x, .y))) %>%
-      # dplyr::select(-df_elv) %>% 
-      
       ## convert units: get ET in mm d-1
       ## total ET
       dplyr::mutate(et_mm = purrr::map(df, ~convert_et(.$et, .$temp, .$elv))) %>% 
