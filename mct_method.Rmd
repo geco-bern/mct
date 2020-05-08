@@ -16,8 +16,8 @@ library(tidyr)
 library(ggplot2)
 library(rbeni)
 library(lubridate)
-library(survival)
-library(SPREDA)
+# library(survival)
+# library(SPREDA)
 library(extRemes)
 source("R/eva_max.R")
 source("R/mct2.R")
@@ -611,7 +611,7 @@ if (!file.exists(filn)){
 ```
 
 Some evaluations across all sites.
-```{r}
+```{r eval=FALSE}
 allsites <- ddf_fluxnet %>% 
   pull(sitename)
 df_corr_fluxnet <- tibble(lue0 = purrr::map_dbl(out, "lue0_fluxnet"), mct20 = purrr::map_dbl(out, "mct20_fluxnet")) %>% 
