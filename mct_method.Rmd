@@ -1,5 +1,5 @@
 ---
-title: "Mass Curve Technique, Gao et al."
+title: "Cumulative Water Deficit events and LUE response"
 author: "Beni Stocker"
 date: "4/30/2019"
 output:
@@ -9,7 +9,7 @@ output:
     toc_float: true
 ---
 
-```{r setup, include=FALSE}
+```{r setup}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyr)
@@ -43,7 +43,7 @@ The steps for the method are:
 
 ### Get FLUXNET data
 
-Let's try this out for the FLUXNET site 'FR-Pue', for which whe have these variables. Read FLUXNET meteo data from FLUXNET stations (and  years), written by `rscript_eval_fluxnet2015.R`.
+Let's try this out for the FLUXNET one site for which whe have these variables. Read FLUXNET meteo data from FLUXNET stations (and  years), written by `rscript_eval_fluxnet2015.R`.
 ```{r}
 ## meteo data 
 load("./data/ddf_meteo.Rdata")
@@ -144,6 +144,8 @@ df_example_alexi <- df_alexi %>%
   mutate(et_mm = ifelse(is.na(et_mm), 0, et_mm)) %>% 
   mutate(bal = prec - et_mm) %>% 
   mutate(bal = myapprox(bal)) %>% 
+  mutate(bal_avg = RcppRoll::roll_mean(bal, n = 5, na.rm = TRUE, fill = NA)) %>% 
+  mutate(bal_avg = ifelse(is.na(bal_avg), 0, bal_avg)) %>% 
   mutate(bal_cum    = cumsum(bal)) %>% 
   mutate(demand_cum = cumsum(et_mm)) %>% 
   mutate(supply_cum = cumsum(prec)) %>% 
@@ -158,16 +160,24 @@ df_example_alexi <- df_alexi %>%
   )
 ```
 
+```{r}
+df_example_alexi %>% 
+  ggplot() +
+  geom_line(aes(date, bal), color = "black") +
+  geom_line(aes(date, bal_avg), color = 'red') +
+  labs(x = "Date", y = expression(paste("Daily water balance (mm d"^{-1}, ")")), title = "Cumulative water balance" )
+```
+
 
 ### CWD events
 
-Get events of consecutive deficit using the `mct()` function.
+Get events of consecutive deficit using the `mct()` function. This function identifies events as periods of consecutive days where the water balance $P-E$ is negative. The maximum CWD for each event is recorded. Actually, the "consecutiveness" of days with negative water balance is slightly relaxed and an event is terminated only when the cumulated water balance has fallen to less than `thresh_terminate` times the maximum CWD of the respective event (see argument `thresh_terminate`). Additionally, all days between that end-of-event day and the day when the CWD has fallen below `thresh_drop` times the maximum CWD are dropped from the respective event, too, in order to avoid days with precipitation. This all sounds a bit complicated but the plots below illustrate this.
 ```{r}
 out_mct_fluxnet <- mct(df_example_fluxnet, varname_wbal = "bal", thresh_terminate = 0.1, thresh_drop = 0.9 )
 out_mct_alexi   <- mct(df_example_alexi,   varname_wbal = "bal", thresh_terminate = 0.1, thresh_drop = 0.9 )
 ```
 
-Plot the cumulative deficit and rain events.
+Plot the cumulative deficit and rain events, with blue for precipitation, reddish for the cumulative water deficit, and black for GPP/PPFD.
 ```{r}
 ## cumulative deficits
 ## FLUXNET data
@@ -200,10 +210,20 @@ ggplot() +
   labs(title = "US-Ton", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI", x = "Date", y = "Cumulative water deficit (mm)")
 ggsave("fig/cwd_example_alexi.pdf", width = 6, height = 3)
 
-## ALEXI and FLUXNET data on top of each other
-ggplot() +
-  geom_line(data = out_mct_fluxnet$df, aes(date, deficit), color="black") +
-  geom_line(data = out_mct_alexi$df, aes(date, deficit), color="tomato")
+## ALEXI vs. FLUXNET: maximum CWD in each year
+df_max_inst <- out_mct_fluxnet$inst %>% 
+  mutate(year = lubridate::year(date_start)) %>% 
+  group_by(year) %>% 
+  summarise(deficit_fluxnet = max(deficit)) %>% 
+  full_join(
+    out_mct_alexi$inst %>% 
+      mutate(year = lubridate::year(date_start)) %>% 
+      group_by(year) %>% 
+      summarise(deficit_alexi = max(deficit)),
+    by = "year"
+  )
+df_max_inst %>% 
+  rbeni::analyse_modobs2("deficit_fluxnet", "deficit_alexi")
 ```
 
 ### LUE vs. CWD
@@ -212,22 +232,20 @@ This shows that GPP/PAR declines as the CWD increases during large CWD events. L
 
 For FLUXNET data:
 ```{r}
-## retain only data from largest instances
-nyears <- out_mct_fluxnet$df %>% 
-  mutate(year = year(date)) %>% 
-  pull(year) %>% 
-  unique() %>% 
-  length()
+## retain only data from largest instances of each year
 biginstances <- out_mct_fluxnet$inst %>% 
-  arrange(-deficit) %>% 
-  slice(1:nyears) %>% 
+  mutate(year = lubridate::year(date_start)) %>% 
+  group_by(year) %>% 
+  filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
 ## get linear fit with outliers
 linmod <- lm(lue ~ deficit, data = out_mct_fluxnet$df %>% mutate(lue = gpp/ppfd))
 idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+
 out_mct_fluxnet$df_clean <- out_mct_fluxnet$df %>% 
   mutate(lue = gpp/ppfd)
+
 out_mct_fluxnet$df_clean$lue[idx_drop] <- NA
 
 ## git linear fit without outliers
@@ -241,28 +259,32 @@ coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
 
 ## get x-axis cutoff
 lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-df_fit = data.frame(y = predict(linmod, newdata = out_mct_fluxnet$df_clean), x = out_mct_fluxnet$df_clean$deficit)
+df_fit = tibble(y = predict(linmod, newdata = out_mct_fluxnet$df_clean), x = out_mct_fluxnet$df_clean$deficit)
+
+## Fit exponential
+expmod <- nls(lue ~ lue0 * exp(k * deficit), data = out_mct_fluxnet$df_clean, start = list(lue0 = 0.1, k = 1/50))
+out_mct_fluxnet$df_clean$lue_fit <- predict(expmod, newdata = out_mct_fluxnet$df_clean)
+lue0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
 out_mct_fluxnet$df_clean %>% 
   filter(iinst %in% biginstances) %>% 
-  ggplot(aes(x = deficit, y = gpp/ppfd)) +
+  ggplot(aes(x = deficit, y = lue)) +
   geom_point(alpha = 0.5) +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET") +
-  geom_vline(xintercept = lue0, linetype = "dotted") +
-  geom_line(data = df_fit, aes(x, y), col = "red")
+  geom_vline(xintercept = lue0, linetype = "dotted", color = 'red') +
+  geom_vline(xintercept = lue0_exp, linetype = "dotted", color = 'royalblue') +
+  geom_line(data = df_fit, aes(x, y), col = "red") +
+  geom_line(data = out_mct_fluxnet$df_clean, aes(x = deficit, y = lue_fit), color = 'royalblue')
 ```
 
 For ALEXI data:
 ```{r}
-nyears <- out_mct_alexi$df %>% 
-  mutate(year = year(date)) %>% 
-  pull(year) %>% 
-  unique() %>% 
-  length()
+## retain only data from largest instances of each year
 biginstances <- out_mct_alexi$inst %>% 
-  arrange(-deficit) %>% 
-  slice(1:nyears) %>% 
+  mutate(year = lubridate::year(date_start)) %>% 
+  group_by(year) %>% 
+  filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
 ## get linear fit with outliers
@@ -274,16 +296,29 @@ out_mct_alexi$df_clean$lue[idx_drop] <- NA
 
 ## git linear fit without outliers
 linmod <- lm(lue ~ deficit, data = out_mct_alexi$df_clean)
+df_linmod <- linmod %>% 
+  broom::tidy()
 
 ## test: is slope negative?
-is_neg <- coef(linmod)["deficit"] < 0.0
+coef_deficit <- df_linmod %>% 
+  dplyr::filter(term == "deficit") %>% 
+  pull(estimate)
+is_neg <- coef_deficit < 0.0
 
 ## test: is slope significantly (5% level) different from zero (t-test)?
-coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+pval_deficit <- df_linmod %>% 
+  dplyr::filter(term == "deficit") %>% 
+  pull(p.value)
+pval_deficit < 0.05
 
 ## get x-axis cutoff
 lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
 df_fit = data.frame(y = predict(linmod, newdata = out_mct_alexi$df_clean), x = out_mct_alexi$df_clean$deficit)
+
+## Fit exponential
+expmod <- nls(lue ~ lue0 * exp(k * deficit), data = out_mct_alexi$df_clean, start = list(lue0 = 0.1, k = 1/50))
+out_mct_alexi$df_clean$lue_fit <- predict(expmod, newdata = out_mct_alexi$df_clean)
+lue0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
 out_mct_alexi$df_clean %>% 
@@ -291,8 +326,10 @@ out_mct_alexi$df_clean %>%
   ggplot(aes(x = deficit, y = gpp/ppfd)) +
   geom_point(alpha = 0.5) +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
-  geom_vline(xintercept = lue0, linetype = "dotted") +
-  geom_line(data = df_fit, aes(x, y), col = "red")
+  geom_vline(xintercept = lue0, linetype = "dotted", color = "red") +
+  geom_vline(xintercept = lue0_exp, linetype = "dotted", color = "royalblue") +
+  geom_line(data = df_fit, aes(x, y), col = "red") +
+  geom_line(data = out_mct_alexi$df_clean, aes(x = deficit, y = lue_fit), color = 'royalblue')
 ```
 
 <!-- ### Evaluate ALEXI ET and WATCH-WFDEI ET -->
@@ -334,10 +371,13 @@ out_mct_alexi$df_clean %>%
 <!--   theme_classic() -->
 <!-- ``` -->
 
+I've fitted a linear regression above. Admittedly, it looks more like an exponential decay with CWD (which surprises me). Fitting an exponential instead is left to do.
+
 ### Distribution of CWD events
 
-Plot the distribution of cumulative deficits (this is actually the maximum CWD attained during each event).
+Plot the distribution of cumulative deficits (this is actually the maximum CWD attained during each event). Grey for CWD based on ET and P from FLUXNET data, reddish from ALEXI (ET) and WATCH-WFDEI (P).
 ```{r}
+## Only events
 ggplot() +
   geom_histogram(
     data = out_mct_fluxnet$inst,
@@ -351,34 +391,94 @@ ggplot() +
     position="identity") +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)")
 
-  scale_fill_manual(name = "", values = c("black", "tomato"), labels = c("FLUXNET", "ALEXI/WATCH-WFDEI"))
+## Daily values
+ggplot() +
+  geom_histogram(
+    data = out_mct_fluxnet$df,
+    aes(x = deficit, y = ..density..),
+    color = "black", alpha = 0.5, fill = "black",
+    position="identity") +
+  geom_histogram(
+    data = out_mct_alexi$df,
+    aes(x = deficit, y = ..density..),
+    color = "black", alpha = 0.5, fill = "tomato", 
+    position="identity") +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)")
 ```
 
 ## Fit an extreme value distribution
 
-To estimate the probability of extreme values, we fit a Gumbel distribution following [this link](http://blogs2.datall-analyse.nl/2016/02/17/extreme_value_analysis_maxima/#more-120). A paper on the R package [extRemes](file:///Users/benjaminstocker/Downloads/v72i08.pdf).
+To estimate the probability of extreme values, we fit a Gumbel distribution following [this link](http://blogs2.datall-analyse.nl/2016/02/17/extreme_value_analysis_maxima/#more-120). A paper on the R package [extRemes](file:///Users/benjaminstocker/Downloads/v72i08.pdf). The distribution above looks a bit strange. There is a large number of events with low CWD, then nothing and then a few very large events (more or less one per year). We try to retain only these few large events and fit a Gumbel distribution. Filtering is now done by taking the largest $N$ events, where $N$ corresponds to the length of the time series in years. Alternatively (better?) would be to take events above the X% threshold (for example X = 95%).
 ```{r}
 ## Take only the N largest instances (deficits), where N is given by the number of years available in the data
 nyears <- year(range(out_mct_alexi$df$date)[2]) - year(range(out_mct_alexi$df$date)[1]) + 1
+
+##-------------------------
+## using annual maximum CWD
+##-------------------------
 vals <- out_mct_alexi$inst %>% 
-  arrange(desc(deficit)) %>% 
-  dplyr::slice(1:nyears) %>%  # use all data!
-  dplyr::select(deficit) %>% 
-  pull()
+  group_by(year(date_start)) %>% 
+  summarise(deficit = max(deficit, na.rm = TRUE)) %>% 
+  pull(deficit)
 
-gumbi <- extRemes::fevd(x=vals, type="Gumbel", method="MLE")
-summary(gumbi)
+## WORKS BEST: annual maximum, GEV
+## if shape not significant different from 0 when using GEV, then it's gumbel? shape parameter is significantly different from zero, hence GEV is supported
+evd_gev <- extRemes::fevd(x=vals, type="GEV", method="MLE", units = "years")
+summary(evd_gev)
 
-pdf("fig/gumbi_example.pdf", width = 8, height = 7)
-pl <- plot(gumbi)
-dev.off()
+## if shape not significant different from 0 when using GEV, then it's gumbel?
+evd_gumbel <- extRemes::fevd(x=vals, type="Gumbel", method="MLE", units = "years")
+summary(evd_gumbel)
+
+## is GEV-fit besser als Gumbel? Gumbel ist gute Annahme da p nicht signifikant
+df_test_fevd <- lr.test(evd_gumbel, evd_gev) %>% 
+  broom::tidy()
+pval <- df_test_fevd %>% 
+  pull(p.value)
+ratio <- df_test_fevd %>% 
+  pull(statistic)
+
+if (ratio > 1 && pval < 0.05){
+  print("It's a Gumbel!!!")
+  plot(evd_gumbel)
+  evd <- evd_gumbel
+} else {
+  print("It's a GEV")
+  plot(evd_gev)
+  evd <- evd_gev
+}
+
+## return level plots fuer fluxnet und alexi uebereinander
+
+# ##-------------------------
+# ## using daily data
+# ##-------------------------
+# vals <- out_mct_fluxnet$df %>% 
+#   pull(deficit)
+# 
+# ## peak over threshold
+# vals_declustered <- decluster(vals, quantile(vals, probs = 0.7, na.rm = TRUE), r = 90)   # r is days between clusters (events)
+# plot(vals_declustered)
+# 
+# ## if shape not significant different from 0 when using GEV, then it's gumbel?
+# evd_gev <- extRemes::fevd(x=vals_declustered, type="GEV", method="MLE")
+# summary(evd_gev)
+# 
+# ## if shape not significant different from 0 when using GEV, then it's gumbel?
+# evd_gp <- extRemes::fevd(x=vals_declustered, type="GP", method="MLE", threshold = quantile(vals, probs = 0.7, na.rm = TRUE), time.units="365/year")
+# summary(evd_gp)
+# plot(evd_gp)
+# 
+# ## is GEV-fit besser als Gumbel? Gumbel ist gute Annahme da p nicht signifikant
+# lr.test(evd_gumbel, evd_gev) 
+# ##-------------------------
 
 # extract MLEs (these are needed for the remaining part of the analysis)
-muG <- gumbi$results$par[1]
-sigmaG <- gumbi$results$par[2]
+muG    <- evd$results$par[1]
+sigmaG <- evd$results$par[2]
 
 ## don't know which package these are coming from (e1071?)
-probplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
+probplot(values=vals, model=evd, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
 #cprobplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
 
 QQplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
@@ -388,29 +488,32 @@ PPplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
 # extRemes::plot.fevd(gumbi)
 
 # only return period plot
-plot.fevd.mle(gumbi, 
+plot.fevd.mle(evd, 
       # type = c("primary", "probprob", "qq", "qq2", "Zplot", "hist", "density", "rl", "trace"),
       type = c("rl"),
       rperiods = c(2, 5, 10, 20, 50, 80, 100, 120, 200, 250, 300, 500, 800),
       a = 0, hist.args = NULL, density.args = NULL, d = NULL )
 
-source("R/get_return_period.R")
-df_test <- get_return_period(gumbi)
-with(df_test, plot(trans_period, return_values, pch=16, col="red"))
+# source("R/get_return_period.R")
+# df_test <- get_return_period(gumbi)
+# with(df_test, plot(trans_period, return_values, pch=16, col="red"))
 ```
 
-### Extract value for return periods
+### Get return levels for given return periods
 
-Get tranformed variate of return period $T$ as described in Gao et al. as
+The plot created by `plot.fevd.mle()` shows the return levels for a given return period. This is returned also by the function `extRemes::return.level()`.
+
+The tranformed variate of return period $T$ as described in Gao et al. as
 $$
 y = - \ln ( -\ln (1-1/T) )
 $$
-
+Return level $X$ has a linear relationship with the transformed return period $y$.
 ```{r}
 ## get return levels for a given vector of return periods
 return_period <- c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800)
+
 return_level <- extRemes::return.level(
-  gumbi, 
+  evd, 
   return.period = return_period
   )
 df_return <- tibble( 
@@ -427,11 +530,13 @@ df_return %>%
 
 Fitting the extreme value distribution and estimating the event size with return period $T$ is done in one single function.
 ```{r}
-result <- get_plantwhc_mct_bysite(df_example_alexi, varname_wbal = "bal")
-result
+# FLUXNET data
+a <- get_plantwhc_mct_bysite(df_example_fluxnet, varname_wbal = "bal")
+a$df_return
 
-result <- get_plantwhc_mct_bysite(df_example_fluxnet, varname_wbal = "bal")
-result
+# ALEXI/WATCH-WFDEI data
+b <- get_plantwhc_mct_bysite(df_example_alexi, varname_wbal = "bal")
+b$df_return
 ```
 
 Let's visualise the estimated event size with a return period of $T = 20$ y on top of the distribution of cumulative water deficit events.
@@ -451,8 +556,8 @@ ggplot() +
     color = "black", alpha = 0.5, fill = "tomato", 
     position="identity") +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)") +
-  geom_vline(xintercept = mct_fluxnet %>% filter(return_period == 20) %>% pull(return_level), col = "black") +
-  geom_vline(xintercept = mct_alexi %>% filter(return_period == 20) %>% pull(return_level), col = "tomato")
+  geom_vline(xintercept = mct_fluxnet$df_return %>% filter(return_period == 20) %>% pull(return_level), col = "black") +
+  geom_vline(xintercept = mct_alexi$df_return %>% filter(return_period == 20) %>% pull(return_level), col = "tomato")
 
   scale_fill_manual(name = "", values = c("black", "tomato"), labels = c("FLUXNET", "ALEXI/WATCH-WFDEI"))
 ```
@@ -463,27 +568,47 @@ We expect that LUE $=$ GPP$/$PAR declines with increasing CWD. Let's align LUE a
 
 ### ALEXI/WATCH-WFDEI data
 ```{r}
-nyears <- out_mct_alexi$df %>% 
-  mutate(year = year(date)) %>% 
-  pull(year) %>% 
-  unique() %>% 
-  length()
 biginstances <- out_mct_alexi$inst %>% 
-  arrange(-deficit) %>% 
-  slice(1:nyears) %>% 
+  mutate(year = lubridate::year(date_start)) %>% 
+  group_by(year) %>% 
+  filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
-out <- out_mct_alexi$df %>% 
+## get linear fit with outliers
+linmod <- lm(lue ~ deficit, data = out_mct_alexi$df %>% mutate(lue = gpp/ppfd))
+idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+out_mct_alexi$df_clean <- out_mct_alexi$df %>% 
+  mutate(lue = gpp/ppfd)
+out_mct_alexi$df_clean$lue[idx_drop] <- NA
+
+## git linear fit without outliers
+linmod <- lm(lue ~ deficit, data = out_mct_alexi$df_clean)
+
+## get x-axis cutoff
+lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+df_fit = data.frame(y = predict(linmod, newdata = out_mct_alexi$df_clean), x = out_mct_alexi$df_clean$deficit)
+
+## Fit exponential
+expmod <- nls(lue ~ lue0 * exp(k * deficit), data = out_mct_alexi$df_clean, start = list(lue0 = 0.1, k = 1/50))
+out_mct_alexi$df_clean$lue_fit <- predict(expmod, newdata = out_mct_alexi$df_clean)
+lue0_exp <- -1/coef(expmod)["k"]*2
+
+## plot
+out <- out_mct_alexi$df_clean %>% 
   filter(iinst %in% biginstances) %>% 
   ggplot(aes(x = deficit, y = gpp/ppfd)) +
   geom_point(alpha = 0.5) +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
-  geom_smooth(aes(y =  gpp/ppfd), color = 'red', method = 'lm', se = TRUE)
-if (!identical(mct_alexi, NA)){
-  mct20 <- mct_alexi %>% filter(return_period == 20) %>% pull(return_level)
+  geom_vline(xintercept = lue0, linetype = "dotted", color = "red") +
+  geom_vline(xintercept = lue0_exp, linetype = "dotted", color = "royalblue") +
+  geom_line(data = df_fit, aes(x, y), col = "red") +
+  geom_line(data = out_mct_alexi$df_clean, aes(x = deficit, y = lue_fit), color = 'royalblue')
+
+if (!identical(mct_alexi$mod, NA)){
+  mct20 <- mct_alexi$df_return %>% filter(return_period == 20) %>% pull(return_level)
   if (!is.na(mct20)){
-    out +
-      geom_vline(xintercept = mct20, col = "tomato")
+    out <- out +
+      geom_vline(xintercept = mct20)
   } else {
     rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
   }
@@ -491,95 +616,7 @@ if (!identical(mct_alexi, NA)){
   rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
 }
 out
-
-  
-# ## get into standard format, with 'idx_start' and 'len' as columns
-# events_fluxnet <- out_mct_fluxnet$df %>%  
-#   ungroup() %>% 
-#   dplyr::mutate( idx = 1:n() ) %>% 
-#   dplyr::select(date_start = date, idx) %>% 
-#   right_join(
-#     out_mct_fluxnet$inst,
-#     by = "date_start"
-#   ) %>% 
-#   dplyr::select(idx_start = idx, len) %>% 
-#   filter(len > 14)
-# 
-# ## add CWD to data frame
-# df_example_fluxnet <- df_example_fluxnet %>% 
-#   left_join(
-#     out_mct_fluxnet$df %>% 
-#       ungroup() %>% 
-#       dplyr::select(date, deficit),
-#     by = "date"
-#   )
-# 
-# ## retain only data that is in a CWD event
-# df_alg_fluxnet <- df_example_fluxnet %>%
-#   dplyr::ungroup() %>% 
-#   align_events(
-#     events         = events_fluxnet,
-#     dovars         = c("gpp", "deficit"), 
-#     leng_threshold = 14, 
-#     before         = 10, 
-#     after          = 30, 
-#     nbins          = 4, 
-#     do_norm        = FALSE
-#     )
-# 
-# df_alg_fluxnet$df_dday %>% 
-#   dplyr::filter(dday>2) %>% 
-#   ggplot(aes(x = deficit, y = gpp/ppfd)) +
-#   geom_point(alpha = 0.5) +
-#   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET") +
-#   geom_smooth(aes(y =  gpp/ppfd), color = 'tomato', method = 'loess', se = TRUE) +
-#   geom_vline(xintercept = mct_fluxnet %>% filter(return_period == 20) %>% pull(return_level), col = "tomato")
 ```
-
-<!-- ### ALEXI/WATCH-WFDEI data -->
-<!-- ```{r} -->
-<!-- ## get into standard format, with 'idx_start' and 'len' as columns -->
-<!-- events_alexi <- out_mct_alexi$df %>%   -->
-<!--   ungroup() %>%  -->
-<!--   dplyr::mutate( idx = 1:n() ) %>%  -->
-<!--   dplyr::select(date_start = date, idx) %>%  -->
-<!--   right_join( -->
-<!--     out_mct_alexi$inst, -->
-<!--     by = "date_start" -->
-<!--   ) %>%  -->
-<!--   dplyr::select(idx_start = idx, len) %>%  -->
-<!--   filter(len > 14) -->
-
-<!-- ## merge CWD to alexi data frame -->
-<!-- df_example_alexi_tmp <- df_example_alexi %>%  -->
-<!--   left_join( -->
-<!--     out_mct_alexi$df %>% -->
-<!--       ungroup() %>% -->
-<!--       dplyr::select(date, deficit), -->
-<!--     by = "date" -->
-<!--   ) -->
-
-<!-- ## retain only data that is in a CWD event -->
-<!-- df_alg_alexi <- df_example_alexi_tmp %>% -->
-<!--   dplyr::ungroup() %>%  -->
-<!--   align_events( -->
-<!--     events         = events_alexi, -->
-<!--     dovars         = c("gpp", "deficit"),  -->
-<!--     leng_threshold = 20,  -->
-<!--     before         = 10,  -->
-<!--     after          = 30,  -->
-<!--     nbins          = 4,  -->
-<!--     do_norm        = FALSE -->
-<!--     ) -->
-
-<!-- df_alg_alexi$df_dday %>%  -->
-<!--   # dplyr::filter(dday>2) %>%  -->
-<!--   ggplot(aes(x = deficit, y = gpp/ppfd)) + -->
-<!--   geom_point(alpha = 0.5) + -->
-<!--   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") + -->
-<!--   geom_smooth(aes(y =  gpp/ppfd), color = 'tomato', method = 'loess', se = TRUE) + -->
-<!--   geom_vline(xintercept = mct_alexi %>% filter(return_period == 20) %>% pull(return_level), col = "tomato") -->
-<!-- ``` -->
 
 ## Methods evaluation at all sites
 
@@ -599,7 +636,8 @@ if (!file.exists(filn)){
        filter(idx == site),
      thresh_terminate = 0.1, 
      thresh_drop = 0.9,
-     use_return_period = 10
+     use_return_period = 10,
+     fittype = "Gumbel"
    )
   }
   save(out, file = "data/out.Rdata")
@@ -610,20 +648,24 @@ if (!file.exists(filn)){
 ## for some reason, purrr::map() did not work here.
 ```
 
-Some evaluations across all sites.
+Some evaluations across all sites. This shows a good correlation between the CWD event size with a 20-year return period and the CWD magnitude at which LUE drops to zero. This may be indicative of plants sizing their rooting zone such as to withstand water deficits that occur, on average, more often than every ~20 years.
 ```{r}
-allsites <- ddf_fluxnet %>% 
-  pull(sitename)
-df_corr_fluxnet <- tibble(lue0 = purrr::map_dbl(out, "lue0_fluxnet"), mct20 = purrr::map_dbl(out, "mct20_fluxnet")) %>% 
-  mutate(sitename = allsites)
-df_corr_alexi <- tibble(lue0 = purrr::map_dbl(out, "lue0_alexi"), mct20 = purrr::map_dbl(out, "mct20_alexi")) %>% 
-  mutate(sitename = allsites)
+## user-defined return period
+df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>% 
+  purrr::map("df_return") %>% 
+  purrr::map(~filter(., return_period==40) %>% pull(return_level)) %>% 
+  tibble(
+    sitename = names(.), 
+    mct = unlist(.),
+    lue0 = purrr::map_dbl(out, "lue0_alexi")) %>% 
+  dplyr::select(sitename, mct, lue0)
+  
+df_corr_alexi %>%
+  # filter(lue0 < 1000 & mct < 1000) %>%
+  rbeni::analyse_modobs2("lue0", "mct")
 
-df_corr_fluxnet %>% 
-  filter(lue0 < 1000 & mct20 < 1000) %>% 
-  rbeni::analyse_modobs2("lue0", "mct20")
-
+## biggest outlier
 df_corr_alexi %>% 
-  filter(lue0 < 1000 & mct20 < 1000) %>% 
-  rbeni::analyse_modobs2("lue0", "mct20")
+  mutate(diff = abs(lue0 - mct)) %>% 
+  arrange(-diff)
 ```
