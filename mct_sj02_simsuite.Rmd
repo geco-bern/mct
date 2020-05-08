@@ -29,7 +29,7 @@ source("R/calc_soilparams.R")
 source("R/calc_zroot.R")
 source("R/extract_return_level.R")
 source("R/convert_et.R")
-source("R/extract_pointdata_allsites.R")
+#source("R/extract_pointdata_allsites.R")
 
 dir_climate <- "/Users/benjaminstocker/sofun/output_nc_global_sofun"
 dir_fapar <- "~/sofun/input_sj02zroot_sofun/sitedata/fapar/"
@@ -98,6 +98,7 @@ df_alexi <- df_alexi %>%
 df_alexi %>% 
   analyse_modobs2("elv", "elv_etopo")  
 ```
+
 Looks ok. Let's fill gaps with this, wrap it inside the data column and re-calculate ET conversion.
 ```{r}
 df_alexi_repaired <- df_alexi %>%

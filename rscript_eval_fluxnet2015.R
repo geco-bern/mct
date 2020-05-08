@@ -18,12 +18,12 @@ source("R/align_events.R")
 
 ## get sites for evaluation
 # mysites <- rsofun::metainfo_Tier1_sites_kgclimate_fluxnet2015 %>% 
-#   filter(!(classid %in% c("CRO", "WET"))) %>% 
-#   filter(year_start<=2007 & year_end>=2007) %>%    # xxx test
+#   dplyr::filter(!(classid %in% c("CRO", "WET"))) %>% 
+#   dplyr::filter(year_start<=2007 & year_end>=2007) %>%    # xxx test
 #   pull(sitename)
 
 siteinfo <- read_csv("~/rsofun/siteinfo_fluxnet2015.csv") %>% 
-  filter(!(classid %in% c("CRO", "WET"))) %>% 
+  dplyr::filter(!(classid %in% c("CRO", "WET"))) %>% 
   mutate(date_start = lubridate::ymd(paste0(year_start, "-01-01"))) %>% 
   mutate(date_end = lubridate::ymd(paste0(year_end, "-12-31")))
 
@@ -91,9 +91,9 @@ if (!file.exists(filn)){
 
 ## test plot
 ggplot() +
-  geom_line(data = ddf_eval %>% filter(sitename == "FR-Pue") %>% unnest(data), aes(x = date, y = latenth)) +
-  geom_line(data = df_pt_jpl %>% filter(idx == "FR-Pue") %>% unnest(df), aes(x = date, y = et), col = "springgreen4") +
-  geom_line(data = df_sebs %>% filter(idx == "FR-Pue") %>% unnest(df), aes(x = date, y = et), col = "springgreen3") +
+  geom_line(data = ddf_eval %>% dplyr::filter(sitename == "FR-Pue") %>% unnest(data), aes(x = date, y = latenth)) +
+  geom_line(data = df_pt_jpl %>% dplyr::filter(idx == "FR-Pue") %>% unnest(df), aes(x = date, y = et), col = "springgreen4") +
+  geom_line(data = df_sebs %>% dplyr::filter(idx == "FR-Pue") %>% unnest(df), aes(x = date, y = et), col = "springgreen3") +
   xlim(ymd("2004-01-01"), ymd("2007-01-01"))
 
 filn <- "data/mdf_eval.Rdata"
@@ -225,22 +225,22 @@ out_eval_sebs$latenth$fluxnet$data$ddf %>%
   geom_line(aes(y = mod), col = "red")
 
 out_eval_pt_jpl$latenth$fluxnet$data$ddf %>% 
-  filter(sitename == "FR-Pue" & lubridate::year(date) == 2007) %>% 
-  filter(sitename == "FR-Pue") %>% 
+  dplyr::filter(sitename == "FR-Pue" & lubridate::year(date) == 2007) %>% 
+  dplyr::filter(sitename == "FR-Pue") %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = obs)) +
   geom_line(aes(y = mod), col = "red")
 
 out_eval_pm_mod$latenth$fluxnet$data$ddf %>% 
-  filter(sitename == "FR-Pue" & lubridate::year(date) == 2007) %>% 
-  filter(sitename == "FR-Pue") %>% 
+  dplyr::filter(sitename == "FR-Pue" & lubridate::year(date) == 2007) %>% 
+  dplyr::filter(sitename == "FR-Pue") %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = obs)) +
   geom_line(aes(y = mod), col = "red")
 
 out_eval_alexi$latenth$fluxnet$data$ddf %>% 
-  filter(sitename == "FR-Pue" & lubridate::year(date) == 2007) %>% 
-  filter(sitename == "FR-Pue") %>% 
+  dplyr::filter(sitename == "FR-Pue" & lubridate::year(date) == 2007) %>% 
+  dplyr::filter(sitename == "FR-Pue") %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = obs)) +
   geom_line(aes(y = mod), col = "red")
@@ -304,7 +304,7 @@ df_eval <- ddf_meteo %>%
 
 # ## xxx test
 # df_eval <- df_eval %>%
-#   filter(year(date)==2007)
+#   dplyr::filter(year(date)==2007)
 
 write_csv(df_eval, path = "./data/df_eval.csv")
 
@@ -366,7 +366,7 @@ write_csv(df_alg$df_dday_aggbydday, path = "data/df_alg__df_dday_aggbydday.Rdata
 ## Compare temperature
 testsite <- "FR-Pue"
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   tidyr::gather("source", "temp", c(temp_watch, temp_fluxnet)) %>%
   ggplot(aes(x = date, y = temp, color = source)) +
     geom_line() +
@@ -374,7 +374,7 @@ df_eval %>%
 
 ## Compare precipitation
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   tidyr::gather("source", "prec", c(prec_watch, prec_fluxnet)) %>%
   ggplot(aes(x = date, y = prec, color = source)) +
   geom_line() +
@@ -382,39 +382,39 @@ df_eval %>%
 
 ## Compare ET PT-JPL
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   tidyr::gather("source", "et", c(et_pt_jpl, et_fluxnet)) %>%
   ggplot(aes(x = date, y = et, color = source)) +
   geom_line() +
   labs(title = testsite)
 
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   analyse_modobs2("et_pt_jpl", "et_fluxnet", type = "heat")
 
 ## Compare ET PM-MOD
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   tidyr::gather("source", "et", c(et_pm_mod, et_fluxnet)) %>%
   ggplot(aes(x = date, y = et, color = source)) +
   geom_line() +
   labs(title = testsite)
 
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   analyse_modobs2("et_pm_mod", "et_fluxnet", type = "heat")
 
 
 ## Compare ET SEBS
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   tidyr::gather("source", "et", c(et_sebs, et_fluxnet)) %>%
   ggplot(aes(x = date, y = et, color = source)) +
   geom_line() +
   labs(title = testsite)
 
 df_eval %>%
-  filter(sitename == testsite) %>%
+  dplyr::filter(sitename == testsite) %>%
   analyse_modobs2("et_sebs", "et_fluxnet", type = "heat")
 
 df_eval %>%
