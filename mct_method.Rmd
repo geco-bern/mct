@@ -653,7 +653,7 @@ Some evaluations across all sites. This shows a good correlation between the CWD
 ## user-defined return period
 df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>% 
   purrr::map("df_return") %>% 
-  purrr::map(~filter(., return_period==40) %>% pull(return_level)) %>% 
+  purrr::map(~dplyr::filter(., return_period==40) %>% pull(return_level)) %>% 
   tibble(
     sitename = names(.), 
     mct = unlist(.),

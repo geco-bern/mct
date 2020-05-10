@@ -245,12 +245,21 @@ avl_et <- function(df, varnam_et){
   any(!is.na(df[varnam_et]))
 }
 
-df_alexi_repaired <- df_alexi_repaired %>%
+df_mct_sj02_alexi <- df_alexi_repaired %>%
   dplyr::mutate( df = purrr::map(df, ~mutate(., bal = prec - et_mm))) %>%
   dplyr::mutate( avl_et = purrr::map_lgl(df, ~avl_et(., varnam_et = "et_mm"))) %>%
   dplyr::filter( avl_et ) %>% 
   dplyr::mutate( df = purrr::map(df, ~clean_bal(., varnam_bal = "bal", varnam_prec = "prec", varnam_et = "et_mm"))) %>%
-  dplyr::mutate( out_mct_20_80 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.2, thresh_drop = 0.8)))
+  dplyr::mutate( 
+    out_mct_10_90 = purrr::map(
+      df, 
+      ~get_plantwhc_mct_bysite(
+        ., 
+        varname_wbal = "bal", 
+        thresh_terminate = 0.1, 
+        thresh_drop = 0.9, 
+        fittype = "Gumbel"))
+    )
   # dplyr::mutate( out_mct_10_90 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.1, thresh_drop = 0.9)))
 
 # list_test <- list()
@@ -268,93 +277,60 @@ df_alexi_repaired <- df_alexi_repaired %>%
 #     dplyr::mutate( out_mct_20_80 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.2, thresh_drop = 0.8)))
 # }
   
-save(df_alexi_repaired, file = "data/df_alexi_repaired.Rdata")
+save(df_mct_sj02_alexi, file = "data/df_mct_sj02_alexi.RData")
 ```
 
 
 The following figure shows the distribution of WHC* values:
 ```{r}
-load("data/ddf_mct_simsuite.Rdata")
-df_alexi_repaired %>% 
-  dplyr::select(idx, out_mct_20_80) %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_20_80, ~extract_return_level(., 10))) %>% 
-  ggplot(aes(x = whc_mct, y = ..count..)) +
+# load("data/ddf_mct_simsuite.Rdata") xxx ??? don't know what this is for
+df_mct_sj02_alexi %>% 
+  dplyr::select(idx, out_mct_10_90) %>% 
+  dplyr::mutate(whc20 = purrr::map_dbl(out_mct_10_90, ~extract_return_level(., 20))) %>% 
+  ggplot(aes(x = whc20, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Plant rooting zone WHC*", subtitle = "10 y return period, 80% reduction of CWD", x = "WHC* (mm)")
 ```
 
 
-
 ## Extract soil texture information
 
-Extract soil information from hi-res HWSD raster files (ideally should extract from shapefiles).
+Using the very nice ingestr package.
 ```{r}
-vars <- c("ROOTS", "T_SAND", "T_OC", "T_GRAVEL", "T_CLAY", "S_SAND", "S_OC", "S_GRAVEL", "S_CLAY")
-df_lonlat <- df_sites %>% 
-  distinct(lon, lat, .keep_all = TRUE) %>% 
-  dplyr::select(lon, lat) %>% 
-  dplyr::mutate(id = 1:n())
-  
-# extract by file
-df_hwsd <- tibble( vars = vars ) %>% 
-  dplyr::mutate(filn = paste0("~/data/soil/hwsd/hwsd_wieder/data/", vars, ".nc4")) %>% 
-  dplyr::mutate(data = purrr::map(filn, ~extract_pointdata_allsites(., df_lonlat, get_time = FALSE)))
-
-# re-arrange data
-df_sites <- df_hwsd %>% 
-  tidyr::unnest(data) %>% 
-  dplyr::mutate(data = purrr::map_dbl(data, ~unlist(.))) %>% 
-  dplyr::select(-filn, -lon, -lat) %>% 
-  tidyr::spread(vars, data) %>% 
-  dplyr::right_join(df_lonlat, by = "id") %>% 
-  dplyr::right_join(df_sites, by = c("lon", "lat"))
+df_hwsd <- ingest(
+  dplyr::select(ungroup(df_mct_sj02_alexi), sitename = idx, lon, lat),
+  source = "hwsd",
+  settings = list(fil = "~/data/hwsd/HWSD_RASTER/hwsd.bil")
+  )
+save(df_hwsd, file = "data/df_hwsd.RData")
 ```
 
 Calculate FC, PWP, and WHC from texture data.
 ```{r}
-# top-soil
-df_sites_topsoil <- df_sites %>%
-  dplyr::select(sitename, roots = ROOTS, fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND) %>% 
-  dplyr::mutate(fclay   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fclay),
-                fgravel = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fgravel),
-                forg    = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, forg),
-                fsand   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fsand)) %>% 
-  calc_soilparams(method = "balland")
-
-df_sites_topsoil_mean <- df_sites_topsoil %>% 
-  dplyr::select(roots, whc) %>% 
-  dplyr::group_by() %>% 
-  dplyr::summarise_all(list( ~mean(., na.rm=TRUE)))
-
-df_sites_topsoil <- df_sites_topsoil %>% 
-  dplyr::mutate( whc = ifelse(is.na(whc), df_sites_topsoil_mean$whc, whc))
-
-# sub-soil
-df_sites_subsoil <- df_sites %>%
-  dplyr::select(sitename, roots = ROOTS, fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND) %>% 
-  dplyr::mutate(fclay   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fclay),
-                fgravel = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fgravel),
-                forg    = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, forg),
-                fsand   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fsand)) %>% 
-  calc_soilparams(method = "balland")
-
-df_sites_subsoil_mean <- df_sites_subsoil %>% 
-  dplyr::select(roots, whc) %>% 
-  dplyr::group_by() %>% 
-  dplyr::summarise_all(list( ~mean(., na.rm=TRUE)))
-
-df_sites_subsoil <- df_sites_subsoil %>% 
-  dplyr::mutate( whc = ifelse(is.na(whc), df_sites_subsoil_mean$whc, whc))
+## re-organise soil texture data into columns for each site (row)
+df_whc <- df_hwsd %>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  mutate(
+    data_topsoil = purrr::map(data, ~dplyr::select(
+      ., fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND, roots = ROOTS, imperm = IL)),
+    data_subsoil = purrr::map(data, ~dplyr::select(
+      ., fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND, roots = ROOTS, imperm = IL))
+    ) %>% 
+  dplyr::select(-data) %>% 
+  mutate(data_topsoil = purrr::map(data_topsoil, ~calc_soilparams(., method = "balland")),
+         data_subsoil = purrr::map(data_subsoil, ~calc_soilparams(., method = "balland")))
 ```
 
 Plot the distribution of values.
 ```{r}
-df_sites_topsoil %>% 
+df_whc %>% 
+  unnest(data_topsoil) %>% 
   ggplot(aes(x = whc, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Top soil WHC", subtitle = " based on HWSD soil texture data", x = "WHC (m3/m3)")
 
-df_sites_subsoil %>% 
+df_whc %>% 
+  unnest(data_subsoil) %>% 
   ggplot(aes(x = whc, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Sub soil WHC", subtitle = " based on HWSD soil texture data", x = "WHC (m3/m3)")
@@ -363,34 +339,31 @@ df_sites_subsoil %>%
 ## Calculate rooting depth.
 
 ```{r}
-ddf_20y_90t <- ddf %>%
-  dplyr::left_join(dplyr::select(df_sites_subsoil, sitename, whc_s = whc, roots), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(df_sites_topsoil, sitename, whc_t = whc), by = "sitename") %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_90, ~extract_return_level(., 20))) %>%
-  dplyr::select(sitename, whc_mct, whc_t, whc_s, roots) %>% 
+## use CWD10 for zroot, no root obstacles accounted for now
+df_zroot <- df_mct_sj02_alexi %>% 
+  ungroup() %>% 
+  dplyr::select(sitename = idx, out_mct_10_90) %>% 
+  dplyr::mutate(whcXX = purrr::map_dbl(out_mct_10_90, ~extract_return_level(., 10))) %>% 
+  dplyr::select(sitename, whcXX) %>% 
+  left_join(
+    df_whc %>% 
+      unnest(data_subsoil) %>%
+      dplyr::select(sitename, whc_s = whc),
+    by = "sitename"
+  ) %>% 
+  left_join(
+    df_whc %>% 
+      unnest(data_topsoil) %>%
+      dplyr::select(sitename, whc_t = whc, roots, imperm),
+    by = "sitename"
+  ) %>% 
   rowwise() %>% 
-  dplyr::mutate(zroot = calc_zroot(whc_mct, whc_t, whc_s, roots))
-
-ddf_10y_95t <- ddf %>%
-  dplyr::left_join(dplyr::select(df_sites_subsoil, sitename, whc_s = whc, roots), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(df_sites_topsoil, sitename, whc_t = whc), by = "sitename") %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_95, ~extract_return_level(., 10))) %>%
-  dplyr::select(sitename, whc_mct, whc_t, whc_s, roots) %>% 
-  rowwise() %>% 
-  dplyr::mutate(zroot = calc_zroot(whc_mct, whc_t, whc_s, roots))
-
-ddf_05y_95t <- ddf %>%
-  dplyr::left_join(dplyr::select(df_sites_subsoil, sitename, whc_s = whc, roots), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(df_sites_topsoil, sitename, whc_t = whc), by = "sitename") %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_95, ~extract_return_level(., 5))) %>%
-  dplyr::select(sitename, whc_mct, whc_t, whc_s, roots) %>% 
-  rowwise() %>% 
-  dplyr::mutate(zroot = calc_zroot(whc_mct, whc_t, whc_s, roots))
+  dplyr::mutate(zroot = calc_zroot(whcXX, whc_t, whc_s, roots, imperm))
 ```
 
 The following figure shows the distribution of zroot* values:
 ```{r}
-ddf_05y_95t %>% 
+df_zroot %>% 
   ggplot(aes(x = zroot, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Plant rooting depth", subtitle = "10 y return period, 95% reduction of D", x = "zroot* (mm)")
@@ -400,56 +373,98 @@ ddf_05y_95t %>%
 
 Combine data frames.
 ```{r}
-df_modobs <- read_csv("/alphadata01/bstocker/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
+df_modobs <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
   dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
   dplyr::rename(sitename = ID) %>% 
-  dplyr::left_join(dplyr::select(ddf_05y_95t, zroot_05y_95t = zroot, sitename), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(ddf_10y_95t, zroot_10y_95t = zroot, sitename), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(ddf_20y_90t, zroot_20y_90t = zroot, sitename), by = "sitename") %>% 
+  dplyr::left_join(dplyr::select(df_zroot, zroot, sitename), by = "sitename") %>% 
   dplyr::mutate(D50 = 1000 * D50, D95 = 1000 * D95, D50_extrapolated = 1000 * D50_extrapolated, D95_extrapolated = 1000 * D95_extrapolated)
 ```
 
 ### Distribution of values
 ```{r}
 df_modobs %>% 
-  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_05y_95t) %>% 
-  tidyr::gather(key = "source", value = "zroot", c(mod, obs)) %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
   ggplot() +
   geom_histogram(
     aes(x = zroot, y = ..count.., fill = source), 
     color = "black", alpha = 0.3, position="identity") +
   scale_fill_manual(name = "", values = c("black", "red")) +
   labs(title = "Distribution of rooting depth (mm), v3", x = "Rooting depth (mm)")
+
 ggsave("fig/hist_zroot_modobs.pdf", height = 4, width = 6)
 ```
 
 ### Comparison by vegetation type.
 ```{r}
 df_modobs %>% 
-  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_05y_95t) %>% 
-  tidyr::gather(key = "source", value = "zroot", c(mod, obs)) %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
   # dplyr::filter(source == "obs") %>% 
   ggplot() +
   geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
   theme(axis.text.x = element_text(angle=90, hjust=1)) +
-  labs(title = "Observed and modelled by vegetation type", subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", y = "Rooting depth (mm)")
-ggsave("fig/modobs_boxplot_zroot_95_5y.pdf", width = 9, height = 6)
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
 
-df_modobs %>% 
-  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_20y_90t) %>% 
-  tidyr::gather(key = "source", value = "zroot", c(mod, obs)) %>% 
-  # dplyr::filter(source == "obs") %>% 
-  ggplot() +
-  geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
-  theme(axis.text.x = element_text(angle=90, hjust=1)) +
-  labs(title = "Observed and modelled by vegetation type", subtitle = "Obs.: 95% quantile  Mod.: 20-yr return period, 10% deficit reduction threshold", y = "Rooting depth (mm)")
+ggsave("fig/modobs_boxplot_zroot.pdf", width = 9, height = 6)
 ```
 
 ### Comparison site by site.
 ```{r}
 out <- df_modobs %>% 
-  analyse_modobs2(
-    mod = "zroot_05y_95t", 
+  rbeni::analyse_modobs2(
+    mod = "zroot", 
+    obs = "D95_extrapolated"
+    )
+out$gg +  
+  labs(
+    title = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    x = "Modelled rooting depth (mm)", 
+    y = "Observed rooting depth (mm)"
+    )
+```
+
+## Check if water table depth is a useful constrait
+
+```{r}
+df_modobs <- df_alexi_repaired %>% 
+  dplyr::select(idx, lon, lat) %>% 
+  ingest_wtd_fan() %>% 
+  rename(sitename = idx, wtd_fan13 = wtd) %>% 
+  mutate(wtd_fan13 = wtd_fan13 * 1000) %>% 
+  right_join(
+    df_modobs,
+    by = "sitename"
+  ) %>% 
+  mutate(wtd_fan13 = ifelse(is.na(wtd_fan13), 99999, wtd_fan13)) %>% 
+  mutate(zroot_wtd = ifelse(zroot > wtd_fan13, wtd_fan13, zroot))
+```
+
+Updated histogram by vegetation type
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  # dplyr::filter(source == "obs") %>% 
+  ggplot() +
+  geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
+
+ggsave("fig/modobs_boxplot_zroot_wtd.pdf", width = 9, height = 6)
+```
+
+Updated mod. vs. obs.
+```{r}
+out <- df_modobs %>% 
+  rbeni::analyse_modobs2(
+    mod = "zroot_wtd", 
     obs = "D95_extrapolated"
     )
 out$gg +  
