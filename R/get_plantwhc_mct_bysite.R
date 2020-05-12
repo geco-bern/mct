@@ -31,12 +31,17 @@ get_plantwhc_mct_bysite <- function( df,
 
   } else {
 
+    ##--------------------------------
     ## Get events of consecutive water deficit and accumulated deficit
-    out <- mct(df, varname_wbal = varname_wbal, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
+    ##--------------------------------
+    out_mct <- mct(df, varname_wbal = varname_wbal, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
     
-    if (nrow(out$inst)>0){
-      ## use annual maximum CWD
-      vals <- out$inst %>% 
+    if (nrow(out_mct$inst)>0){
+
+      ##--------------------------------
+      ## get annual maximum CWD
+      ##--------------------------------
+      vals <- out_mct$inst %>% 
         group_by(lubridate::year(date_start)) %>% 
         summarise(deficit = max(deficit, na.rm = TRUE)) %>% 
         pull(deficit)      
@@ -44,13 +49,20 @@ get_plantwhc_mct_bysite <- function( df,
       if (length(vals)>3){
         
         if (!is.null(fittype)){
+
+          ##--------------------------------
+          ## Prescribed distribution: Gumbel
+          ##--------------------------------
           ## Fit a specific extreme value distribution (Gumbel)
           evd <- try( extRemes::fevd(x=vals, type=fittype, method="MLE", units = "years") )
           if (class(evd) == "try-error"){ failed <- TRUE }
             
         } else {
-          ## Fit a general extreme value distribution, use Gumbel instead if it works better than GEV
           
+          ##--------------------------------
+          ## Free distribution: GEV or Gumbel
+          ##--------------------------------
+          ## Fit a general extreme value distribution, use Gumbel instead if it works better than GEV
           ## if shape not significant different from 0 when using GEV, then it's gumbel? shape parameter is significantly different from zero, hence GEV is supported
           evd_gev <- try(extRemes::fevd(x=vals, type="GEV", method="MLE", units = "years"))
           
@@ -58,6 +70,7 @@ get_plantwhc_mct_bysite <- function( df,
           evd_gumbel <- try(extRemes::fevd(x=vals, type="Gumbel", method="MLE", units = "years"))
           
           if (class(evd_gev) != "try-error" && class(evd_gumbel) != "try-error"){
+
             ## is GEV-fit besser als Gumbel? Gumbel ist gute Annahme da p nicht signifikant
             df_test_fevd <- lr.test(evd_gumbel, evd_gev) %>% 
               broom::tidy()
@@ -90,7 +103,9 @@ get_plantwhc_mct_bysite <- function( df,
     
   }
   
-  
+  ##--------------------------------
+  ## Get magnitudes of extremes with given return period
+  ##--------------------------------  
   if (failed){
 
     df_return <- tibble(
@@ -98,6 +113,7 @@ get_plantwhc_mct_bysite <- function( df,
       return_level = rep(NA, length(return_period))
       )
     evd <- NA
+    out_mct <- NA
 
   } else {
     ## Get values for return periods and constructi data frame with it
@@ -110,8 +126,7 @@ get_plantwhc_mct_bysite <- function( df,
       return_level = unname(c(return_level)))           
   }
   
-  out <- list(df_return = df_return, mod = evd)
-  return(out)
+  return(list(df_return = df_return, mod = evd, mct = out_mct))
 }
 
 

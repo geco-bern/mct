@@ -29,6 +29,8 @@ source("R/calc_soilparams.R")
 source("R/calc_zroot.R")
 source("R/extract_return_level.R")
 source("R/convert_et.R")
+source("R/ingest_wtd_fan.R")
+source("R/test_et_tseries.R")
 #source("R/extract_pointdata_allsites.R")
 
 dir_climate <- "/Users/benjaminstocker/sofun/output_nc_global_sofun"
@@ -43,35 +45,50 @@ Load ALEXI-ET and WATCH-WFDEI precipitation data for each site. This is prepared
 load("data/df_alexi_sj02.Rdata")
 ```
 
-## Look at the data
+## Clean and complement data
 
-Some ET data seems to be missing. Is it really?
+### Remove sites with missing ET
+
+Some ET data seems to be missing. Retain only sites with more than 3000 ET dates.
 ```{r}
-plot_et <- function(df){
-  gg <- df %>% 
-    ggplot(aes(date, et_mm)) + 
-    geom_line() 
-  return(gg)
+n_avl_et <- function(df){
+  sum(!is.na(df$et))
 }
-test_gg <- df_alexi %>% 
-  dplyr::mutate( gg = purrr::map(df, ~plot_et(.)))
-```
 
-Problem: The first row in `df_alexi$df` is always NA. This is a bug. Drop the row.
-```{r}
 df_alexi <- df_alexi %>% 
-  mutate(df = purrr::map(df, ~drop_na(., date)))
+  mutate(avl_et = purrr::map_int(df, ~n_avl_et(.))) 
+
+## where are they? They are along coasts. Ok, valid to remove them.
+plot_map_simpl() +
+  geom_point(
+    data = df_alexi %>% 
+      dplyr::filter(avl_et < 3000),
+    aes(lon, lat),
+    color = 'red')
+
+df_alexi <- df_alexi %>% 
+  dplyr::filter(avl_et > 3000)
 ```
 
-More problem: For some sites, elevation data is missing. How many sites are affected?
+More sites have missing data for colum `et_mm` but have data in column `et`. This is because elevation data was missing when downloading the data and conversion to mm failed.
 ```{r}
-df_missing <- df_alexi %>% 
-  tidyr::unnest(df) %>% 
-  dplyr::select(idx, elv) %>% 
-  dplyr::distinct() %>% 
-  dplyr::filter(is.na(elv))
+n_avl_et_mm <- function(df){
+  sum(!is.na(df$et_mm))
+}
+
+df_alexi <- df_alexi %>% 
+  mutate(avl_et_mm = purrr::map_int(df, ~n_avl_et_mm(.))) 
+
+df_alexi %>% 
+  dplyr::select(lon, lat, idx, avl_et, avl_et_mm) %>% 
+  dplyr::filter(avl_et_mm==0)
 ```
 
+### Re-calculate ET in mm
+
+Read elevation data from ETOPO1 and complement missing ET data, converted to mm.
+
+#### Get ETOPO elevation data
 Ingest elevation data for sites from ETOPO1 where it's missing in the original data.
 ```{r}
 df_etopo <- ingest(
@@ -100,9 +117,13 @@ df_alexi %>%
 ```
 
 Looks ok. Let's fill gaps with this, wrap it inside the data column and re-calculate ET conversion.
+
+#### Re-calculate conversion
+
 ```{r}
 df_alexi_repaired <- df_alexi %>%
   ungroup() %>% 
+  dplyr::select(-avl_et, -avl_et_mm) %>% 
   dplyr::mutate(elv = ifelse(is.na(elv), elv_etopo, elv)) %>% 
   dplyr::select(-elv_etopo) %>% 
 
@@ -116,18 +137,19 @@ df_alexi_repaired <- df_alexi %>%
   ## total ET
   dplyr::mutate(et_mm = purrr::map(df, ~convert_et(.$et, .$temp, .$elv))) %>% 
   dplyr::mutate(et_mm = purrr::map(et_mm, ~tibble(et_mm = .))) %>% 
+  dplyr::mutate(df    = purrr::map(df, ~dplyr::rename(., et_mm_old = et_mm))) %>% 
   dplyr::mutate(df    = purrr::map2(df, et_mm, ~bind_cols(.x, .y))) %>% 
   dplyr::select(-et_mm) %>% 
-  
-  ## correct unwanted renaming
-  dplyr::mutate(df = purrr::map(df, ~dplyr::select(., -et_mm))) %>% 
-  dplyr::mutate(df = purrr::map(df, ~dplyr::rename(., et_mm = et_mm1)))
+  dplyr::mutate(df    = purrr::map(df, ~drop_na(., date))) # Problem: The first row in `df_alexi$df` is always NA. This is a bug. Drop the row.
 
 save(df_alexi_repaired, file = "data/df_alexi_repaired.Rdata")
 ```
 
 Check if all is correct for a site where elevation data was given already before and `et_mm` calculated and now re-calculated - should yield identical results.
 ```{r}
+## one example
+df_alexi_repaired %>% dplyr::filter(idx == "BF03a") %>% pull(df)
+
 ## data for a site where elevation was now recalculated
 df1 <- df_alexi %>% 
   dplyr::filter(idx == "AC01a") %>% 
@@ -148,15 +170,33 @@ df1 %>%
   ) %>% 
   ggplot() +
   geom_point(aes(x = et_mm_orig, y = et_mm_repaired))
-
-# ## data for a site where elevation was not available before
-# df1 <- df_alexi %>% 
-#   dplyr::filter(idx == "BF03a") %>% 
-#   unnest(df)
-# df2 <- df_alexi_repaired %>% 
-#   dplyr::filter(idx == "BF03a") %>% 
-#   unnest(df)
 ```
+
+Count missing data again.
+```{r}
+df_alexi_repaired <- df_alexi_repaired %>% 
+  mutate(avl_et_mm = purrr::map_int(df, ~n_avl_et_mm(.))) %>% 
+  mutate(avl_et = purrr::map_int(df, ~n_avl_et(.))) 
+
+df_alexi_repaired %>% 
+  dplyr::select(lon, lat, idx, avl_et, avl_et_mm) %>% 
+  dplyr::filter(avl_et_mm==0)
+```
+Ok. Done.
+
+Plot an example ET time series.
+```{r}
+df_gg_et <- df_alexi_repaired %>% 
+  ungroup() %>% 
+  mutate(gg = purrr::map(df, ~test_et_tseries(.))) %>% 
+  dplyr::select(idx, lon, lat, gg)
+
+gg <- df_gg_et %>% 
+  dplyr::filter(idx == "TD10c") %>% 
+  pull(gg)
+gg
+```
+
 
 Some sites have exact same locations. Number of rows could be halved if only distinct lon and lat were used:
 ```{r}
@@ -175,6 +215,7 @@ df_alexi_repaired %>%
 Do some otherwise identical sites differ by elevation? Yes. Some do. -> Might be necessary to use higer resolution precipitation data...
 ```{r}
 df_alexi_repaired %>% 
+  dplyr::select(lon, lat, idx, df) %>% 
   ungroup() %>% 
   unnest(df) %>% 
   dplyr::select(idx, lon, lat, elv) %>% 
@@ -185,6 +226,7 @@ df_alexi_repaired %>%
   dim()
 
 df_unique_lon_lat_evl <- df_alexi_repaired %>% 
+  dplyr::select(lon, lat, idx, df) %>% 
   ungroup() %>% 
   unnest(df) %>% 
   dplyr::select(lon, lat, elv) %>% 
@@ -224,7 +266,7 @@ all.equal(df1, df2)
 ## Apply the MCT function
 
 Calculate the daily water balance and apply the MCT function to get CWD events in different configurations.
-```{r eval=FALSE}
+```{r}
 clean_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
   
   ## remove NAs at head and tail      
@@ -232,10 +274,10 @@ clean_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
   
   if (any(is.na(df[varnam_bal]))){
     ## linearly interpolate ET
-    df[varnam_et] <- rbeni::myapprox(df[varnam_et])
+    df[[varnam_et]] <- myapprox(df[[varnam_et]])
     
     ## re-calculate daily water balance
-    df[varnam_bal] <- df[varnam_prec] - df[varnam_et]
+    df[[varnam_bal]] <- df[[varnam_prec]] - df[[varnam_et]]
   }
   
   return(df)
@@ -249,37 +291,40 @@ df_mct_sj02_alexi <- df_alexi_repaired %>%
   dplyr::mutate( df = purrr::map(df, ~mutate(., bal = prec - et_mm))) %>%
   dplyr::mutate( avl_et = purrr::map_lgl(df, ~avl_et(., varnam_et = "et_mm"))) %>%
   dplyr::filter( avl_et ) %>% 
-  dplyr::mutate( df = purrr::map(df, ~clean_bal(., varnam_bal = "bal", varnam_prec = "prec", varnam_et = "et_mm"))) %>%
-  dplyr::mutate( 
-    out_mct_10_90 = purrr::map(
-      df, 
+  dplyr::mutate( df = purrr::map(df, ~clean_bal(., varnam_bal = "bal", varnam_prec = "prec", varnam_et = "et_mm"))) %>% 
+  dplyr::mutate(
+    out_mct_00_80 = purrr::map(
+      df,
       ~get_plantwhc_mct_bysite(
-        ., 
-        varname_wbal = "bal", 
-        thresh_terminate = 0.1, 
-        thresh_drop = 0.9, 
+        .,
+        varname_wbal = "bal",
+        thresh_terminate = 0.0,
+        thresh_drop = 0.8,
         fittype = "Gumbel"))
     )
-  # dplyr::mutate( out_mct_10_90 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.1, thresh_drop = 0.9)))
-
-# list_test <- list()
-# sites <- df_alexi_repaired %>% pull(idx)
-# for (idx_site in sites){
-#   print(idx_site)
-#   # idx_site <- "AC08"
-#   list_test[[idx_site]] test <- df_alexi_repaired %>% 
-#     dplyr::filter(idx == idx_site) %>% 
-#     dplyr::mutate( df = purrr::map(df, ~mutate(., bal = prec - et_mm))) %>%
-#     dplyr::mutate( avl_et = purrr::map_lgl(df, ~avl_et(., varnam_et = "et_mm"))) %>%
-#     dplyr::filter(avl_et) %>% 
-#     dplyr::mutate( df = purrr::map(df, ~clean_bal(., varnam_bal = "bal", varnam_prec = "prec", varnam_et = "et_mm"))) %>%
-#     
-#     dplyr::mutate( out_mct_20_80 = purrr::map(df, ~get_plantwhc_mct_bysite(., varname_wbal = "bal", thresh_terminate = 0.2, thresh_drop = 0.8)))
-# }
   
 save(df_mct_sj02_alexi, file = "data/df_mct_sj02_alexi.RData")
 ```
 
+### Test output
+
+Look at cumulative water deficit time series. Weird: at some sites ET is very small and doesn't change over time.
+```{r}
+## plot CWD time series for sites with zero SD in ET
+df_test_mct_gg <- df_mct_sj02_alexi %>% 
+  mutate(mct = purrr::map(out_mct_00_80, "mct")) %>% 
+  mutate(df  = purrr::map(mct, "df")) %>% 
+  dplyr::select(idx, lon, lat, mct) %>% 
+  mutate(gg_cwd_tseries = purrr::map(mct, ~try(test_cwd_tseries(., filter_years = c(2010, 2011, 2012)))))
+
+
+df_test_gg %>% 
+  dplyr::filter(idx == "TD10c") %>% 
+  pull(gg_cwd_tseries)
+```
+
+
+### Overview of WHC*
 
 The following figure shows the distribution of WHC* values:
 ```{r}
@@ -297,12 +342,17 @@ df_mct_sj02_alexi %>%
 
 Using the very nice ingestr package.
 ```{r}
-df_hwsd <- ingest(
-  dplyr::select(ungroup(df_mct_sj02_alexi), sitename = idx, lon, lat),
-  source = "hwsd",
-  settings = list(fil = "~/data/hwsd/HWSD_RASTER/hwsd.bil")
-  )
-save(df_hwsd, file = "data/df_hwsd.RData")
+filn <- "data/df_hwsd_sj02.RData"
+if (!file.exists(filn)){
+  df_hwsd <- ingest(
+    dplyr::select(ungroup(df_mct_sj02_alexi), sitename = idx, lon, lat),
+    source = "hwsd",
+    settings = list(fil = "~/data/hwsd/HWSD_RASTER/hwsd.bil")
+    )
+  save(df_hwsd, file = filn)
+} else {
+  load(filn)
+}
 ```
 
 Calculate FC, PWP, and WHC from texture data.
@@ -473,4 +523,67 @@ out$gg +
     x = "Modelled rooting depth (mm)", 
     y = "Observed rooting depth (mm)"
     )
+```
+
+## Focus on model-data mismatch
+
+There seem to be many sites with an observed rooting depth < 2500 mm where modelled values are way too low.
+```{r}
+df_wrongsites <- df_modobs %>% 
+  dplyr::filter(D95_extrapolated < 2500) %>% 
+  mutate(relbias = zroot/D95_extrapolated) %>% 
+  dplyr::filter(relbias < 0.5)
+out$gg +
+  geom_point(data = df_wrongsites, aes(x = zroot, y = D95_extrapolated), color = 'red')
+```
+
+Where are they located?
+```{r}
+library(rworldmap)
+data(coastsCoarse)
+sPDF <- getMap()[getMap()$ADMIN!='Antarctica',]
+
+ggplot() +
+		# background countries
+	  geom_polygon(data=sPDF, aes(long, lat, group=group), color=NA, fill='grey75') +
+
+		# Coastline
+		geom_path(data=coastsCoarse, aes(long, lat, group=group), color='black') +
+    
+    scale_x_continuous(expand = c(0,0), limits = c(-180,180)) +
+    scale_y_continuous(expand = c(0,0), limits = c(-60,85)) +
+  
+    geom_point(data = df_wrongsites, aes(x = lon, y = lat), color = 'red')
+```
+
+Look at cumulative water deficit time series. Weird: at some sites ET is very small and doesn't change over time.
+```{r}
+df_test_gg <- df_mct_sj02_alexi %>% 
+  dplyr::filter(idx %in% df_wrongsites$sitename) %>% 
+  mutate(mct = purrr::map(out_mct_10_90, "mct")) %>% 
+  mutate(gg_cwd_tseries = purrr::map(mct, ~test_cwd_tseries(., filter_years = c(2010))))
+
+df_test_gg %>% 
+  dplyr::filter(idx == "TD10c") %>% 
+  pull(gg_cwd_tseries)
+```
+
+Identidfy weird sites (where ET is constant)
+```{r}
+df_test_sj02 <- df_mct_sj02_alexi %>% 
+  dplyr::filter(idx %in% df_wrongsites$sitename) %>% 
+  mutate(mct = purrr::map(out_mct_10_90, "mct")) %>% 
+  mutate(mct_df = purrr::map(mct, "df")) %>% 
+  tidyr::unnest(mct_df) %>% 
+  group_by(idx, lon, lat) %>% 
+  summarise(sd_et = sd(et_mm), mean_et = mean(et_mm))
+
+## problematic sites with zero SD:
+df_zeroSD <- df_test_sj02 %>% 
+  dplyr::filter(sd_et == 0)
+
+shitsites <- df_zeroSD %>% pull(idx)
+
+plot_map_simpl() +
+  geom_point(data = df_zeroSD, aes(lon, lat), col = 'red')
 ```
