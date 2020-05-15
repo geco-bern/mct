@@ -31,6 +31,8 @@ source("R/extract_return_level.R")
 source("R/convert_et.R")
 source("R/ingest_wtd_fan.R")
 source("R/test_et_tseries.R")
+source("R/simulate_snow.R")
+source("R/add_biome_ncrs.R")
 #source("R/extract_pointdata_allsites.R")
 
 dir_climate <- "/Users/benjaminstocker/sofun/output_nc_global_sofun"
@@ -142,7 +144,7 @@ df_alexi_repaired <- df_alexi %>%
   dplyr::select(-et_mm) %>% 
   dplyr::mutate(df    = purrr::map(df, ~drop_na(., date))) # Problem: The first row in `df_alexi$df` is always NA. This is a bug. Drop the row.
 
-save(df_alexi_repaired, file = "data/df_alexi_repaired.Rdata")
+save(df_alexi_repaired, file = "data/df_alexi_repaired_sj02.Rdata")
 ```
 
 Check if all is correct for a site where elevation data was given already before and `et_mm` calculated and now re-calculated - should yield identical results.
@@ -262,23 +264,56 @@ df2 <- df_alexi_repaired %>%
 all.equal(df1, df2)
 ```
 
+## Simulate snow water storage and melt
+
+Test it for one site in the high north.
+```{r}
+df_test <- df_alexi_repaired %>% 
+  arrange(desc(lat)) %>% 
+  dplyr::filter(idx == "AC01a") %>%
+  mutate(df = purrr::map(df, ~slice(., -1))) %>% 
+  mutate(df = purrr::map(df, ~simulate_snow(.)))
+
+plot_map_simpl() +
+  geom_point(data = df_test, aes(lon, lat), color = 'red')
+  
+## water balance test:
+df_test$df[[1]] %>% 
+  summarise(prec_snow = sum(prec + snow), lts = sum(liquid_to_soil)) %>% 
+  mutate(lts = lts + tail(df_test$df[[1]]$snow_pool, 1) - + head(df_test$df[[1]]$snow_pool, 1))
+
+df_test$df[[1]] %>% 
+  # dplyr::filter(lubridate::year(date) == 2005) %>% 
+  ggplot() + 
+  geom_line(aes(date, snow_pool), col = "royalblue") +
+  geom_line(aes(date, liquid_to_soil), col = "springgreen4") +
+  geom_line(aes(date, prec), col = "tomato")
+```
+
+Apply snow model at all sites.
+```{r}
+df_alexi_repaired <- df_alexi_repaired %>%
+  mutate(df = purrr::map(df, ~slice(., -1))) %>% 
+  mutate(df = purrr::map(df, ~simulate_snow(.)))
+
+save(df_alexi_repaired, file = "data/df_alexi_repaired_sj02.RData")
+```
+
 
 ## Apply the MCT function
 
 Calculate the daily water balance and apply the MCT function to get CWD events in different configurations.
 ```{r}
-clean_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
+get_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
   
-  ## remove NAs at head and tail      
-  df <- rbeni::cutna_headtail_df(df, varnam_bal)
-  
-  if (any(is.na(df[varnam_bal]))){
-    ## linearly interpolate ET
-    df[[varnam_et]] <- myapprox(df[[varnam_et]])
+  ## linearly interpolate ET
+  df[[varnam_et]] <- myapprox(df[[varnam_et]])
     
-    ## re-calculate daily water balance
-    df[[varnam_bal]] <- df[[varnam_prec]] - df[[varnam_et]]
-  }
+  ## re-calculate daily water balance
+  df[[varnam_bal]] <- df[[varnam_prec]] - df[[varnam_et]]
+
+  ## remove NAs at head and tail
+  df <- rbeni::cutna_headtail_df(df, varnam_bal)
   
   return(df)
 }
@@ -288,10 +323,9 @@ avl_et <- function(df, varnam_et){
 }
 
 df_mct_sj02_alexi <- df_alexi_repaired %>%
-  dplyr::mutate( df = purrr::map(df, ~mutate(., bal = prec - et_mm))) %>%
   dplyr::mutate( avl_et = purrr::map_lgl(df, ~avl_et(., varnam_et = "et_mm"))) %>%
   dplyr::filter( avl_et ) %>% 
-  dplyr::mutate( df = purrr::map(df, ~clean_bal(., varnam_bal = "bal", varnam_prec = "prec", varnam_et = "et_mm"))) %>% 
+  dplyr::mutate( df = purrr::map(df, ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))) %>% 
   dplyr::mutate(
     out_mct_00_80 = purrr::map(
       df,
@@ -311,16 +345,11 @@ save(df_mct_sj02_alexi, file = "data/df_mct_sj02_alexi.RData")
 Look at cumulative water deficit time series. Weird: at some sites ET is very small and doesn't change over time.
 ```{r}
 ## plot CWD time series for sites with zero SD in ET
-df_test_mct_gg <- df_mct_sj02_alexi %>% 
+df_test_mct_gg <- df_test %>% 
   mutate(mct = purrr::map(out_mct_00_80, "mct")) %>% 
-  mutate(df  = purrr::map(mct, "df")) %>% 
-  dplyr::select(idx, lon, lat, mct) %>% 
-  mutate(gg_cwd_tseries = purrr::map(mct, ~try(test_cwd_tseries(., filter_years = c(2010, 2011, 2012)))))
+  mutate(gg_cwd_tseries = purrr::map(mct, ~try(test_cwd_tseries(.))))
 
-
-df_test_gg %>% 
-  dplyr::filter(idx == "TD10c") %>% 
-  pull(gg_cwd_tseries)
+df_test_mct_gg$gg_cwd_tseries[[1]]
 ```
 
 
@@ -330,8 +359,8 @@ The following figure shows the distribution of WHC* values:
 ```{r}
 # load("data/ddf_mct_simsuite.Rdata") xxx ??? don't know what this is for
 df_mct_sj02_alexi %>% 
-  dplyr::select(idx, out_mct_10_90) %>% 
-  dplyr::mutate(whc20 = purrr::map_dbl(out_mct_10_90, ~extract_return_level(., 20))) %>% 
+  dplyr::select(idx, out_mct_00_80) %>% 
+  dplyr::mutate(whc20 = purrr::map_dbl(out_mct_00_80, ~extract_return_level(., 20))) %>% 
   ggplot(aes(x = whc20, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Plant rooting zone WHC*", subtitle = "10 y return period, 80% reduction of CWD", x = "WHC* (mm)")
@@ -390,10 +419,10 @@ df_whc %>%
 
 ```{r}
 ## use CWD10 for zroot, no root obstacles accounted for now
-df_zroot <- df_mct_sj02_alexi %>% 
+df_zroot <- df_mct_sj02_alexi %>%
   ungroup() %>% 
-  dplyr::select(sitename = idx, out_mct_10_90) %>% 
-  dplyr::mutate(whcXX = purrr::map_dbl(out_mct_10_90, ~extract_return_level(., 10))) %>% 
+  dplyr::select(sitename = idx, out_mct_00_80) %>% 
+  dplyr::mutate(whcXX = purrr::map_dbl(out_mct_00_80, ~extract_return_level(., 20))) %>% 
   dplyr::select(sitename, whcXX) %>% 
   left_join(
     df_whc %>% 
@@ -409,6 +438,8 @@ df_zroot <- df_mct_sj02_alexi %>%
   ) %>% 
   rowwise() %>% 
   dplyr::mutate(zroot = calc_zroot(whcXX, whc_t, whc_s, roots, imperm))
+
+save(df_zroot, file = "data/df_zroot_sj02.RData")
 ```
 
 The following figure shows the distribution of zroot* values:
@@ -428,6 +459,8 @@ df_modobs <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/ro
   dplyr::rename(sitename = ID) %>% 
   dplyr::left_join(dplyr::select(df_zroot, zroot, sitename), by = "sitename") %>% 
   dplyr::mutate(D50 = 1000 * D50, D95 = 1000 * D95, D50_extrapolated = 1000 * D50_extrapolated, D95_extrapolated = 1000 * D95_extrapolated)
+
+save(df_modobs, file = "data/df_modobs_sj02.RData")
 ```
 
 ### Distribution of values
@@ -450,7 +483,6 @@ ggsave("fig/hist_zroot_modobs.pdf", height = 4, width = 6)
 df_modobs %>% 
   dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot) %>% 
   tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
-  # dplyr::filter(source == "obs") %>% 
   ggplot() +
   geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
   theme(axis.text.x = element_text(angle=90, hjust=1)) +
@@ -491,15 +523,19 @@ df_modobs <- df_alexi_repaired %>%
   ) %>% 
   mutate(wtd_fan13 = ifelse(is.na(wtd_fan13), 99999, wtd_fan13)) %>% 
   mutate(zroot_wtd = ifelse(zroot > wtd_fan13, wtd_fan13, zroot))
+
+save(df_modobs, file = "data/df_modobs_sj02.RData")
 ```
 
 Updated histogram by vegetation type
 ```{r}
+## may check here: https://community.rstudio.com/t/how-to-reorder-boxplot-by-only-one-level-of-a-variable/37775
 df_modobs %>% 
   dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_wtd) %>% 
-  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
-  # dplyr::filter(source == "obs") %>% 
+  # mutate(Vegetation = forcats::fct_reorder(Vegetation, obs, .fun = 'median')) %>%
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>%
   ggplot() +
+  # geom_boxplot(aes(x = reorder(Vegetation, zroot), y = -zroot, fill = source)) +
   geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
   theme(axis.text.x = element_text(angle=90, hjust=1)) +
   labs(
@@ -525,12 +561,43 @@ out$gg +
     )
 ```
 
+Ridges.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+
+  ggplot(aes(x = zroot, y = Vegetation, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_sj02.pdf", width = 15, height = 10)
+```
+
+
+
 ## Focus on model-data mismatch
 
 There seem to be many sites with an observed rooting depth < 2500 mm where modelled values are way too low.
 ```{r}
 df_wrongsites <- df_modobs %>% 
-  dplyr::filter(D95_extrapolated < 2500) %>% 
   mutate(relbias = zroot/D95_extrapolated) %>% 
   dplyr::filter(relbias < 0.5)
 out$gg +
@@ -539,28 +606,16 @@ out$gg +
 
 Where are they located?
 ```{r}
-library(rworldmap)
-data(coastsCoarse)
-sPDF <- getMap()[getMap()$ADMIN!='Antarctica',]
-
-ggplot() +
-		# background countries
-	  geom_polygon(data=sPDF, aes(long, lat, group=group), color=NA, fill='grey75') +
-
-		# Coastline
-		geom_path(data=coastsCoarse, aes(long, lat, group=group), color='black') +
-    
-    scale_x_continuous(expand = c(0,0), limits = c(-180,180)) +
-    scale_y_continuous(expand = c(0,0), limits = c(-60,85)) +
-  
-    geom_point(data = df_wrongsites, aes(x = lon, y = lat), color = 'red')
+library(rbeni)
+plot_map_simpl() +
+  geom_point(data = df_wrongsites, aes(x = lon, y = lat), color = 'red')
 ```
 
 Look at cumulative water deficit time series. Weird: at some sites ET is very small and doesn't change over time.
 ```{r}
 df_test_gg <- df_mct_sj02_alexi %>% 
   dplyr::filter(idx %in% df_wrongsites$sitename) %>% 
-  mutate(mct = purrr::map(out_mct_10_90, "mct")) %>% 
+  mutate(mct = purrr::map(out_mct_00_80, "mct")) %>% 
   mutate(gg_cwd_tseries = purrr::map(mct, ~test_cwd_tseries(., filter_years = c(2010))))
 
 df_test_gg %>% 
@@ -571,8 +626,9 @@ df_test_gg %>%
 Identidfy weird sites (where ET is constant)
 ```{r}
 df_test_sj02 <- df_mct_sj02_alexi %>% 
+  dplyr::select(-avl_et, -avl_et_mm) %>% 
   dplyr::filter(idx %in% df_wrongsites$sitename) %>% 
-  mutate(mct = purrr::map(out_mct_10_90, "mct")) %>% 
+  mutate(mct = purrr::map(out_mct_00_80, "mct")) %>% 
   mutate(mct_df = purrr::map(mct, "df")) %>% 
   tidyr::unnest(mct_df) %>% 
   group_by(idx, lon, lat) %>% 
@@ -586,4 +642,160 @@ shitsites <- df_zeroSD %>% pull(idx)
 
 plot_map_simpl() +
   geom_point(data = df_zeroSD, aes(lon, lat), col = 'red')
+```
+
+## Alternative biome classification
+
+### WWF Ecoregions
+
+Try an alternative biome classification based on the WWF Ecoregions (implemented in ingestr). Ingest data into separate dataframe.
+```{r}
+df_wwf <- ingest(
+  dplyr::select(df_modobs, sitename, lon, lat),
+  source = "wwf",
+  dir = "~/data/biomes/wwf_ecoregions/official/",
+  settings = list(layer = "wwf_terr_ecos")
+)
+save(df_wwf, file = "./data/df_wwf_sj02.RData")
+```
+
+Combine dataframes.
+```{r}
+df_modobs <- df_wwf %>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  unnest(data) %>% 
+  dplyr::select(sitename, BIOME, biome_wwf = BIOME_NAME, ECO_NAME, ECO_NUM) %>% 
+  right_join(df_modobs, by = "sitename")
+```
+
+Plot.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  ggplot() +
+  geom_boxplot(aes(x = biome_wwf, y = -zroot, fill = source)) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
+
+ggsave("fig/modobs_boxplot_zroot_biome_wwf.pdf", width = 9, height = 10)
+```
+
+Ridges.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+
+  ggplot(aes(x = zroot, y = biome_wwf, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_wwf.pdf", width = 15, height = 10)
+```
+
+
+### NCRS Biomes
+
+```{r}
+df_ncrs <- add_biome_ncrs(
+  dplyr::select(df_modobs, sitename, lon, lat), 
+  path = "~/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
+  )
+```
+
+Combine dataframes.
+```{r}
+df_modobs <- df_ncrs %>% 
+  dplyr::select(sitename, biome_ncrs, biome_ncrs_name = biome_ncrs_chr) %>% 
+  right_join(df_modobs, by = "sitename")
+```
+
+Boxplot.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, biome_ncrs_name, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  ggplot() +
+  geom_boxplot(aes(x = biome_ncrs_name, y = -zroot, fill = source)) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
+
+ggsave("fig/modobs_boxplot_zroot_biome_ncrs.pdf", width = 9, height = 6)
+```
+
+Ridges.
+```{r}
+library(ggridges)
+df_modobs %>% 
+  dplyr::select(sitename, biome_ncrs_name, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_ncrs_name)) %>% 
+  
+  ggplot(aes(x = zroot, y = biome_ncrs_name, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by NCRS biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+  
+ggsave("fig/modobs_ridges_zroot_biome_ncrs.pdf", width = 9, height = 6)
+```
+
+Quantile regression
+```{r}
+out <- df_modobs %>% 
+  group_by(Vegetation) %>% 
+  summarise(obs = median(D95_extrapolated, na.rm = TRUE), mod = median(zroot_wtd, na.rm = TRUE)) %>% 
+  analyse_modobs2("mod", "obs")
+out$gg
+
+out <- df_modobs %>% 
+  group_by(biome_ncrs_name) %>% 
+  summarise(obs = median(D95_extrapolated, na.rm = TRUE), mod = median(zroot_wtd, na.rm = TRUE)) %>% 
+  analyse_modobs2("mod", "obs")
+out$gg
+
+out <- df_modobs %>% 
+  group_by(biome_wwf) %>% 
+  summarise(obs = median(D95_extrapolated, na.rm = TRUE), mod = median(zroot_wtd, na.rm = TRUE)) %>% 
+  analyse_modobs2("mod", "obs")
+out$gg
 ```

@@ -23,7 +23,7 @@ test_cwd_tseries <- function(out_mct, sitename = NA, filter_years = NA){
         aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999),
         fill=rgb(0,0,0,0.3),
         color=NA) +
-      geom_line(data = out_mct$df, aes(date, prec), color="royalblue") +
+      geom_line(data = out_mct$df, aes(date, liquid_to_soil), color="royalblue") +
       geom_line(data = out_mct$df, aes(date, et_mm), color="springgreen3") +
       geom_line(data = out_mct$df, aes(date, deficit), color="tomato") +
       coord_cartesian(ylim=c(0, maxval)) +
