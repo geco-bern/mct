@@ -68,6 +68,7 @@ test_mct_bysite <- function(sitename, df, thresh_terminate = 0.2, thresh_drop = 
     pull(iinst)
 
   out_mct$df <- out_mct$df %>% 
+    filter(iinst %in% biginstances) %>% 
     mutate(lue = gpp/ppfd) 
   
   ## get linear fit with outliers
@@ -107,7 +108,7 @@ test_mct_bysite <- function(sitename, df, thresh_terminate = 0.2, thresh_drop = 
   }
   
   ## get exponential fit
-  expmod <- try( nls(lue ~ lue0 * exp(k * deficit), data = out_mct$df, start = list(lue0 = 0.1, k = 1/50)) )
+  expmod <- try( nls(lue ~ a * exp(k * deficit), data = out_mct$df, start = list(a = 0.1, k = 1/50)) )
   if (class(expmod) != "try-error"){
     
     df_coef <- summary(expmod) %>% coef()
@@ -139,7 +140,6 @@ test_mct_bysite <- function(sitename, df, thresh_terminate = 0.2, thresh_drop = 
   }
   
   out <- out_mct$df %>% 
-    filter(iinst %in% biginstances) %>% 
     ggplot(aes(x = deficit, y = lue)) +
     geom_point(alpha = 0.5) +
     labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
@@ -170,6 +170,120 @@ test_mct_bysite <- function(sitename, df, thresh_terminate = 0.2, thresh_drop = 
   out
   ggsave(paste0(dir, "/lue_cwd/lue_cwd_", sitename, ".pdf"), width = 6, height = 4)
   
+
+  ##------------------------------------------
+  ## EOR vs CWD
+  ##------------------------------------------
+  ## retain only data from largest instances of each year
+  biginstances <- out_mct$inst %>% 
+    mutate(year = lubridate::year(date_start)) %>% 
+    group_by(year) %>% 
+    filter(deficit == max(deficit)) %>% 
+    pull(iinst)
+
+  out_mct$df <- out_mct$df %>% 
+    filter(iinst %in% biginstances) %>% 
+    mutate(eor = et/netrad) 
+  
+  ## get linear fit with outliers
+  linmod <- try(lm(eor ~ deficit, data = out_mct$df))
+  if (class(linmod) != "try-error"){
+    idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+    out_mct$df$eor[idx_drop] <- NA
+    
+    ## git linear fit without outliers
+    linmod <- try(lm(eor ~ deficit, data = out_mct$df))
+    
+    if (class(linmod) != "try-error"){
+      ## test: is slope negative?
+      is_neg <- coef(linmod)["deficit"] < 0.0
+      
+      if (is_neg){
+        ## test: is slope significantly (5% level) different from zero (t-test)?
+        is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+        if (is_sign){
+          ## get x-axis cutoff
+          eor0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+          df_fit <- tibble(y = predict(linmod, newdata = out_mct$df), x = out_mct$df$deficit)
+        } else {
+          eor0 <- NA
+        }
+      } else {
+        is_sign <- FALSE
+        eor0 <- NA
+      }
+    } else {
+      is_sign <- FALSE
+      eor0 <- NA
+    }
+  } else {
+    is_sign <- FALSE
+    eor0 <- NA
+  }
+  
+  ## get exponential fit
+  expmod <- try( nls(eor ~ a * exp(k * deficit), data = out_mct$df, start = list(a = 0.1, k = 1/50)) )
+  if (class(expmod) != "try-error"){
+    
+    df_coef <- summary(expmod) %>% coef()
+    
+    ## test: is slope negative?
+    is_neg_exp <- df_coef["k", "Estimate"] < 0
+    
+    if (is_neg_exp){
+      ## test: is slope significantly (5% level) different from zero (t-test)?
+      is_sign_exp <- df_coef["k", "Pr(>|t|)"] < 0.05
+      
+      if (is_sign_exp){
+        
+        ## get CWD at wich eor is at 1/2e
+        eor0_exp <- -1.0/coef(expmod)["k"]*2.0   ## CWD where eor is reduced to 1/2e
+        df_fit_exp <- tibble(y = predict(expmod, newdata = out_mct$df), x = out_mct$df$deficit)
+        
+      } else {
+        eor0_exp <- NA
+      }
+    } else {
+      is_sign_exp <- FALSE
+      eor0_exp <- NA
+    }
+    
+  } else {
+    is_sign_exp <- FALSE
+    eor0_exp <- NA
+  }
+  
+  out <- out_mct$df %>% 
+    ggplot(aes(x = deficit, y = eor)) +
+    geom_point(alpha = 0.5) +
+    labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
+    ylim(-0.1, 0.5)
+  
+  if (is_sign){
+    out <- out +
+      geom_vline(xintercept = eor0, linetype = "dotted", color = 'tomato') +
+      geom_line(data = df_fit, aes(x, y), col = "tomato")
+  }
+  if (is_sign_exp){
+    out <- out +
+      geom_vline(xintercept = eor0_exp, linetype = "dotted", color = 'royalbeor') +
+      geom_line(data = df_fit_exp, aes(x, y), col = "royalbeor")
+  }
+  if (!identical(gumbi$mod, NA)){
+    mctXX <- gumbi$df_return %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mctXX)){
+      out <- out +
+        geom_vline(xintercept = mctXX)
+    } else {
+      rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
+    }
+  } else {
+    rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
+    mctXX <- NA
+  }
+  out
+  ggsave(paste0(dir, "/eor_cwd/eor_cwd_", sitename, ".pdf"), width = 6, height = 4)
+
 
   ##------------------------------------------
   ## Histogram: Distribution of cumulative deficits and the extreme values
