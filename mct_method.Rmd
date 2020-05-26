@@ -198,7 +198,7 @@ out_mct_alexi   <- mct(df_example_alexi,   varname_wbal = "bal", thresh_terminat
 Plot the cumulative deficit and rain events, with blue for precipitation, reddish for the cumulative water deficit, and black for GPP/PPFD.
 ```{r}
 out_mct_alexi$df <- out_mct_alexi$df %>%
-  left_join(out_mct_fluxnet$df %>% 
+  left_join(df_example_fluxnet %>%
               dplyr::select(date, netrad),
             by = "date")
 
@@ -264,17 +264,14 @@ biginstances <- out_mct_fluxnet$inst %>%
   dplyr::filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
-## get linear fit with outliers
-linmod <- lm(lue ~ deficit, data = out_mct_fluxnet$df %>% mutate(lue = gpp/ppfd))
-idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+## NEW: filter by dday, do not do the outlier thing
+df <- out_mct_fluxnet$df %>% 
+  dplyr::filter(!is.na(dday)) %>% 
+  mutate(lue = gpp/ppfd) %>% 
+  dplyr::filter(iinst %in% biginstances)
 
-out_mct_fluxnet$df_clean <- out_mct_fluxnet$df %>% 
-  mutate(lue = gpp/ppfd)
-
-out_mct_fluxnet$df_clean$lue[idx_drop] <- NA
-
-## git linear fit without outliers
-linmod <- lm(lue ~ deficit, data = out_mct_fluxnet$df_clean)
+## git linear fit
+linmod <- lm(lue ~ deficit, data = df)
 
 ## test: is slope negative?
 is_neg <- coef(linmod)["deficit"] < 0.0
@@ -284,23 +281,22 @@ coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
 
 ## get x-axis cutoff
 lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-df_fit = tibble(y = predict(linmod, newdata = out_mct_fluxnet$df_clean), x = out_mct_fluxnet$df_clean$deficit)
+df_fit = tibble(y = predict(linmod, newdata = df), x = df$deficit)
 
 ## Fit exponential
-expmod <- nls(lue ~ lue0 * exp(k * deficit), data = out_mct_fluxnet$df_clean, start = list(lue0 = 0.1, k = 1/50))
-out_mct_fluxnet$df_clean$lue_fit <- predict(expmod, newdata = out_mct_fluxnet$df_clean)
+expmod <- nls(lue ~ lue0 * exp(k * deficit), data = df, start = list(lue0 = 0.1, k = 1/50))
+df$lue_fit <- predict(expmod, newdata = df)
 lue0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
-out_mct_fluxnet$df_clean %>% 
-  dplyr::filter(iinst %in% biginstances) %>% 
+df %>% 
   ggplot(aes(x = deficit, y = lue)) +
   geom_point(alpha = 0.5) +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET") +
   geom_vline(xintercept = lue0, linetype = "dotted", color = 'red') +
   geom_vline(xintercept = lue0_exp, linetype = "dotted", color = 'royalblue') +
   geom_line(data = df_fit, aes(x, y), col = "red") +
-  geom_line(data = out_mct_fluxnet$df_clean, aes(x = deficit, y = lue_fit), color = 'royalblue')
+  geom_line(data = df, aes(x = deficit, y = lue_fit), color = 'royalblue')
 ```
 
 For ALEXI data:
@@ -312,15 +308,14 @@ biginstances <- out_mct_alexi$inst %>%
   dplyr::filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
-## get linear fit with outliers
-linmod <- lm(lue ~ deficit, data = out_mct_alexi$df %>% mutate(lue = gpp/ppfd))
-idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-out_mct_alexi$df_clean <- out_mct_alexi$df %>% 
-  mutate(lue = gpp/ppfd)
-out_mct_alexi$df_clean$lue[idx_drop] <- NA
+## NEW: filter by dday, do not do the outlier thing
+df <- out_mct_alexi$df %>% 
+  dplyr::filter(!is.na(dday)) %>% 
+  mutate(lue = gpp/ppfd) %>% 
+  dplyr::filter(iinst %in% biginstances)
 
 ## git linear fit without outliers
-linmod <- lm(lue ~ deficit, data = out_mct_alexi$df_clean)
+linmod <- lm(lue ~ deficit, data = df)
 df_linmod <- linmod %>% 
   broom::tidy()
 
@@ -338,15 +333,15 @@ pval_deficit < 0.05
 
 ## get x-axis cutoff
 lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-df_fit = data.frame(y = predict(linmod, newdata = out_mct_alexi$df_clean), x = out_mct_alexi$df_clean$deficit)
+df_fit = data.frame(y = predict(linmod, newdata = df), x = df$deficit)
 
 ## Fit exponential
-expmod <- nls(lue ~ lue0 * exp(k * deficit), data = out_mct_alexi$df_clean, start = list(lue0 = 0.1, k = 1/50))
-out_mct_alexi$df_clean$lue_fit <- predict(expmod, newdata = out_mct_alexi$df_clean)
+expmod <- nls(lue ~ lue0 * exp(k * deficit), data = df, start = list(lue0 = 0.1, k = 1/50))
+df$lue_fit <- predict(expmod, newdata = df)
 lue0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
-out_mct_alexi$df_clean %>% 
+df %>% 
   dplyr::filter(iinst %in% biginstances) %>% 
   ggplot(aes(x = deficit, y = gpp/ppfd)) +
   geom_point(alpha = 0.5) +
@@ -354,7 +349,7 @@ out_mct_alexi$df_clean %>%
   geom_vline(xintercept = lue0, linetype = "dotted", color = "red") +
   geom_vline(xintercept = lue0_exp, linetype = "dotted", color = "royalblue") +
   geom_line(data = df_fit, aes(x, y), col = "red") +
-  geom_line(data = out_mct_alexi$df_clean, aes(x = deficit, y = lue_fit), color = 'royalblue')
+  geom_line(data = df, aes(x = deficit, y = lue_fit), color = 'royalblue')
 ```
 
 ### ET/Rn vs. CWD
@@ -370,23 +365,13 @@ biginstances <- out_mct_fluxnet$inst %>%
   dplyr::filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
-## get linear fit with outliers
-linmod <- lm(
-  eor ~ deficit, 
-  data = out_mct_fluxnet$df %>% 
-    dplyr::filter(iinst %in% biginstances) %>% 
-    mutate(eor = latenth/netrad)
-  )
-idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-
-out_mct_fluxnet$df_clean <- out_mct_fluxnet$df %>% 
+df <- out_mct_fluxnet$df %>% 
+  dplyr::filter(!is.na(dday)) %>% 
   dplyr::filter(iinst %in% biginstances) %>% 
   mutate(eor = latenth/netrad)
 
-out_mct_fluxnet$df_clean$eor[idx_drop] <- NA
-
-## git linear fit without outliers
-linmod <- lm(eor ~ deficit, data = out_mct_fluxnet$df_clean)
+## git linear fit
+linmod <- lm(eor ~ deficit, data = df)
 
 ## test: is slope negative?
 is_neg <- coef(linmod)["deficit"] < 0.0
@@ -396,22 +381,22 @@ coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
 
 ## get x-axis cutoff
 eor0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-df_fit = tibble(y = predict(linmod, newdata = out_mct_fluxnet$df_clean), x = out_mct_fluxnet$df_clean$deficit)
+df_fit = tibble(y = predict(linmod, newdata = df), x = df$deficit)
 
 ## Fit exponential
-expmod <- nls(eor ~ a * exp(k * deficit), data = out_mct_fluxnet$df_clean, start = list(a = 0.1, k = 1/50))
-out_mct_fluxnet$df_clean$eor_fit <- predict(expmod, newdata = out_mct_fluxnet$df_clean)
+expmod <- nls(eor ~ a * exp(k * deficit), data = df, start = list(a = 0.1, k = 1/50))
+df$eor_fit <- predict(expmod, newdata = df)
 eor0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
-out_mct_fluxnet$df_clean %>% 
+df %>% 
   ggplot(aes(x = deficit, y = eor)) +
   geom_point(alpha = 0.5) +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "ET/Rn", subtitle = "ET: FLUXNET, precipitation: FLUXNET, Rn: FLUXNET") +
   geom_vline(xintercept = eor0, linetype = "dotted", color = 'red') +
   geom_vline(xintercept = eor0_exp, linetype = "dotted", color = 'royalblue') +
   geom_line(data = df_fit, aes(x, y), col = "red") +
-  geom_line(data = out_mct_fluxnet$df_clean, aes(x = deficit, y = eor_fit), color = 'royalblue') +
+  geom_line(data = df, aes(x = deficit, y = eor_fit), color = 'royalblue') +
   ylim(0, 1)
 ```
 
@@ -424,23 +409,18 @@ biginstances <- out_mct_alexi$inst %>%
   dplyr::filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
-## get linear fit with outliers
-linmod <- lm(
-  eor ~ deficit, 
-  data = out_mct_alexi$df %>% 
-    dplyr::filter(iinst %in% biginstances) %>% 
-    mutate(eor = et/netrad)
-  )
-idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+# out_mct_alexi$df <- out_mct_alexi$df %>%
+#   left_join(df_example_fluxnet %>%
+#               dplyr::select(date, netrad),
+#             by = "date")
 
-out_mct_alexi$df_clean <- out_mct_alexi$df %>% 
+df <- out_mct_alexi$df %>% 
+  dplyr::filter(!is.na(dday)) %>% 
   dplyr::filter(iinst %in% biginstances) %>% 
   mutate(eor = et/netrad)
 
-out_mct_alexi$df_clean$eor[idx_drop] <- NA
-
-## git linear fit without outliers
-linmod <- lm(eor ~ deficit, data = out_mct_alexi$df_clean)
+## git linear fit
+linmod <- lm(eor ~ deficit, data = df)
 
 ## test: is slope negative?
 is_neg <- coef(linmod)["deficit"] < 0.0
@@ -450,22 +430,22 @@ coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
 
 ## get x-axis cutoff
 eor0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-df_fit = tibble(y = predict(linmod, newdata = out_mct_alexi$df_clean), x = out_mct_alexi$df_clean$deficit)
+df_fit = tibble(y = predict(linmod, newdata = df), x = df$deficit)
 
 ## Fit exponential
-expmod <- nls(eor ~ a * exp(k * deficit), data = out_mct_alexi$df_clean, start = list(a = 0.1, k = 1/50))
-out_mct_alexi$df_clean$eor_fit <- predict(expmod, newdata = out_mct_alexi$df_clean)
+expmod <- nls(eor ~ a * exp(k * deficit), data = df, start = list(a = 0.1, k = 1/50))
+df$eor_fit <- predict(expmod, newdata = df)
 eor0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
-out_mct_alexi$df_clean %>% 
+df %>% 
   ggplot(aes(x = deficit, y = eor)) +
   geom_point(alpha = 0.5) +
-  labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "ET/Rn", subtitle = "ET: alexi, precipitation: alexi, Rn: alexi") +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "ET/Rn", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, Rn: FLUXNET") +
   geom_vline(xintercept = eor0, linetype = "dotted", color = 'red') +
   geom_vline(xintercept = eor0_exp, linetype = "dotted", color = 'royalblue') +
   geom_line(data = df_fit, aes(x, y), col = "red") +
-  geom_line(data = out_mct_alexi$df_clean, aes(x = deficit, y = eor_fit), color = 'royalblue') +
+  geom_line(data = df, aes(x = deficit, y = eor_fit), color = 'royalblue') +
   ylim(0, 1)
 ```
 
@@ -708,27 +688,40 @@ biginstances <- out_mct_alexi$inst %>%
   dplyr::filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
-## get linear fit with outliers
-linmod <- lm(lue ~ deficit, data = out_mct_alexi$df %>% mutate(lue = gpp/ppfd))
-idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-out_mct_alexi$df_clean <- out_mct_alexi$df %>% 
-  mutate(lue = gpp/ppfd)
-out_mct_alexi$df_clean$lue[idx_drop] <- NA
+## NEW: filter by dday, do not do the outlier thing
+df <- out_mct_alexi$df %>% 
+  dplyr::filter(!is.na(dday)) %>% 
+  mutate(lue = gpp/ppfd) %>% 
+  dplyr::filter(iinst %in% biginstances)
 
 ## git linear fit without outliers
-linmod <- lm(lue ~ deficit, data = out_mct_alexi$df_clean)
+linmod <- lm(lue ~ deficit, data = df)
+df_linmod <- linmod %>% 
+  broom::tidy()
+
+## test: is slope negative?
+coef_deficit <- df_linmod %>% 
+  dplyr::filter(term == "deficit") %>% 
+  pull(estimate)
+is_neg <- coef_deficit < 0.0
+
+## test: is slope significantly (5% level) different from zero (t-test)?
+pval_deficit <- df_linmod %>% 
+  dplyr::filter(term == "deficit") %>% 
+  pull(p.value)
+pval_deficit < 0.05
 
 ## get x-axis cutoff
 lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-df_fit = data.frame(y = predict(linmod, newdata = out_mct_alexi$df_clean), x = out_mct_alexi$df_clean$deficit)
+df_fit = data.frame(y = predict(linmod, newdata = df), x = df$deficit)
 
 ## Fit exponential
-expmod <- nls(lue ~ lue0 * exp(k * deficit), data = out_mct_alexi$df_clean, start = list(lue0 = 0.1, k = 1/50))
-out_mct_alexi$df_clean$lue_fit <- predict(expmod, newdata = out_mct_alexi$df_clean)
+expmod <- nls(lue ~ lue0 * exp(k * deficit), data = df, start = list(lue0 = 0.1, k = 1/50))
+df$lue_fit <- predict(expmod, newdata = df)
 lue0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
-out <- out_mct_alexi$df_clean %>% 
+out <- df %>% 
   dplyr::filter(iinst %in% biginstances) %>% 
   ggplot(aes(x = deficit, y = gpp/ppfd)) +
   geom_point(alpha = 0.5) +
@@ -736,7 +729,7 @@ out <- out_mct_alexi$df_clean %>%
   geom_vline(xintercept = lue0, linetype = "dotted", color = "red") +
   geom_vline(xintercept = lue0_exp, linetype = "dotted", color = "royalblue") +
   geom_line(data = df_fit, aes(x, y), col = "red") +
-  geom_line(data = out_mct_alexi$df_clean, aes(x = deficit, y = lue_fit), color = 'royalblue')
+  geom_line(data = df, aes(x = deficit, y = lue_fit), color = 'royalblue')
 
 if (!identical(mct_alexi$mod, NA)){
   mct20 <- mct_alexi$df_return %>% dplyr::filter(return_period == 20) %>% pull(return_level)
@@ -763,23 +756,13 @@ biginstances <- out_mct_alexi$inst %>%
   dplyr::filter(deficit == max(deficit)) %>% 
   pull(iinst)
 
-## get linear fit with outliers
-linmod <- lm(
-  eor ~ deficit, 
-  data = out_mct_alexi$df %>% 
-    dplyr::filter(iinst %in% biginstances) %>% 
-    mutate(eor = et/netrad)
-  )
-idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-
-out_mct_alexi$df_clean <- out_mct_alexi$df %>% 
+df <- out_mct_alexi$df %>% 
+  dplyr::filter(!is.na(dday)) %>% 
   dplyr::filter(iinst %in% biginstances) %>% 
   mutate(eor = et/netrad)
 
-out_mct_alexi$df_clean$eor[idx_drop] <- NA
-
-## git linear fit without outliers
-linmod <- lm(eor ~ deficit, data = out_mct_alexi$df_clean)
+## git linear fit
+linmod <- lm(eor ~ deficit, data = df)
 
 ## test: is slope negative?
 is_neg <- coef(linmod)["deficit"] < 0.0
@@ -789,59 +772,23 @@ coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
 
 ## get x-axis cutoff
 eor0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-df_fit = tibble(y = predict(linmod, newdata = out_mct_alexi$df_clean), x = out_mct_alexi$df_clean$deficit)
+df_fit = tibble(y = predict(linmod, newdata = df), x = df$deficit)
 
 ## Fit exponential
-expmod <- nls(eor ~ a * exp(k * deficit), data = out_mct_alexi$df_clean, start = list(a = 0.1, k = 1/50))
-out_mct_alexi$df_clean$eor_fit <- predict(expmod, newdata = out_mct_alexi$df_clean)
+expmod <- nls(eor ~ a * exp(k * deficit), data = df, start = list(a = 0.1, k = 1/50))
+df$eor_fit <- predict(expmod, newdata = df)
 eor0_exp <- -1/coef(expmod)["k"]*2
 
 ## plot
-out <- out_mct_alexi$df_clean %>% 
+out <- df %>% 
   ggplot(aes(x = deficit, y = eor)) +
   geom_point(alpha = 0.5) +
-  labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "ET/Rn", subtitle = "ET: alexi, precipitation: alexi, Rn: alexi") +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "ET/Rn", subtitle = "ET: FLUXNET, precipitation: FLUXNET, Rn: FLUXNET") +
   geom_vline(xintercept = eor0, linetype = "dotted", color = 'red') +
   geom_vline(xintercept = eor0_exp, linetype = "dotted", color = 'royalblue') +
   geom_line(data = df_fit, aes(x, y), col = "red") +
-  geom_line(data = out_mct_alexi$df_clean, aes(x = deficit, y = eor_fit), color = 'royalblue') +
+  geom_line(data = df, aes(x = deficit, y = eor_fit), color = 'royalblue') +
   ylim(0, 1)
-
-# biginstances <- out_mct_alexi$inst %>% 
-#   mutate(year = lubridate::year(date_start)) %>% 
-#   group_by(year) %>% 
-#   dplyr::filter(deficit == max(deficit)) %>% 
-#   pull(iinst)
-# 
-# ## get linear fit with outliers
-# linmod <- lm(lue ~ deficit, data = out_mct_alexi$df %>% mutate(lue = gpp/ppfd))
-# idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-# out_mct_alexi$df_clean <- out_mct_alexi$df %>% 
-#   mutate(lue = gpp/ppfd)
-# out_mct_alexi$df_clean$lue[idx_drop] <- NA
-# 
-# ## git linear fit without outliers
-# linmod <- lm(lue ~ deficit, data = out_mct_alexi$df_clean)
-# 
-# ## get x-axis cutoff
-# lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-# df_fit = data.frame(y = predict(linmod, newdata = out_mct_alexi$df_clean), x = out_mct_alexi$df_clean$deficit)
-# 
-# ## Fit exponential
-# expmod <- nls(lue ~ lue0 * exp(k * deficit), data = out_mct_alexi$df_clean, start = list(lue0 = 0.1, k = 1/50))
-# out_mct_alexi$df_clean$lue_fit <- predict(expmod, newdata = out_mct_alexi$df_clean)
-# lue0_exp <- -1/coef(expmod)["k"]*2
-# 
-# ## plot
-# out <- out_mct_alexi$df_clean %>% 
-#   dplyr::filter(iinst %in% biginstances) %>% 
-#   ggplot(aes(x = deficit, y = gpp/ppfd)) +
-#   geom_point(alpha = 0.5) +
-#   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
-#   geom_vline(xintercept = lue0, linetype = "dotted", color = "red") +
-#   geom_vline(xintercept = lue0_exp, linetype = "dotted", color = "royalblue") +
-#   geom_line(data = df_fit, aes(x, y), col = "red") +
-#   geom_line(data = out_mct_alexi$df_clean, aes(x = deficit, y = lue_fit), color = 'royalblue')
 
 if (!identical(mct_alexi$mod, NA)){
   mct20 <- mct_alexi$df_return %>% dplyr::filter(return_period == 20) %>% pull(return_level)
@@ -892,7 +839,7 @@ Some evaluations across all sites. This shows a good correlation between the CWD
 ## user-defined return period
 df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>% 
   purrr::map("df_return") %>% 
-  purrr::map(~dplyr::filter(., return_period==40) %>% pull(return_level)) %>% 
+  purrr::map(~dplyr::filter(., return_period==20) %>% pull(return_level)) %>% 
   tibble(
     sitename = names(.), 
     mct = unlist(.),

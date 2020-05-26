@@ -114,41 +114,36 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       pull(iinst)
     
     mct_fluxnet$df <- mct_fluxnet$df %>% 
+      dplyr::filter(!is.na(dday)) %>% 
       dplyr::filter(iinst %in% biginstances) %>%
-      mutate(lue = gpp/ppfd) 
+      mutate(lue = gpp/ppfd) %>% 
+      mutate(lue = remove_outliers(lue, coef = 1.5))
     
     ## get linear fit with outliers
     linmod <- try(lm(lue ~ deficit, data = mct_fluxnet$df))
     if (class(linmod) != "try-error"){
-      idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-      mct_fluxnet$df$lue[idx_drop] <- NA
       
-      ## git linear fit without outliers
-      linmod <- try(lm(lue ~ deficit, data = mct_fluxnet$df))
+      ## test: is slope negative?
+      is_neg <- coef(linmod)["deficit"] < 0.0
       
-      if (class(linmod) != "try-error"){
+      if (is_neg){
+        ## test: is slope significantly (5% level) different from zero (t-test)?
+        is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
         
-        ## test: is slope negative?
-        is_neg <- coef(linmod)["deficit"] < 0.0
-        
-        if (is_neg){
-          ## test: is slope significantly (5% level) different from zero (t-test)?
-          is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
-          if (is_sign){
-            ## get x-axis cutoff
-            lue0_fluxnet <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-            df_fit <- tibble(y = predict(linmod, newdata = mct_fluxnet$df), x = mct_fluxnet$df$deficit)
-          } else {
-            lue0_fluxnet <- NA
-          }
+        if (is_sign){
+          ## get x-axis cutoff
+          lue0_fluxnet <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+          df_fit <- tibble(y = predict(linmod, newdata = mct_fluxnet$df), x = mct_fluxnet$df$deficit)
+          
         } else {
-          is_sign <- FALSE
           lue0_fluxnet <- NA
         }
+        
       } else {
         is_sign <- FALSE
         lue0_fluxnet <- NA
       }
+      
     } else {
       is_sign <- FALSE
       lue0_fluxnet <- NA
@@ -191,7 +186,8 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       ggplot(aes(x = deficit, y = lue)) +
       geom_point(alpha = 0.5) +
       labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET") +
-      ylim(-0.1, 0.5)
+      geom_hline(yintercept = 0.0, linetype = "dotted")
+      # ylim(-0.1, 0.5)
 
     if (is_sign){
       out <- out +
@@ -228,40 +224,33 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       pull(iinst)
 
     mct_alexi$df <- mct_alexi$df %>% 
+      dplyr::filter(!is.na(dday)) %>% 
       dplyr::filter(iinst %in% biginstances) %>%
-      mutate(lue = gpp/ppfd) 
+      mutate(lue = gpp/ppfd) %>% 
+      mutate(lue = remove_outliers(lue, coef = 1.5))
     
     ## get linear fit with outliers
     linmod <- try(lm(lue ~ deficit, data = mct_alexi$df))
     if (class(linmod) != "try-error"){
-      idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-      mct_alexi$df$lue[idx_drop] <- NA
+
+      ## test: is slope negative?
+      is_neg <- coef(linmod)["deficit"] < 0.0
       
-      ## git linear fit without outliers
-      linmod <- try(lm(lue ~ deficit, data = mct_alexi$df))
-      
-      if (class(linmod) != "try-error"){
-        ## test: is slope negative?
-        is_neg <- coef(linmod)["deficit"] < 0.0
-        
-        if (is_neg){
-          ## test: is slope significantly (5% level) different from zero (t-test)?
-          is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
-          if (is_sign){
-            ## get x-axis cutoff
-            lue0_alexi <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-            df_fit <- tibble(y = predict(linmod, newdata = mct_alexi$df), x = mct_alexi$df$deficit)
-          } else {
-            lue0_alexi <- NA
-          }
+      if (is_neg){
+        ## test: is slope significantly (5% level) different from zero (t-test)?
+        is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+        if (is_sign){
+          ## get x-axis cutoff
+          lue0_alexi <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+          df_fit <- tibble(y = predict(linmod, newdata = mct_alexi$df), x = mct_alexi$df$deficit)
         } else {
-          is_sign <- FALSE
           lue0_alexi <- NA
         }
       } else {
         is_sign <- FALSE
         lue0_alexi <- NA
       }
+      
     } else {
       is_sign <- FALSE
       lue0_alexi <- NA
@@ -303,7 +292,8 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       ggplot(aes(x = deficit, y = lue)) +
       geom_point(alpha = 0.5) +
       labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
-      ylim(-0.1, 0.5)
+      geom_hline(yintercept = 0.0, linetype = "dotted")
+      # ylim(-0.1, 0.5)
     
     if (is_sign){
       out <- out +
@@ -339,41 +329,33 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       pull(iinst)
     
     mct_fluxnet$df <- mct_fluxnet$df %>% 
+      dplyr::filter(!is.na(dday)) %>% 
       dplyr::filter(iinst %in% biginstances) %>%
-      mutate(eor = latenth/netrad) 
+      mutate(eor = latenth/netrad) %>% 
+      mutate(eor = remove_outliers(eor, coef = 1.5))
     
     ## get linear fit with outliers
     linmod <- try(lm(eor ~ deficit, data = mct_fluxnet$df))
     if (class(linmod) != "try-error"){
-      idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-      mct_fluxnet$df$eor[idx_drop] <- NA
+
+      ## test: is slope negative?
+      is_neg <- coef(linmod)["deficit"] < 0.0
       
-      ## git linear fit without outliers
-      linmod <- try(lm(eor ~ deficit, data = mct_fluxnet$df))
-      
-      if (class(linmod) != "try-error"){
-        
-        ## test: is slope negative?
-        is_neg <- coef(linmod)["deficit"] < 0.0
-        
-        if (is_neg){
-          ## test: is slope significantly (5% level) different from zero (t-test)?
-          is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
-          if (is_sign){
-            ## get x-axis cutoff
-            eor0_fluxnet <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-            df_fit <- tibble(y = predict(linmod, newdata = mct_fluxnet$df), x = mct_fluxnet$df$deficit)
-          } else {
-            eor0_fluxnet <- NA
-          }
+      if (is_neg){
+        ## test: is slope significantly (5% level) different from zero (t-test)?
+        is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+        if (is_sign){
+          ## get x-axis cutoff
+          eor0_fluxnet <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+          df_fit <- tibble(y = predict(linmod, newdata = mct_fluxnet$df), x = mct_fluxnet$df$deficit)
         } else {
-          is_sign <- FALSE
           eor0_fluxnet <- NA
         }
       } else {
         is_sign <- FALSE
         eor0_fluxnet <- NA
       }
+      
     } else {
       is_sign <- FALSE
       eor0_fluxnet <- NA
@@ -416,7 +398,8 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       ggplot(aes(x = deficit, y = eor)) +
       geom_point(alpha = 0.5) +
       labs(title = sitename, x = "Cumulative water deficit (mm)", y = "ET/Rn", subtitle = "ET: FLUXNET, precipitation: FLUXNET, Rn: FLUXNET") +
-      ylim(-0.1, 0.5)
+      geom_hline(yintercept = 0.0, linetype = "dotted")
+      # ylim(-0.1, 0.5)
 
     if (is_sign){
       out <- out +
@@ -453,43 +436,36 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       pull(iinst)
 
     mct_alexi$df <- mct_alexi$df %>% 
-      left_join(mct_fluxnet$df %>% 
+      left_join(df_fluxnet %>%
                   dplyr::select(date, netrad),
                 by = "date") %>%
+      dplyr::filter(!is.na(dday)) %>% 
       dplyr::filter(iinst %in% biginstances) %>%
-      mutate(eor = et/netrad) 
+      mutate(eor = et/netrad)  %>% 
+      mutate(eor = remove_outliers(eor, coef = 1.5))
     
     ## get linear fit with outliers
     linmod <- try(lm(eor ~ deficit, data = mct_alexi$df))
     if (class(linmod) != "try-error"){
-      idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
-      mct_alexi$df$eor[idx_drop] <- NA
+
+      ## test: is slope negative?
+      is_neg <- coef(linmod)["deficit"] < 0.0
       
-      ## git linear fit without outliers
-      linmod <- try(lm(eor ~ deficit, data = mct_alexi$df))
-      
-      if (class(linmod) != "try-error"){
-        ## test: is slope negative?
-        is_neg <- coef(linmod)["deficit"] < 0.0
-        
-        if (is_neg){
-          ## test: is slope significantly (5% level) different from zero (t-test)?
-          is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
-          if (is_sign){
-            ## get x-axis cutoff
-            eor0_alexi <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
-            df_fit <- tibble(y = predict(linmod, newdata = mct_alexi$df), x = mct_alexi$df$deficit)
-          } else {
-            eor0_alexi <- NA
-          }
+      if (is_neg){
+        ## test: is slope significantly (5% level) different from zero (t-test)?
+        is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+        if (is_sign){
+          ## get x-axis cutoff
+          eor0_alexi <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+          df_fit <- tibble(y = predict(linmod, newdata = mct_alexi$df), x = mct_alexi$df$deficit)
         } else {
-          is_sign <- FALSE
           eor0_alexi <- NA
         }
       } else {
         is_sign <- FALSE
         eor0_alexi <- NA
       }
+        
     } else {
       is_sign <- FALSE
       eor0_alexi <- NA
@@ -531,7 +507,8 @@ test_mct_bysite_alexi_fluxnet <- function(sitename, df_fluxnet, df_alexi, thresh
       ggplot(aes(x = deficit, y = eor)) +
       geom_point(alpha = 0.5) +
       labs(title = sitename, x = "Cumulative water deficit (mm)", y = "ET/Rn", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, Rn: FLUXNET") +
-      ylim(-0.1, 0.5)
+      geom_hline(yintercept = 0.0, linetype = "dotted")
+      # ylim(-0.1, 0.5)
     
     if (is_sign){
       out <- out +
