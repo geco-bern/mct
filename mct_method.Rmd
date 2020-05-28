@@ -111,9 +111,21 @@ ddf_fluxnet$data[[3]] %>%
  
 ### Get ALEXI/WATCH-WFDEI data
 
-Read ALEXI ET and WATCH-WFDEI data at FLUXNET sites, written by `rscript_get_data_fluxnetsites.R`.
+Read ALEXI ET and WATCH-WFDEI data at FLUXNET sites, written by `rscript_get_data_fluxnetsites.R`, and ad SiF data.
 ```{r}
 load("data/df_alexi.Rdata")
+load("data/df_sif.Rdata")
+
+df_alexi <- df_alexi %>% 
+  unnest(df) %>% 
+  left_join(dplyr::select(df_sif, idx, data) %>% 
+              unnest(data),
+            by = c("idx", "date")) %>% 
+  drop_na(date) %>% 
+  dplyr::select(-lon, -lat) %>% 
+  group_by(idx) %>%
+  nest() %>% 
+  rename(df = data)
 ```
 
 ### Plot water balance components
@@ -255,7 +267,7 @@ df_max_inst %>%
 
 This shows that GPP/PAR declines as the CWD increases during large CWD events. Let's retain only data from the largest $N$ events and plot GPP/PAR vs. CWD.
 
-For FLUXNET data:
+#### FLUXNET data
 ```{r}
 ## retain only data from largest instances of each year
 biginstances <- out_mct_fluxnet$inst %>% 
@@ -299,7 +311,7 @@ df %>%
   geom_line(data = df, aes(x = deficit, y = lue_fit), color = 'royalblue')
 ```
 
-For ALEXI data:
+#### ALEXI data
 ```{r}
 ## retain only data from largest instances of each year
 biginstances <- out_mct_alexi$inst %>% 
@@ -346,6 +358,60 @@ df %>%
   ggplot(aes(x = deficit, y = gpp/ppfd)) +
   geom_point(alpha = 0.5) +
   labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
+  geom_vline(xintercept = lue0, linetype = "dotted", color = "red") +
+  geom_vline(xintercept = lue0_exp, linetype = "dotted", color = "royalblue") +
+  geom_line(data = df_fit, aes(x, y), col = "red") +
+  geom_line(data = df, aes(x = deficit, y = lue_fit), color = 'royalblue')
+```
+
+#### ALEXI, SiF data
+
+```{r}
+## retain only data from largest instances of each year
+biginstances <- out_mct_alexi$inst %>% 
+  mutate(year = lubridate::year(date_start)) %>% 
+  group_by(year) %>% 
+  dplyr::filter(deficit == max(deficit)) %>% 
+  pull(iinst)
+
+## NEW: filter by dday, do not do the outlier thing
+df <- out_mct_alexi$df %>% 
+  dplyr::filter(!is.na(dday)) %>% 
+  mutate(lue = sif) %>% 
+  dplyr::filter(iinst %in% biginstances)
+
+## git linear fit without outliers
+linmod <- lm(lue ~ deficit, data = df)
+df_linmod <- linmod %>% 
+  broom::tidy()
+
+## test: is slope negative?
+coef_deficit <- df_linmod %>% 
+  dplyr::filter(term == "deficit") %>% 
+  pull(estimate)
+is_neg <- coef_deficit < 0.0
+
+## test: is slope significantly (5% level) different from zero (t-test)?
+pval_deficit <- df_linmod %>% 
+  dplyr::filter(term == "deficit") %>% 
+  pull(p.value)
+pval_deficit < 0.05
+
+## get x-axis cutoff
+lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+df_fit = data.frame(y = predict(linmod, newdata = df), x = df$deficit)
+
+## Fit exponential
+expmod <- nls(lue ~ lue0 * exp(k * deficit), data = df, start = list(lue0 = 0.1, k = 1/50))
+df$lue_fit <- predict(expmod, newdata = df)
+lue0_exp <- -1/coef(expmod)["k"]*2
+
+## plot
+df %>% 
+  dplyr::filter(iinst %in% biginstances) %>% 
+  ggplot(aes(x = deficit, y = lue)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "US-Ton", x = "Cumulative water deficit (mm)", y = "SiF", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, SiF: Duveiller et al.") +
   geom_vline(xintercept = lue0, linetype = "dotted", color = "red") +
   geom_vline(xintercept = lue0_exp, linetype = "dotted", color = "royalblue") +
   geom_line(data = df_fit, aes(x, y), col = "red") +
@@ -595,8 +661,8 @@ muG    <- evd$results$par[1]
 sigmaG <- evd$results$par[2]
 
 ## don't know which package these are coming from (e1071?)
-probplot(values=vals, model=evd, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
-#cprobplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
+SPREDA::probplot(values=vals, model=evd, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
+# cprobplot(values=vals, model=gumbi, varname="Deficit (mm)", alpha=1-0.95, dist="gumbel")
 
 QQplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
 PPplot(values=vals, mu=muG, sigma=sigmaG, dist="gumbel")
@@ -826,7 +892,7 @@ if (!file.exists(filn)){
      fittype = "Gumbel"
    )
   }
-  save(out, file = "data/out.Rdata")
+  save(out, file = "data/out_L2.Rdata")
 } else {
   load(filn)
 }
@@ -835,15 +901,61 @@ if (!file.exists(filn)){
 ```
 
 Some evaluations across all sites. This shows a good correlation between the CWD event size with a 20-year return period and the CWD magnitude at which LUE drops to zero. This may be indicative of plants sizing their rooting zone such as to withstand water deficits that occur, on average, more often than every ~20 years.
+
+### WHCXX vs. LUE0, ALEXI data:
 ```{r}
 ## user-defined return period
-df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>% 
-  purrr::map("df_return") %>% 
-  purrr::map(~dplyr::filter(., return_period==20) %>% pull(return_level)) %>% 
+df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>%
+  purrr::map("df_return") %>%
+  purrr::map(~dplyr::filter(., return_period==40) %>% pull(return_level)) %>%
   tibble(
     sitename = names(.), 
     mct = unlist(.),
     lue0 = purrr::map_dbl(out, "lue0_alexi")) %>% 
+  dplyr::select(sitename, mct, lue0)
+  
+df_corr_alexi %>%
+  # dplyr::filter(lue0 < 1000 & mct < 1000) %>%
+  rbeni::analyse_modobs2("lue0", "mct")
+
+## biggest outlier
+df_corr_alexi %>% 
+  mutate(diff = abs(lue0 - mct)) %>% 
+  arrange(-diff)
+```
+
+### WHCXX vs. EOR0, ALEXI data
+```{r}
+## user-defined return period
+df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>%
+  purrr::map("df_return") %>%
+  purrr::map(~dplyr::filter(., return_period==40) %>% pull(return_level)) %>%
+  tibble(
+    sitename = names(.), 
+    mct = unlist(.),
+    eor0 = purrr::map_dbl(out, "eor0_alexi")) %>% 
+  dplyr::select(sitename, mct, eor0)
+  
+df_corr_alexi %>%
+  # dplyr::filter(lue0 < 1000 & mct < 1000) %>%
+  rbeni::analyse_modobs2("eor0", "mct")
+
+## biggest outlier
+df_corr_alexi %>% 
+  mutate(diff = abs(lue0 - mct)) %>% 
+  arrange(-diff)
+```
+
+### WHCXX vs. SiF0, ALEXI data:
+```{r}
+## user-defined return period
+df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>%
+  purrr::map("df_return") %>%
+  purrr::map(~dplyr::filter(., return_period==40) %>% pull(return_level)) %>%
+  tibble(
+    sitename = names(.), 
+    mct = unlist(.),
+    lue0 = purrr::map_dbl(out, "sif0_alexi")) %>% 
   dplyr::select(sitename, mct, lue0)
   
 df_corr_alexi %>%
