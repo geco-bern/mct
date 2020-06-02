@@ -128,6 +128,25 @@ df_alexi <- df_alexi %>%
   rename(df = data)
 ```
 
+Problem: Many sites have no SiF data.
+```{r}
+count_sif <- function(df){
+  df %>% 
+    mutate(avl = !is.na(sif)) %>% 
+    summarise(navl = sum(avl)) %>% 
+    pull(navl)
+}
+sites_avl_sif <- df_sif %>% 
+  mutate(navl_sif = purrr::map_dbl(data, ~count_sif(.))) %>% 
+  dplyr::filter(navl_sif > 30) %>% 
+  pull(idx)
+
+sites_not_avl_sif <- df_alexi %>% 
+  dplyr::filter(!(idx %in% sites_avl_sif)) %>% 
+  pull(idx)
+sites_not_avl_sif
+```
+
 ### Plot water balance components
 
 ```{r}
