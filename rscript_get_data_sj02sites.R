@@ -28,6 +28,12 @@ df_grid <- siteinfo %>%
   dplyr::select(sitename, lon, lat, elv) %>% 
   dplyr::rename(idx = sitename)
 
+df_grid_unique <- df_grid %>%
+  dplyr::select(lon, lat) %>%
+  distinct() %>%
+  mutate(idx = 1:n()) %>%
+  mutate(idx = paste0("i", idx))
+
 ##------------------------------------------------------------------------
 ## Get data from global fields (WATCH-WFDEI and LandFlux)
 ##------------------------------------------------------------------------
@@ -173,7 +179,7 @@ filn_csv <- str_replace(filn, "Rdata", "csv")
 if (!file.exists(filn)){
   if (!file.exists(filn_csv)){
     df_sif <- get_data_mct_global(
-      df_grid,
+      df_grid_unique,
       dir_et   = "~/data/sif_tir/netcdf/", fil_et_pattern = "EDAY_CERES_",
       dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
       dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",

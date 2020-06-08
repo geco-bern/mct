@@ -18,7 +18,7 @@ source("R/align_events.R")
 siteinfo <- read_csv("~/data/FLUXNET-2015_Tier1/siteinfo_fluxnet2015_sofun+whc.csv") %>% 
   rename(sitename = mysitename) %>% 
   filter(!(classid %in% c("CRO", "WET"))) %>% 
-  filter(year_start<=2007) %>%    # xxx USE ONLY FOR LANDEVAL xxx
+  #filter(year_start<=2007) %>%    # xxx USE ONLY FOR LANDEVAL xxx
   mutate(date_start = lubridate::ymd(paste0(year_start, "-01-01"))) %>% 
   mutate(date_end = lubridate::ymd(paste0(year_end, "-12-31")))
 
