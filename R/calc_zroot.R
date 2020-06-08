@@ -1,4 +1,4 @@
-calc_zroot <- function(deficit, whc_t, whc_s, roots){
+calc_zroot <- function(deficit, whc_t, whc_s, roots = NA, imperm = NA){
   
   ## In whc_t and whc_s refer to plant available WHC in topsoil and subsoil.
   ## WHC is calculated based on HWSD data (https://daac.ornl.gov/SOILS/guides/HWSD.html).
@@ -17,18 +17,33 @@ calc_zroot <- function(deficit, whc_t, whc_s, roots){
   
   zroot <- zroot_t + zroot_s
   
-  if (roots == 1){
-    zroot <- min(zroot, 800)
-  } else if (roots == 2){
-    zroot <- min(zroot, 800)
-  } else if (roots == 3){
-    zroot <- min(zroot, 600)
-  } else if (roots == 4){
-    zroot <- min(zroot, 400)
-  } else if (roots == 5){
-    zroot <- min(zroot, 800)
-  } else if (roots == 6){
-    zroot <- min(zroot, 200)
+  ## limit if obstacles to roots are present (using hwsd documentation for codes)
+  if (!is.na(roots)){
+    if (roots == 2){
+      zroot <- min(zroot, 800)
+    } else if (roots == 3){
+      zroot <- min(zroot, 600)
+    } else if (roots == 4){
+      zroot <- min(zroot, 400)
+    } else if (roots == 5){
+      zroot <- min(zroot, 800)
+    } else if (roots == 6){
+      zroot <- min(zroot, 200)
+    }
+    # else if (roots == 1){
+    #   zroot <- min(zroot, 800)
+    # } 
+  }
+  
+  ## limit if impermeable layer is present (using hwsd documentation for codes)
+  if (!is.na(imperm)){
+    if (imperm==2){
+      zroot <- min(zroot, 1500)
+    } else if (imperm==3){
+      zroot <- min(zroot, 800)
+    }  else if (imperm==4){
+      zroot <- min(zroot, 400)
+    }
   }
   
   return(zroot)

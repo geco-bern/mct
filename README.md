@@ -1,5 +1,23 @@
 # mct
 
+## Approach
+
+- **Hypothesis 1**: Plants should be acclimated to the maximum cumulative water deficit with a return period of *N* years (CWD*N).
+- **Test data 1:** Reliability of ALEXI and WATCH-WFDEI for estimating CWD, data: FLUXNET. ALEXI captures ET during dry periods → Use this in combination with precipitation estimates to estimate the apparent rooting zone water storage capacity.
+- **Test H1:** CWD*N ~ zroot95, data: SJ02 → CWD*N governs maximum rooting depth variations across the globe (across biomes). Do a similar analysis with Shersingh's data.
+- **Global application 1:**
+    - Map of CWD*N and implied (estimated) rooting depth (accounting for soil texture).
+    - CWD'N ~ (aridity index **x** seasonality index) → largest rooting depth at intermediate aridity with pronounced seasonality.
+- **Challenge**: Rooting depth measurements are sparse. → Is there a way to "sense" rooting depth from above?
+- **Hypothesis 2:** CWD*N to which rooting depth is acclimated should also be reflected by the CWD at which LUE drops to zero. → Alternative approach to estimate CWD*N, and CWD*N determines sensitivity to drought.
+- **Test H2:** CWD'N ~ CWD_LUE0 (CWD at which LUE is zero), data: FLUXNET sites → Analyze correlation of CWD'N ~ CWD_LUE0.
+- **Test data 2**: Reliability of SiF data for estimating GPP, and SiF/PAR and ALEXI/WATCH-WFDEI -based CWD'N ~ CWD_LUE0 analysis.
+- **Global application 2:**
+    - Map of CWD_LUE0
+    - Same pattern across globe? biomes? (aridity index **x** seasonality index)-space?
+- (Hopefully) **conclusion**: Rooting depth is acclimated to the hydro-climate and determines the global distribution of drought impact thresholds on vegetation productivity.
+
+
 Steps of my analysis:
 
 ## Steps
@@ -60,8 +78,6 @@ Visualisation of global maps
 
 ## Method evaluation
 
-
-
 1. Get ET and precip data for FLUXNET sites and extract from global files (WATCH-WFDEI and LandFlux) at respective sites for comparison: `rscript_get_data_fluxnetsites.R`
 2. Evaluate ET during rain-free periods `rscript_eval_fluxnet2015.R`: Creating file `data/df_eval.csv` and with aligned data `data/df_alg__df_dday_aggbydday.Rdata`. This is used to evaluate whether ET products can accurately simulate ET during dry rain-free periods (i.e., whether bias w.r.t. EC measurements shows any relationship to the duration of rain-free periods).
 3. Apply MCT method to identify CWD events based on SEBS and precipitation from FLUXNET or WATCH (should yield a list of events for each site)
@@ -70,6 +86,7 @@ Visualisation of global maps
 **Old:**
 - `calibrate_ET.Rmd` replaces old `calib_mct_fluxnet2015.Rmd`
 - Run vignette 'splash_fluxnet2015.Rmd' in rsofun repo to prepare input files for FLUXNET 2015 simulations (for PET)
+>>>>>>> 1da34a5d0ceb62d52c33958539581f52233704e3
 - Run site-scale simulations (done on my laptop)
 - Analyse results using `eval_et.Rmd`
 

@@ -195,8 +195,9 @@ get_data_mct_chunk <- function(df, idx,
     ##-------------------------------------------------
     print("getting SiF from Duveiller et al. (GOME2-SiF-downscaled) ...")
     list_fil_sif <- list.files(dir_sif, pattern = fil_sif_pattern, recursive = FALSE)
-    df <- extract_points_filelist(df, list_fil_sif, varnam = "SIF", dirnam = dir_sif, fil_pattern = fil_sif_pattern, filetype = "sif")
-    
+    df <- extract_points_filelist(df, list_fil_sif, varnam = "SIF", dirnam = dir_sif, fil_pattern = fil_sif_pattern, filetype = "sif") %>% 
+      dplyr::rename(data0 = data) %>%
+      dplyr::mutate(data0 = purrr::map(data0, ~rename(., sif = V1)))
   }
   
   if (get_watch && get_landeval){
@@ -268,12 +269,6 @@ get_data_mct_chunk <- function(df, idx,
       dplyr::group_by(lon, lat, idx) %>% 
       tidyr::nest() %>% 
       dplyr::rename(df = data) %>% 
-      
-      # ## add elevation to the nested dataframes (repeating same value for each time step)
-      # nest(df_elv = elv) %>%
-      # dplyr::mutate(df_elv = purrr::map2(df_elv, df, ~row_rep(.x, nrow(.y)))) %>%
-      # dplyr::mutate(df     = purrr::map2(df, df_elv, ~bind_cols(.x, .y))) %>%
-      # dplyr::select(-df_elv) %>% 
       
       ## convert units: get ET in mm d-1
       ## total ET

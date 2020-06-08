@@ -15,24 +15,47 @@ source("R/extract_points_filelist.R")
 source("R/convert_et.R")
 source("R/align_events.R")
 
-siteinfo <- read_csv("~/data/FLUXNET-2015_Tier1/siteinfo_fluxnet2015_sofun+whc.csv") %>% 
-  rename(sitename = mysitename) %>% 
-  filter(!(classid %in% c("CRO", "WET"))) %>% 
-  #filter(year_start<=2007) %>%    # xxx USE ONLY FOR LANDEVAL xxx
-  mutate(date_start = lubridate::ymd(paste0(year_start, "-01-01"))) %>% 
-  mutate(date_end = lubridate::ymd(paste0(year_end, "-12-31")))
+##------------------------------------------------------------------------
+## Adjust site set by hand ("sj02" or "fluxnet")
+##------------------------------------------------------------------------
+siteset <- "sj02"
+
+##------------------------------------------------------------------------
+## get site meta info
+##------------------------------------------------------------------------
+if (siteset == "sj02"){
+
+  ## Get meta info of sites (lon, lat)
+  siteinfo <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
+    dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
+    dplyr::rename(sitename = ID, lat = Latitude, lon = Longitude) %>% 
+    dplyr::mutate(elv = ifelse(elv==-999, NA, elv)) %>% 
+    dplyr::filter(lon!=-999 & lat!=-999) %>% 
+    dplyr::mutate(year_start = 1982, year_end = 2011) %>% 
+    dplyr::select(sitename, lon, lat, elv, year_start, year_end)
+
+} else {
+
+  siteinfo <- read_csv("~/data/FLUXNET-2015_Tier1/siteinfo_fluxnet2015_sofun+whc.csv") %>% 
+    rename(sitename = mysitename) %>% 
+    filter(!(classid %in% c("CRO", "WET"))) %>% 
+    #filter(year_start<=2007) %>%    # xxx USE ONLY FOR LANDEVAL xxx
+    mutate(date_start = lubridate::ymd(paste0(year_start, "-01-01"))) %>% 
+    mutate(date_end = lubridate::ymd(paste0(year_end, "-12-31")))
+
+}
 
 df_grid <- siteinfo %>% 
   dplyr::select(sitename, lon, lat, elv) %>% 
   dplyr::rename(idx = sitename)
 
-# ##------------------------------------------------------------------------
-# ## Get data from global fields (WATCH-WFDEI and LandFlux)
-# ##------------------------------------------------------------------------
-# ## df_grid must contain columns lon, lat, elv, and idx
-# 
+##------------------------------------------------------------------------
+## Get data from global fields (WATCH-WFDEI and LandFlux)
+##------------------------------------------------------------------------
+## df_grid must contain columns lon, lat, elv, and idx
+
 # ## PT-JPL
-# filn <- "data/df_pt_jpl.Rdata"
+# filn <- paste0("data/df_pt_jpl_", siteset, ".Rdata")
 # filn_csv <- str_replace(filn, "Rdata", "csv")
 # if (!file.exists(filn)){
 #   if (!file.exists(filn_csv)){
@@ -60,12 +83,12 @@ df_grid <- siteinfo %>%
 #   load(filn)
 #   df_pt_jpl %>%
 #     tidyr::unnest(df) %>%
-#     write_csv(path = "data/df_pt_jpl.csv")
+#     write_csv(path = paste0("data/df_pt_jpl_", siteset, ".csv"))
 # }
-# 
-# 
+
+
 # ## PM
-# filn <- "data/df_pm_mod.Rdata"
+# filn <- paste0("data/df_pm_mod_", siteset, ".Rdata")
 # filn_csv <- str_replace(filn, "Rdata", "csv")
 # if (!file.exists(filn)){
 #   if (!file.exists(filn_csv)){
@@ -93,12 +116,12 @@ df_grid <- siteinfo %>%
 #   load(filn)
 #   df_pm_mod %>%
 #     tidyr::unnest(df) %>%
-#     write_csv(path = "data/df_pm_mod.csv")
+#     write_csv(path = paste0("data/df_pm_mod_", siteset, ".csv"))
 # }
-# 
-# 
+
+
 # ## SEBS
-# filn <- "data/df_sebs.Rdata"
+# filn <- paste0("data/df_sebs_", siteset, ".Rdata")
 # filn_csv <- str_replace(filn, "Rdata", "csv")
 # if (!file.exists(filn)){
 #   if (!file.exists(filn_csv)){
@@ -126,13 +149,13 @@ df_grid <- siteinfo %>%
 #   load(filn)
 #   df_sebs %>%
 #     tidyr::unnest(df) %>%
-#     write_csv(path = "data/df_sebs.csv")
+#     write_csv(path = paste0("data/df_sebs_", siteset, ".csv"))
 # }
-# 
+
 # ##------------------------------------------------------------------------
 # ## WATCH-WFDEI and ALEXI
 # ##------------------------------------------------------------------------
-# filn <- "data/df_alexi.Rdata"
+# filn <- paste0("data/df_alexi_", siteset, ".Rdata")
 # filn_csv <- str_replace(filn, "Rdata", "csv")
 # if (!file.exists(filn)){
 #   if (!file.exists(filn_csv)){
@@ -160,13 +183,13 @@ df_grid <- siteinfo %>%
 #   load(filn)
 #   df_alexi %>%
 #     tidyr::unnest(df) %>%
-#     write_csv(path = "data/df_alexi.csv")
+#     write_csv(path = paste0("data/df_alexi_", siteset, ".csv"))
 # }
 
 ##------------------------------------------------------------------------
 ## SiF-downscaled from Duveiller
 ##------------------------------------------------------------------------
-filn <- "data/df_sif.Rdata"
+filn <- paste0("data/df_sif_", siteset, ".Rdata")
 filn_csv <- str_replace(filn, "Rdata", "csv")
 if (!file.exists(filn)){
   if (!file.exists(filn_csv)){
@@ -179,13 +202,9 @@ if (!file.exists(filn)){
       dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_",
       get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
     )
-  # ## correct xxx  
-  # df_sif <- df_sif %>%     
-  #   dplyr::rename(data = data0) %>%
-  #   dplyr::mutate(data = purrr::map(data, ~rename(., sif = V1)))
     save(df_sif, file = filn)
     df_sif %>%
-      tidyr::unnest(data) %>%
+      tidyr::unnest(df) %>%
       write_csv(path = filn_csv)
   } else {
     df_sif <- read_csv(file = filn_csv) %>%
@@ -198,7 +217,7 @@ if (!file.exists(filn)){
   load(filn)
   df_sif %>%
     tidyr::unnest(df) %>%
-    write_csv(path = "data/df_sif.csv")
+    write_csv(path = paste0("data/df_sif_", siteset, ".csv"))
 }
 
 

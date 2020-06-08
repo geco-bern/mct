@@ -20,226 +20,396 @@ library(extRemes)
 library(R.utils)
 library(readr)
 library(ggplot2)
+library(ingestr)
 
-source("R/mct.R")
+source("R/mct2.R")
 source("R/get_plantwhc_mct_bysite.R")
 source("R/get_plantwhc_mct_simsuite.R")
 source("R/calc_soilparams.R")
 source("R/calc_zroot.R")
 source("R/extract_return_level.R")
+source("R/convert_et.R")
+source("R/ingest_wtd_fan.R")
+source("R/test_et_tseries.R")
+source("R/simulate_snow.R")
+source("R/add_biome_ncrs.R")
+#source("R/extract_pointdata_allsites.R")
+
 dir_climate <- "/Users/benjaminstocker/sofun/output_nc_global_sofun"
 dir_fapar <- "~/sofun/input_sj02zroot_sofun/sitedata/fapar/"
 ```
 
 
-## Prepare data
-Get meta info of sites (lon, lat)
+## Load data
+
+Load ALEXI-ET and WATCH-WFDEI precipitation data for each site. This is prepared by `rscript_get_data_sj02sites.R`. This loads an object called `df_alexi`.
 ```{r}
-df_sites <- read_csv("/alphadata01/bstocker/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
-  dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
-  dplyr::rename(sitename = ID, lat = Latitude, lon = Longitude) %>% 
-  dplyr::mutate(elv = ifelse(elv==-999, NA, elv)) %>% 
-  dplyr::filter(lon!=-999 & lat!=-999) %>% 
-  dplyr::mutate(year_start = 1982, year_end = 2011) %>% 
-  dplyr::select(sitename, lon, lat, elv, year_start, year_end)
+load("data/df_alexi_sj02.Rdata")
 ```
 
-Extract all the climate data (sofun output)
-```{r eval=FALSE}
-df <- tibble( year = 1982:2011 ) %>% 
-  rowwise() %>%
-  dplyr::mutate(filn_pet  = paste0( dir_climate, "/s1_fapar3g_v4_global.d.pet",  year, ".nc"),
-                filn_wbal = paste0( dir_climate, "/s1_fapar3g_v4_global.d.wbal", year, ".nc")) %>%
-  dplyr::mutate(data_pet  = purrr::map(filn_pet,  ~extract_pointdata_allsites(., df_sites, get_time = TRUE)),
-                data_wbal = purrr::map(filn_wbal, ~extract_pointdata_allsites(., df_sites, get_time = TRUE)))
+## Clean and complement data
+
+### Remove sites with missing ET
+
+Some ET data seems to be missing. Retain only sites with more than 3000 ET dates.
+```{r}
+n_avl_et <- function(df){
+  sum(!is.na(df$et))
+}
+
+df_alexi <- df_alexi %>% 
+  mutate(avl_et = purrr::map_int(df, ~n_avl_et(.))) 
+
+## where are they? They are along coasts. Ok, valid to remove them.
+plot_map_simpl() +
+  geom_point(
+    data = df_alexi %>% 
+      dplyr::filter(avl_et < 3000),
+    aes(lon, lat),
+    color = 'red')
+
+df_alexi <- df_alexi %>% 
+  dplyr::filter(avl_et > 3000)
 ```
 
-Re-arrange data to a flat table
-```{r eval=FALSE}
-ddf <- df %>% 
-  dplyr::select(-filn_pet, -filn_wbal) %>% 
-  tidyr::unnest(data_pet) %>% 
-  dplyr::select(-year_start, -year_end, -year) %>% 
-  tidyr::unnest(data) %>% 
-  dplyr::rename(pet = V1) %>% 
-  left_join(
-    df %>% 
-      dplyr::select(-filn_pet, -filn_wbal) %>% 
-      tidyr::unnest(data_wbal) %>% 
-      dplyr::select(-year_start, -year_end, -year) %>% 
-      tidyr::unnest(data) %>% 
-      dplyr::rename(water_to_soil = V1),
-    by = c("lon", "lat", "sitename", "elv", "date")
+More sites have missing data for colum `et_mm` but have data in column `et`. This is because elevation data was missing when downloading the data and conversion to mm failed.
+```{r}
+n_avl_et_mm <- function(df){
+  sum(!is.na(df$et_mm))
+}
+
+df_alexi <- df_alexi %>% 
+  mutate(avl_et_mm = purrr::map_int(df, ~n_avl_et_mm(.))) 
+
+df_alexi %>% 
+  dplyr::select(lon, lat, idx, avl_et, avl_et_mm) %>% 
+  dplyr::filter(avl_et_mm==0)
+```
+
+### Re-calculate ET in mm
+
+Read elevation data from ETOPO1 and complement missing ET data, converted to mm.
+
+#### Get ETOPO elevation data
+Ingest elevation data for sites from ETOPO1 where it's missing in the original data.
+```{r}
+df_etopo <- ingest(
+  df_alexi %>% 
+    dplyr::select(sitename = idx, lon, lat),
+  source = "etopo1",
+  dir = "~/data/etopo/"
   ) %>% 
-  dplyr::select(-lon, -lat, -elv)
-
+  tidyr::unnest(data) %>% 
+  rename(idx = sitename, elv_etopo = elv)
 ```
 
-Read all the fapar data (interpolated to daily)
-```{r eval=FALSE}
-myread_csv <- function(filn){
-  if (file.exists(filn)){
-    df <- read_csv(filn) %>% 
-      dplyr::select(date, fapar = modisvar_interpol )
-  } else {
-    df <- tibble(date = NA, fapar = NA)
-  }
-  return(df)
-}
-ddf <- df_sites %>% 
-  # slice(1:10) %>%
-  dplyr::mutate( filn = paste0( dir_fapar, "/", sitename, "dfapar_MODIS_FPAR_MCD15A3H_gee_MCD15A3H_", sitename, "_gee_subset.csv" ) ) %>% 
-  dplyr::mutate( data_fapar = purrr::map(filn, ~myread_csv(.)) ) %>% 
-  tidyr::unnest( data_fapar ) %>% 
-  tidyr::drop_na(fapar) %>% 
-  dplyr::select(sitename, date, fapar) %>% 
-  dplyr::right_join(ddf, by = c("sitename", "date"))
-```
-
-
-Set fapar to zero where pet is zero (arctic night?)
-```{r eval=FALSE}
-ddf <- ddf %>%
-  rowwise() %>% 
-  dplyr::mutate(fapar = ifelse(pet==0 & is.na(fapar), 0, fapar))
-
-# library(ggplot2)
-# ddf %>% 
-#   dplyr::filter(lubridate::year(date) %in% 2000:2005) %>% 
-#   ggplot(aes(x=date, y=wbal - fapar * pet)) +
-#   geom_line()
-
-```
-
-Add daytime VPD and calculate VPD-stress functions.
+Add ETOPO1 elevation to df_alexi and compare with data for which elevation is given.
 ```{r}
-f_vpd_oren01 <- function(q, D){
-  q/(q+a) * (b + m *ln(D))
-}
-f_vpd_bigleaf <- function(D){
-  g0 + 1.6 * (1 + g1/sqrt(D))
-}
-bigleaf::stomatal.sensitivity
+df_alexi <- df_alexi %>% 
+  tidyr::unnest(df) %>% 
+  dplyr::group_by(lon, lat, elv, idx) %>% 
+  tidyr::nest() %>% 
+  dplyr::rename(df = data) %>% 
+  left_join(
+    df_etopo,
+    by = "idx"
+  )
+df_alexi %>% 
+  analyse_modobs2("elv", "elv_etopo")  
+```
+
+Looks ok. Let's fill gaps with this, wrap it inside the data column and re-calculate ET conversion.
+
+#### Re-calculate conversion
+
+```{r}
+df_alexi_repaired <- df_alexi %>%
+  ungroup() %>% 
+  dplyr::select(-avl_et, -avl_et_mm) %>% 
+  dplyr::mutate(elv = ifelse(is.na(elv), elv_etopo, elv)) %>% 
+  dplyr::select(-elv_etopo) %>% 
+
+  ## add elevation to the nested dataframes (repeating same value for each time step)
+  tidyr::unnest(df) %>% 
+  dplyr::group_by(lon, lat, idx) %>% 
+  tidyr::nest() %>% 
+  dplyr::rename(df = data) %>% 
+  
+  ## convert units: get ET in mm d-1
+  ## total ET
+  dplyr::mutate(et_mm = purrr::map(df, ~convert_et(.$et, .$temp, .$elv))) %>% 
+  dplyr::mutate(et_mm = purrr::map(et_mm, ~tibble(et_mm = .))) %>% 
+  dplyr::mutate(df    = purrr::map(df, ~dplyr::rename(., et_mm_old = et_mm))) %>% 
+  dplyr::mutate(df    = purrr::map2(df, et_mm, ~bind_cols(.x, .y))) %>% 
+  dplyr::select(-et_mm) %>% 
+  dplyr::mutate(df    = purrr::map(df, ~drop_na(., date))) # Problem: The first row in `df_alexi$df` is always NA. This is a bug. Drop the row.
+
+save(df_alexi_repaired, file = "data/df_alexi_repaired_sj02.Rdata")
+```
+
+Check if all is correct for a site where elevation data was given already before and `et_mm` calculated and now re-calculated - should yield identical results.
+```{r}
+## one example
+df_alexi_repaired %>% dplyr::filter(idx == "BF03a") %>% pull(df)
+
+## data for a site where elevation was now recalculated
+df1 <- df_alexi %>% 
+  dplyr::filter(idx == "AC01a") %>% 
+  unnest(df)
+df2 <- df_alexi_repaired %>% 
+  dplyr::filter(idx == "AC01a") %>% 
+  unnest(df)
+
+## ok!
+df1 %>%
+  ungroup() %>% 
+  dplyr::select(idx, date, et_mm_orig = et_mm) %>% 
+  left_join(
+    df2 %>% 
+      ungroup() %>% 
+      dplyr::select(idx, date, et_mm_repaired = et_mm),
+    by = c("idx", "date")
+  ) %>% 
+  ggplot() +
+  geom_point(aes(x = et_mm_orig, y = et_mm_repaired))
+```
+
+Count missing data again.
+```{r}
+df_alexi_repaired <- df_alexi_repaired %>% 
+  mutate(avl_et_mm = purrr::map_int(df, ~n_avl_et_mm(.))) %>% 
+  mutate(avl_et = purrr::map_int(df, ~n_avl_et(.))) 
+
+df_alexi_repaired %>% 
+  dplyr::select(lon, lat, idx, avl_et, avl_et_mm) %>% 
+  dplyr::filter(avl_et_mm==0)
+```
+Ok. Done.
+
+Plot an example ET time series.
+```{r}
+df_gg_et <- df_alexi_repaired %>% 
+  ungroup() %>% 
+  mutate(gg = purrr::map(df, ~test_et_tseries(.))) %>% 
+  dplyr::select(idx, lon, lat, gg)
+
+gg <- df_gg_et %>% 
+  dplyr::filter(idx == "TD10c") %>% 
+  pull(gg)
+gg
 ```
 
 
-Calculate wbal and nest data frames per site
-```{r eval=FALSE}
-ddf <- ddf %>% 
-  dplyr::mutate(wbal = water_to_soil - fapar * pet) %>% 
-  tidyr::drop_na(wbal) %>% 
-  group_by(sitename) %>% 
-  tidyr::nest() 
+Some sites have exact same locations. Number of rows could be halved if only distinct lon and lat were used:
+```{r}
+df_alexi_repaired %>% 
+  ungroup() %>% 
+  dplyr::select(idx, lon, lat) %>% 
+  distinct() %>% 
+  dim()
+df_alexi_repaired %>% 
+  ungroup() %>% 
+  dplyr::select(lon, lat) %>% 
+  distinct() %>% 
+  dim()
 ```
 
-Remove sites where not the full time series is available
-```{r eval=FALSE}
-ddf <- ddf %>%
-  dplyr::mutate(len = purrr::map_int(data, ~nrow(.))) %>% 
-  dplyr::filter(len == 10948)
+Do some otherwise identical sites differ by elevation? Yes. Some do. -> Might be necessary to use higer resolution precipitation data...
+```{r}
+df_alexi_repaired %>% 
+  dplyr::select(lon, lat, idx, df) %>% 
+  ungroup() %>% 
+  unnest(df) %>% 
+  dplyr::select(idx, lon, lat, elv) %>% 
+  dplyr::group_by(idx, lon, lat, elv) %>% 
+  nest() %>% 
+  dplyr::select(idx, lon, lat, elv) %>% 
+  distinct() %>% 
+  dim()
+
+df_unique_lon_lat_evl <- df_alexi_repaired %>% 
+  dplyr::select(lon, lat, idx, df) %>% 
+  ungroup() %>% 
+  unnest(df) %>% 
+  dplyr::select(lon, lat, elv) %>% 
+  dplyr::group_by(lon, lat, elv) %>% 
+  nest() %>% 
+  dplyr::select(lon, lat, elv) %>% 
+  distinct()
+df_unique_lon_lat_evl %>% 
+  dim()
+```
+
+Identify duplicated rows (that have identical lon, lat, and elv).
+```{r}
+df_alexi_repaired <- df_alexi_repaired %>% 
+  ungroup() %>% 
+  dplyr::select(lon, lat) %>% 
+  mutate(dupl = duplicated(.)) %>% 
+  dplyr::select(dupl) %>% 
+  bind_cols(
+    df_alexi_repaired,
+    .
+  )
+```
+
+Look at some duplicated rows (that have identical lon, lat, and elv): Data should be identical. Yes, for this one it is (didn't check other duplicates).
+```{r}
+df1 <- df_alexi_repaired %>% 
+  dplyr::filter(idx=="AC01b") %>% 
+  pull(df)
+df2 <- df_alexi_repaired %>% 
+  dplyr::filter(idx=="AC01c") %>% 
+  pull(df)
+all.equal(df1, df2)
+```
+
+## Simulate snow water storage and melt
+
+Test it for one site in the high north.
+```{r}
+df_test <- df_alexi_repaired %>% 
+  arrange(desc(lat)) %>% 
+  dplyr::filter(idx == "AC01a") %>%
+  mutate(df = purrr::map(df, ~slice(., -1))) %>% 
+  mutate(df = purrr::map(df, ~simulate_snow(.)))
+
+plot_map_simpl() +
+  geom_point(data = df_test, aes(lon, lat), color = 'red')
+  
+## water balance test:
+df_test$df[[1]] %>% 
+  summarise(prec_snow = sum(prec + snow), lts = sum(liquid_to_soil)) %>% 
+  mutate(lts = lts + tail(df_test$df[[1]]$snow_pool, 1) - + head(df_test$df[[1]]$snow_pool, 1))
+
+df_test$df[[1]] %>% 
+  # dplyr::filter(lubridate::year(date) == 2005) %>% 
+  ggplot() + 
+  geom_line(aes(date, snow_pool), col = "royalblue") +
+  geom_line(aes(date, liquid_to_soil), col = "springgreen4") +
+  geom_line(aes(date, prec), col = "tomato")
+```
+
+Apply snow model at all sites.
+```{r}
+df_alexi_repaired <- df_alexi_repaired %>%
+  mutate(df = purrr::map(df, ~slice(., -1))) %>% 
+  mutate(df = purrr::map(df, ~simulate_snow(.)))
+
+save(df_alexi_repaired, file = "data/df_alexi_repaired_sj02.RData")
 ```
 
 
 ## Apply the MCT function
 
-Apply the MCT function in different configurations to get plant-adjusted WHC across the rooting zone WCH$^\ast$.
-```{r eval=FALSE}
-ddf <- ddf %>% 
-  dplyr::mutate( out_mct_50 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.5)) ) %>%
-  dplyr::mutate( out_mct_75 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.25)) ) %>% 
-  dplyr::mutate( out_mct_90 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.1)) ) %>% 
-  dplyr::mutate( out_mct_95 = purrr::map(data, ~get_plantwhc_mct_bysite(., varname_wbal = "wbal", thresh_deficit = 0.05)) )
+Calculate the daily water balance and apply the MCT function to get CWD events in different configurations.
+```{r}
+get_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
+  
+  ## linearly interpolate ET
+  df[[varnam_et]] <- myapprox(df[[varnam_et]])
+    
+  ## re-calculate daily water balance
+  df[[varnam_bal]] <- df[[varnam_prec]] - df[[varnam_et]]
+
+  ## remove NAs at head and tail
+  df <- rbeni::cutna_headtail_df(df, varnam_bal)
+  
+  return(df)
+}
+
+avl_et <- function(df, varnam_et){
+  any(!is.na(df[varnam_et]))
+}
+
+df_mct_sj02_alexi <- df_alexi_repaired %>%
+  dplyr::mutate( avl_et = purrr::map_lgl(df, ~avl_et(., varnam_et = "et_mm"))) %>%
+  dplyr::filter( avl_et ) %>% 
+  dplyr::mutate( df = purrr::map(df, ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))) %>% 
+  dplyr::mutate(
+    out_mct_00_80 = purrr::map(
+      df,
+      ~get_plantwhc_mct_bysite(
+        .,
+        varname_wbal = "bal",
+        thresh_terminate = 0.0,
+        thresh_drop = 0.8,
+        fittype = "Gumbel"))
+    )
+  
+save(df_mct_sj02_alexi, file = "data/df_mct_sj02_alexi.RData")
 ```
 
-Write to file
-```{r eval=FALSE}
-save(ddf, file = "data/ddf_mct_simsuite.Rdata")
+### Test output
+
+Look at cumulative water deficit time series. Weird: at some sites ET is very small and doesn't change over time.
+```{r}
+## plot CWD time series for sites with zero SD in ET
+df_test_mct_gg <- df_test %>% 
+  mutate(mct = purrr::map(out_mct_00_80, "mct")) %>% 
+  mutate(gg_cwd_tseries = purrr::map(mct, ~try(test_cwd_tseries(.))))
+
+df_test_mct_gg$gg_cwd_tseries[[1]]
 ```
+
+
+### Overview of WHC*
 
 The following figure shows the distribution of WHC* values:
 ```{r}
-load("data/ddf_mct_simsuite.Rdata")
-ddf %>% 
-  dplyr::select(sitename, out_mct_95) %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_95, ~extract_return_level(., 10))) %>% 
-  ggplot(aes(x = whc_mct, y = ..count..)) +
+# load("data/ddf_mct_simsuite.Rdata") xxx ??? don't know what this is for
+df_mct_sj02_alexi %>% 
+  dplyr::select(idx, out_mct_00_80) %>% 
+  dplyr::mutate(whc20 = purrr::map_dbl(out_mct_00_80, ~extract_return_level(., 20))) %>% 
+  ggplot(aes(x = whc20, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
-  labs(title = "Plant rooting zone WHC*", subtitle = "10 y return period, 95% reduction of D", x = "WHC* (mm)")
+  labs(title = "Plant rooting zone WHC*", subtitle = "10 y return period, 80% reduction of CWD", x = "WHC* (mm)")
 ```
-
 
 
 ## Extract soil texture information
 
-Extract soil information from hi-res HWSD raster files (ideally should extract from shapefiles).
+Using the very nice ingestr package.
 ```{r}
-source("R/extract_pointdata_allsites.R")
-vars <- c("ROOTS", "T_SAND", "T_OC", "T_GRAVEL", "T_CLAY", "S_SAND", "S_OC", "S_GRAVEL", "S_CLAY")
-df_lonlat <- df_sites %>% 
-  distinct(lon, lat, .keep_all = TRUE) %>% 
-  dplyr::select(lon, lat) %>% 
-  dplyr::mutate(id = 1:n())
-  
-# extract by file
-df_hwsd <- tibble( vars = vars ) %>% 
-  dplyr::mutate(filn = paste0("~/data/soil/hwsd/hwsd_wieder/data/", vars, ".nc4")) %>% 
-  dplyr::mutate(data = purrr::map(filn, ~extract_pointdata_allsites(., df_lonlat, get_time = FALSE)))
-
-# re-arrange data
-df_sites <- df_hwsd %>% 
-  tidyr::unnest(data) %>% 
-  dplyr::mutate(data = purrr::map_dbl(data, ~unlist(.))) %>% 
-  dplyr::select(-filn, -lon, -lat) %>% 
-  tidyr::spread(vars, data) %>% 
-  dplyr::right_join(df_lonlat, by = "id") %>% 
-  dplyr::right_join(df_sites, by = c("lon", "lat"))
+filn <- "data/df_hwsd_sj02.RData"
+if (!file.exists(filn)){
+  df_hwsd <- ingest(
+    dplyr::select(ungroup(df_mct_sj02_alexi), sitename = idx, lon, lat),
+    source = "hwsd",
+    settings = list(fil = "~/data/hwsd/HWSD_RASTER/hwsd.bil")
+    )
+  save(df_hwsd, file = filn)
+} else {
+  load(filn)
+}
 ```
 
 Calculate FC, PWP, and WHC from texture data.
 ```{r}
-# top-soil
-df_sites_topsoil <- df_sites %>%
-  dplyr::select(sitename, roots = ROOTS, fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND) %>% 
-  dplyr::mutate(fclay   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fclay),
-                fgravel = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fgravel),
-                forg    = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, forg),
-                fsand   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fsand)) %>% 
-  calc_soilparams(method = "balland")
-
-df_sites_topsoil_mean <- df_sites_topsoil %>% 
-  dplyr::select(roots, whc) %>% 
-  dplyr::group_by() %>% 
-  dplyr::summarise_all(list( ~mean(., na.rm=TRUE)))
-
-df_sites_topsoil <- df_sites_topsoil %>% 
-  dplyr::mutate( whc = ifelse(is.na(whc), df_sites_topsoil_mean$whc, whc))
-
-# sub-soil
-df_sites_subsoil <- df_sites %>%
-  dplyr::select(sitename, roots = ROOTS, fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND) %>% 
-  dplyr::mutate(fclay   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fclay),
-                fgravel = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fgravel),
-                forg    = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, forg),
-                fsand   = ifelse(fclay==0 & fgravel ==0 & fsand ==0, NA, fsand)) %>% 
-  calc_soilparams(method = "balland")
-
-df_sites_subsoil_mean <- df_sites_subsoil %>% 
-  dplyr::select(roots, whc) %>% 
-  dplyr::group_by() %>% 
-  dplyr::summarise_all(list( ~mean(., na.rm=TRUE)))
-
-df_sites_subsoil <- df_sites_subsoil %>% 
-  dplyr::mutate( whc = ifelse(is.na(whc), df_sites_subsoil_mean$whc, whc))
+## re-organise soil texture data into columns for each site (row)
+df_whc <- df_hwsd %>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  mutate(
+    data_topsoil = purrr::map(data, ~dplyr::select(
+      ., fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND, roots = ROOTS, imperm = IL)),
+    data_subsoil = purrr::map(data, ~dplyr::select(
+      ., fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND, roots = ROOTS, imperm = IL))
+    ) %>% 
+  dplyr::select(-data) %>% 
+  mutate(data_topsoil = purrr::map(data_topsoil, ~calc_soilparams(., method = "balland")),
+         data_subsoil = purrr::map(data_subsoil, ~calc_soilparams(., method = "balland")))
 ```
 
 Plot the distribution of values.
 ```{r}
-df_sites_topsoil %>% 
+df_whc %>% 
+  unnest(data_topsoil) %>% 
   ggplot(aes(x = whc, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Top soil WHC", subtitle = " based on HWSD soil texture data", x = "WHC (m3/m3)")
 
-df_sites_subsoil %>% 
+df_whc %>% 
+  unnest(data_subsoil) %>% 
   ggplot(aes(x = whc, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Sub soil WHC", subtitle = " based on HWSD soil texture data", x = "WHC (m3/m3)")
@@ -248,34 +418,33 @@ df_sites_subsoil %>%
 ## Calculate rooting depth.
 
 ```{r}
-ddf_20y_90t <- ddf %>%
-  dplyr::left_join(dplyr::select(df_sites_subsoil, sitename, whc_s = whc, roots), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(df_sites_topsoil, sitename, whc_t = whc), by = "sitename") %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_90, ~extract_return_level(., 20))) %>%
-  dplyr::select(sitename, whc_mct, whc_t, whc_s, roots) %>% 
+## use CWD10 for zroot, no root obstacles accounted for now
+df_zroot <- df_mct_sj02_alexi %>%
+  ungroup() %>% 
+  dplyr::select(sitename = idx, out_mct_00_80) %>% 
+  dplyr::mutate(whcXX = purrr::map_dbl(out_mct_00_80, ~extract_return_level(., 20))) %>% 
+  dplyr::select(sitename, whcXX) %>% 
+  left_join(
+    df_whc %>% 
+      unnest(data_subsoil) %>%
+      dplyr::select(sitename, whc_s = whc),
+    by = "sitename"
+  ) %>% 
+  left_join(
+    df_whc %>% 
+      unnest(data_topsoil) %>%
+      dplyr::select(sitename, whc_t = whc, roots, imperm),
+    by = "sitename"
+  ) %>% 
   rowwise() %>% 
-  dplyr::mutate(zroot = calc_zroot(whc_mct, whc_t, whc_s, roots))
+  dplyr::mutate(zroot = calc_zroot(whcXX, whc_t, whc_s, roots, imperm))
 
-ddf_10y_95t <- ddf %>%
-  dplyr::left_join(dplyr::select(df_sites_subsoil, sitename, whc_s = whc, roots), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(df_sites_topsoil, sitename, whc_t = whc), by = "sitename") %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_95, ~extract_return_level(., 10))) %>%
-  dplyr::select(sitename, whc_mct, whc_t, whc_s, roots) %>% 
-  rowwise() %>% 
-  dplyr::mutate(zroot = calc_zroot(whc_mct, whc_t, whc_s, roots))
-
-ddf_05y_95t <- ddf %>%
-  dplyr::left_join(dplyr::select(df_sites_subsoil, sitename, whc_s = whc, roots), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(df_sites_topsoil, sitename, whc_t = whc), by = "sitename") %>% 
-  dplyr::mutate(whc_mct = purrr::map_dbl(out_mct_95, ~extract_return_level(., 5))) %>%
-  dplyr::select(sitename, whc_mct, whc_t, whc_s, roots) %>% 
-  rowwise() %>% 
-  dplyr::mutate(zroot = calc_zroot(whc_mct, whc_t, whc_s, roots))
+save(df_zroot, file = "data/df_zroot_sj02.RData")
 ```
 
 The following figure shows the distribution of zroot* values:
 ```{r}
-ddf_05y_95t %>% 
+df_zroot %>% 
   ggplot(aes(x = zroot, y = ..count..)) +
   geom_histogram(color = "black", alpha = 0.3, position="identity") +
   labs(title = "Plant rooting depth", subtitle = "10 y return period, 95% reduction of D", x = "zroot* (mm)")
@@ -285,56 +454,51 @@ ddf_05y_95t %>%
 
 Combine data frames.
 ```{r}
-df_modobs <- read_csv("/alphadata01/bstocker/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
+df_modobs <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
   dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
   dplyr::rename(sitename = ID) %>% 
-  dplyr::left_join(dplyr::select(ddf_05y_95t, zroot_05y_95t = zroot, sitename), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(ddf_10y_95t, zroot_10y_95t = zroot, sitename), by = "sitename") %>% 
-  dplyr::left_join(dplyr::select(ddf_20y_90t, zroot_20y_90t = zroot, sitename), by = "sitename") %>% 
+  dplyr::left_join(dplyr::select(df_zroot, zroot, sitename), by = "sitename") %>% 
   dplyr::mutate(D50 = 1000 * D50, D95 = 1000 * D95, D50_extrapolated = 1000 * D50_extrapolated, D95_extrapolated = 1000 * D95_extrapolated)
+
+save(df_modobs, file = "data/df_modobs_sj02.RData")
 ```
 
 ### Distribution of values
 ```{r}
 df_modobs %>% 
-  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_05y_95t) %>% 
-  tidyr::gather(key = "source", value = "zroot", c(mod, obs)) %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
   ggplot() +
   geom_histogram(
     aes(x = zroot, y = ..count.., fill = source), 
     color = "black", alpha = 0.3, position="identity") +
   scale_fill_manual(name = "", values = c("black", "red")) +
   labs(title = "Distribution of rooting depth (mm), v3", x = "Rooting depth (mm)")
+
 ggsave("fig/hist_zroot_modobs.pdf", height = 4, width = 6)
 ```
 
 ### Comparison by vegetation type.
 ```{r}
 df_modobs %>% 
-  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_05y_95t) %>% 
-  tidyr::gather(key = "source", value = "zroot", c(mod, obs)) %>% 
-  # dplyr::filter(source == "obs") %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
   ggplot() +
   geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
   theme(axis.text.x = element_text(angle=90, hjust=1)) +
-  labs(title = "Observed and modelled by vegetation type", subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", y = "Rooting depth (mm)")
-ggsave("fig/modobs_boxplot_zroot_95_5y.pdf", width = 9, height = 6)
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
 
-df_modobs %>% 
-  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_20y_90t) %>% 
-  tidyr::gather(key = "source", value = "zroot", c(mod, obs)) %>% 
-  # dplyr::filter(source == "obs") %>% 
-  ggplot() +
-  geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
-  theme(axis.text.x = element_text(angle=90, hjust=1)) +
-  labs(title = "Observed and modelled by vegetation type", subtitle = "Obs.: 95% quantile  Mod.: 20-yr return period, 10% deficit reduction threshold", y = "Rooting depth (mm)")
+ggsave("fig/modobs_boxplot_zroot.pdf", width = 9, height = 6)
 ```
 
 ### Comparison site by site.
 ```{r}
 out <- df_modobs %>% 
-  analyse_modobs2(
-    mod = "zroot_05y_95t", 
+  rbeni::analyse_modobs2(
+    mod = "zroot", 
     obs = "D95_extrapolated"
     )
 out$gg +  
@@ -343,4 +507,295 @@ out$gg +
     x = "Modelled rooting depth (mm)", 
     y = "Observed rooting depth (mm)"
     )
+```
+
+## Check if water table depth is a useful constrait
+
+```{r}
+df_modobs <- df_alexi_repaired %>% 
+  dplyr::select(idx, lon, lat) %>% 
+  ingest_wtd_fan() %>% 
+  rename(sitename = idx, wtd_fan13 = wtd) %>% 
+  mutate(wtd_fan13 = wtd_fan13 * 1000) %>% 
+  right_join(
+    df_modobs,
+    by = "sitename"
+  ) %>% 
+  mutate(wtd_fan13 = ifelse(is.na(wtd_fan13), 99999, wtd_fan13)) %>% 
+  mutate(zroot_wtd = ifelse(zroot > wtd_fan13, wtd_fan13, zroot))
+
+save(df_modobs, file = "data/df_modobs_sj02.RData")
+```
+
+Updated histogram by vegetation type
+```{r}
+## may check here: https://community.rstudio.com/t/how-to-reorder-boxplot-by-only-one-level-of-a-variable/37775
+df_modobs %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  # mutate(Vegetation = forcats::fct_reorder(Vegetation, obs, .fun = 'median')) %>%
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>%
+  ggplot() +
+  # geom_boxplot(aes(x = reorder(Vegetation, zroot), y = -zroot, fill = source)) +
+  geom_boxplot(aes(x = Vegetation, y = -zroot, fill = source)) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
+
+ggsave("fig/modobs_boxplot_zroot_wtd.pdf", width = 9, height = 6)
+```
+
+Updated mod. vs. obs.
+```{r}
+out <- df_modobs %>% 
+  rbeni::analyse_modobs2(
+    mod = "zroot_wtd", 
+    obs = "D95_extrapolated"
+    )
+out$gg +  
+  labs(
+    title = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    x = "Modelled rooting depth (mm)", 
+    y = "Observed rooting depth (mm)"
+    )
+```
+
+Ridges.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, Vegetation, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+
+  ggplot(aes(x = zroot, y = Vegetation, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_sj02.pdf", width = 15, height = 10)
+```
+
+
+
+## Focus on model-data mismatch
+
+There seem to be many sites with an observed rooting depth < 2500 mm where modelled values are way too low.
+```{r}
+df_wrongsites <- df_modobs %>% 
+  mutate(relbias = zroot/D95_extrapolated) %>% 
+  dplyr::filter(relbias < 0.5)
+out$gg +
+  geom_point(data = df_wrongsites, aes(x = zroot, y = D95_extrapolated), color = 'red')
+```
+
+Where are they located?
+```{r}
+library(rbeni)
+plot_map_simpl() +
+  geom_point(data = df_wrongsites, aes(x = lon, y = lat), color = 'red')
+```
+
+Look at cumulative water deficit time series. Weird: at some sites ET is very small and doesn't change over time.
+```{r}
+df_test_gg <- df_mct_sj02_alexi %>% 
+  dplyr::filter(idx %in% df_wrongsites$sitename) %>% 
+  mutate(mct = purrr::map(out_mct_00_80, "mct")) %>% 
+  mutate(gg_cwd_tseries = purrr::map(mct, ~test_cwd_tseries(., filter_years = c(2010))))
+
+df_test_gg %>% 
+  dplyr::filter(idx == "TD10c") %>% 
+  pull(gg_cwd_tseries)
+```
+
+Identidfy weird sites (where ET is constant)
+```{r}
+df_test_sj02 <- df_mct_sj02_alexi %>% 
+  dplyr::select(-avl_et, -avl_et_mm) %>% 
+  dplyr::filter(idx %in% df_wrongsites$sitename) %>% 
+  mutate(mct = purrr::map(out_mct_00_80, "mct")) %>% 
+  mutate(mct_df = purrr::map(mct, "df")) %>% 
+  tidyr::unnest(mct_df) %>% 
+  group_by(idx, lon, lat) %>% 
+  summarise(sd_et = sd(et_mm), mean_et = mean(et_mm))
+
+## problematic sites with zero SD:
+df_zeroSD <- df_test_sj02 %>% 
+  dplyr::filter(sd_et == 0)
+
+shitsites <- df_zeroSD %>% pull(idx)
+
+plot_map_simpl() +
+  geom_point(data = df_zeroSD, aes(lon, lat), col = 'red')
+```
+
+## Alternative biome classification
+
+### WWF Ecoregions
+
+Try an alternative biome classification based on the WWF Ecoregions (implemented in ingestr). Ingest data into separate dataframe.
+```{r}
+df_wwf <- ingest(
+  dplyr::select(df_modobs, sitename, lon, lat),
+  source = "wwf",
+  dir = "~/data/biomes/wwf_ecoregions/official/",
+  settings = list(layer = "wwf_terr_ecos")
+)
+save(df_wwf, file = "./data/df_wwf_sj02.RData")
+```
+
+Combine dataframes.
+```{r}
+df_modobs <- df_wwf %>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  unnest(data) %>% 
+  dplyr::select(sitename, BIOME, biome_wwf = BIOME_NAME, ECO_NAME, ECO_NUM) %>% 
+  right_join(df_modobs, by = "sitename")
+```
+
+Plot.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  ggplot() +
+  geom_boxplot(aes(x = biome_wwf, y = -zroot, fill = source)) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
+
+ggsave("fig/modobs_boxplot_zroot_biome_wwf.pdf", width = 9, height = 10)
+```
+
+Ridges.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+
+  ggplot(aes(x = zroot, y = biome_wwf, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_wwf.pdf", width = 15, height = 10)
+```
+
+
+### NCRS Biomes
+
+```{r}
+df_ncrs <- add_biome_ncrs(
+  dplyr::select(df_modobs, sitename, lon, lat), 
+  path = "~/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
+  )
+```
+
+Combine dataframes.
+```{r}
+df_modobs <- df_ncrs %>% 
+  dplyr::select(sitename, biome_ncrs, biome_ncrs_name = biome_ncrs_chr) %>% 
+  right_join(df_modobs, by = "sitename")
+```
+
+Boxplot.
+```{r}
+df_modobs %>% 
+  dplyr::select(sitename, biome_ncrs_name, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  ggplot() +
+  geom_boxplot(aes(x = biome_ncrs_name, y = -zroot, fill = source)) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  labs(
+    title = "Observed and modelled by vegetation type", 
+    subtitle = "Obs.: 95% quantile  Mod.: 5-yr return period, 5% deficit reduction threshold", 
+    y = "Rooting depth (mm)")
+
+ggsave("fig/modobs_boxplot_zroot_biome_ncrs.pdf", width = 9, height = 6)
+```
+
+Ridges.
+```{r}
+library(ggridges)
+df_modobs %>% 
+  dplyr::select(sitename, biome_ncrs_name, obs = D95_extrapolated, mod = zroot_wtd) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_ncrs_name)) %>% 
+  
+  ggplot(aes(x = zroot, y = biome_ncrs_name, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by NCRS biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+  
+ggsave("fig/modobs_ridges_zroot_biome_ncrs.pdf", width = 9, height = 6)
+```
+
+Quantile regression
+```{r}
+out <- df_modobs %>% 
+  group_by(Vegetation) %>% 
+  summarise(obs = median(D95_extrapolated, na.rm = TRUE), mod = median(zroot_wtd, na.rm = TRUE)) %>% 
+  analyse_modobs2("mod", "obs")
+out$gg
+
+out <- df_modobs %>% 
+  group_by(biome_ncrs_name) %>% 
+  summarise(obs = median(D95_extrapolated, na.rm = TRUE), mod = median(zroot_wtd, na.rm = TRUE)) %>% 
+  analyse_modobs2("mod", "obs")
+out$gg
+
+out <- df_modobs %>% 
+  group_by(biome_wwf) %>% 
+  summarise(obs = median(D95_extrapolated, na.rm = TRUE), mod = median(zroot_wtd, na.rm = TRUE)) %>% 
+  analyse_modobs2("mod", "obs")
+out$gg
 ```

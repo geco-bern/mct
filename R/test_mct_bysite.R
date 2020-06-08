@@ -1,250 +1,292 @@
-test_mct_bysite <- function(sitename, df_fluxnet, df_alexi, thresh_terminate = 0.2, thresh_drop = 0.8, use_return_period = 10){
+test_mct_bysite <- function(sitename, df, thresh_terminate = 0.2, thresh_drop = 0.8, use_return_period = 10, fittype = NULL, dir = "."){
   
   print(sitename)
+
+  if (!dir.exists(paste0(dir, "/cwd"))) system(paste0("mkdir -p ", dir, "/cwd"))
+  if (!dir.exists(paste0(dir, "/lue_cwd"))) system(paste0("mkdir -p ", dir, "/lue_cwd"))
+  if (!dir.exists(paste0(dir, "/hist"))) system(paste0("mkdir -p ", dir, "/hist"))
+  if (!dir.exists(paste0(dir, "/prec"))) system(paste0("mkdir -p ", dir, "/prec"))
+  if (!dir.exists(paste0(dir, "/modobs_prec"))) system(paste0("mkdir -p ", dir, "/modobs_prec"))
+  if (!dir.exists(paste0(dir, "/modobs_et"))) system(paste0("mkdir -p ", dir, "/modobs_et"))
+  if (!dir.exists(paste0(dir, "/et"))) system(paste0("mkdir -p ", dir, "/et"))
   
+  ##------------------------------------------
   ## calculate daily water balance
-  df_fluxnet <- df_fluxnet %>% 
-    unnest(data) %>% 
-    mutate(latenth_mm = ifelse(is.na(latenth_mm), 0, latenth_mm)) %>% 
-    mutate(bal = prec - latenth_mm) %>% 
-    mutate(bal = myapprox(bal))
-  
-  df_alexi <- df_alexi %>% 
+  ##------------------------------------------
+  df <- df %>% 
     unnest(df) %>% 
     mutate(et_mm = ifelse(is.na(et_mm), 0, et_mm)) %>% 
     mutate(bal = prec - et_mm) %>% 
     mutate(bal = myapprox(bal)) %>% 
-    drop_na(bal) %>% 
-    ## merge FLUXNET GPP and PPFD data into the alexi data frame
-    left_join(
-      df_example_fluxnet %>% 
-        ungroup() %>% 
-        dplyr::select(date, gpp, ppfd),
-      by = "date"
-    )
+    drop_na(bal)
   
+  ##------------------------------------------
   ## apply mct function
-  mct_fluxnet <- mct(df_fluxnet, varname_wbal = "bal", thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
-  mct_alexi   <- mct(df_alexi,   varname_wbal = "bal", thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
+  ##------------------------------------------
+  out_mct <- mct(df, varname_wbal = "bal", thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
 
+  ##------------------------------------------
   ## fit extreme value statistics  
-  gumbi_alexi   <- get_plantwhc_mct_bysite(df_alexi,   varname_wbal = "bal")
-  gumbi_fluxnet <- get_plantwhc_mct_bysite(df_fluxnet, varname_wbal = "bal")
+  ##------------------------------------------
+  gumbi <- get_plantwhc_mct_bysite(df,   varname_wbal = "bal", thresh_terminate = thresh_terminate, thresh_drop = thresh_drop, fittype = fittype)
   
-  if (!dir.exists("fig/cwd_fluxnet")) system("mkdir -p fig/cwd_fluxnet")
-  if (!dir.exists("fig/cwd_alexi")) system("mkdir -p fig/cwd_alexi")
-  if (!dir.exists("fig/cwd_alexi_fluxnet")) system("mkdir -p fig/cwd_alexi_fluxnet")
-  if (!dir.exists("fig/lue_cwd_fluxnet")) system("mkdir -p fig/lue_cwd_fluxnet")
-  if (!dir.exists("fig/lue_cwd_alexi")) system("mkdir -p fig/lue_cwd_alexi")
-  if (!dir.exists("fig/hist")) system("mkdir -p fig/hist")
-  if (!dir.exists("fig/prec")) system("mkdir -p fig/prec")
-  if (!dir.exists("fig/modobs_prec")) system("mkdir -p fig/modobs_prec")
-  if (!dir.exists("fig/modobs_et")) system("mkdir -p fig/modobs_et")
-  if (!dir.exists("fig/et")) system("mkdir -p fig/er")
-  
-  ## cumulative deficits
-  ## FLUXNET data
+  ##------------------------------------------
+  ## Time series of cumulative deficits and events
+  ##------------------------------------------
   ggplot() +
     geom_rect(
-      data=mct_fluxnet$inst,
+      data=out_mct$inst,
       aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999),
       fill=rgb(0,0,0,0.3),
       color=NA) +
-    geom_line(data = mct_fluxnet$df, aes(date, prec), size = 0.2, color="royalblue") +
-    geom_line(data = mct_fluxnet$df, aes(date, deficit), color="tomato", size = 0.2) +
-    geom_line(data = mct_fluxnet$df, aes(date, 100 * (gpp/ppfd)), size = 0.2) +
-    coord_cartesian(ylim=c(0, max(mct_alexi$df$deficit, na.rm = TRUE))) +
-    theme_classic() +
-    labs(title = sitename, subtitle = "ET and precipitation: FLUXNET", x = "Date", y = "Cumulative water deficit (mm)")
-  ggsave(paste0("fig/cwd_fluxnet/cwd_fluxnet_", sitename, ".pdf"), width = 6, height = 3)
-
-  ## ALEXI data
-  ggplot() +
-    geom_rect(
-      data=mct_alexi$inst,
-      aes(xmin=date_start, xmax=date_end, ymin=-99, ymax=99999),
-      fill=rgb(0,0,0,0.3),
-      color=NA) +
-    geom_line(data = mct_alexi$df, aes(date, prec), size = 0.2, color="royalblue") +
-    geom_line(data = mct_alexi$df, aes(date, deficit), color="tomato", size = 0.2) +
-    geom_line(data = mct_alexi$df, aes(date, 100 * (gpp/ppfd)), size = 0.2) +
-    coord_cartesian(ylim=c(0, max(mct_alexi$df$deficit, na.rm = TRUE))) +
+    geom_line(data = out_mct$df, aes(date, prec), size = 0.2, color="royalblue") +
+    geom_line(data = out_mct$df, aes(date, deficit), color="tomato", size = 0.2) +
+    geom_line(data = out_mct$df, aes(date, 100 * (gpp/ppfd)), size = 0.2) +
+    coord_cartesian(ylim=c(0, max(out_mct$df$deficit, na.rm = TRUE))) +
     theme_classic() +
     labs(title = sitename, subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI", x = "Date", y = "Cumulative water deficit (mm)")
-  ggsave(paste0("fig/cwd_alexi/cwd_alexi_", sitename, ".pdf"), width = 6, height = 3)
   
+  ggsave(paste0(dir, "/cwd/cwd_", sitename, ".pdf"), width = 6, height = 3)
+  
+  ##------------------------------------------
+  ## Time series of evapotranspiration
+  ##------------------------------------------
+  df %>%
+    ggplot(aes(x = date, y = et_mm, color = source)) +
+    geom_line() +
+    labs(title = sitename, y = expression(paste("ET (mm d"^{-1}, ")")), x = "Date")
+  ggsave(paste0("./fig/et/et_", sitename, ".pdf"), width = 6, height = 3)
+  
+  ##------------------------------------------
+  ## LUE vs CWD
+  ##------------------------------------------
+  ## retain only data from largest instances of each year
+  biginstances <- out_mct$inst %>% 
+    mutate(year = lubridate::year(date_start)) %>% 
+    group_by(year) %>% 
+    dplyr::filter(deficit == max(deficit)) %>% 
+    pull(iinst)
 
-  ## ALEXI and FLUXNET data on top of each other
-  ggplot() +
-    geom_line(data = mct_fluxnet$df, aes(date, deficit), color="black", size = 0.2) +
-    geom_line(data = mct_alexi$df, aes(date, deficit), color="tomato", size = 0.2) +
-    labs(title = sitename, subtitle = "ALEXI/WATCH vs FLUXNET", x = "Date", y = "Cumulative water deficit (mm)")
-  ggsave(paste0("fig/cwd_alexi_fluxnet/cwd_alexi_fluxnet_", sitename, ".pdf"), width = 6, height = 3)
+  out_mct$df <- out_mct$df %>% 
+    dplyr::filter(!is.na(dday)) %>% 
+    dplyr::filter(iinst %in% biginstances) %>% 
+    mutate(lue = gpp/ppfd) %>% 
+    mutate(lue = remove_outliers(lue, coef = 1.5))
   
-  
-  ## LUE vs CWD: FLUXNET
-  nyears <- mct_fluxnet$df %>% 
-    mutate(year = year(date)) %>% 
-    pull(year) %>% 
-    unique() %>% 
-    length()
-  biginstances <- mct_fluxnet$inst %>% 
-    arrange(-deficit) %>% 
-    slice(1:nyears) %>% 
-    pull(iinst)
-  
-  out <- mct_fluxnet$df %>% 
-    filter(iinst %in% biginstances) %>% 
-    ggplot(aes(x = deficit, y = gpp/ppfd)) +
-    geom_point(alpha = 0.5) +
-    labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: FLUXNET, precipitation: FLUXNET, GPP: FLUXNET, PPFD: FLUXNET") +
-    geom_smooth(aes(y = gpp/ppfd), color = 'red', method = 'lm', se = TRUE)
-  if (!identical(gumbi_fluxnet, NA)){
-    mct20 <- gumbi_fluxnet %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
-      out +
-        geom_vline(xintercept = mct20, col = "black")
+  ## get linear fit with outliers
+  linmod <- try(lm(lue ~ deficit, data = out_mct$df))
+  if (class(linmod) != "try-error"){
+
+    ## test: is slope negative?
+    is_neg <- coef(linmod)["deficit"] < 0.0
+    
+    if (is_neg){
+      ## test: is slope significantly (5% level) different from zero (t-test)?
+      is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+      if (is_sign){
+        ## get x-axis cutoff
+        lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+        df_fit <- tibble(y = predict(linmod, newdata = out_mct$df), x = out_mct$df$deficit)
+      } else {
+        lue0 <- NA
+      }
     } else {
-      rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
+      is_sign <- FALSE
+      lue0 <- NA
     }
+      
   } else {
-    rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
+    is_sign <- FALSE
+    lue0 <- NA
   }
-  out
-  ggsave(paste0("fig/lue_cwd_fluxnet/lue_cwd_fluxnet_", sitename, ".pdf"), width = 6, height = 4)
   
+  ## get exponential fit
+  expmod <- try( nls(lue ~ a * exp(k * deficit), data = out_mct$df, start = list(a = 0.1, k = 1/50)) )
+  if (class(expmod) != "try-error"){
+    
+    df_coef <- summary(expmod) %>% coef()
+    
+    ## test: is slope negative?
+    is_neg_exp <- df_coef["k", "Estimate"] < 0
+    
+    if (is_neg_exp){
+      ## test: is slope significantly (5% level) different from zero (t-test)?
+      is_sign_exp <- df_coef["k", "Pr(>|t|)"] < 0.05
+      
+      if (is_sign_exp){
+        
+        ## get CWD at wich LUE is at 1/2e
+        lue0_exp <- -1.0/coef(expmod)["k"]*2.0   ## CWD where LUE is reduced to 1/2e
+        df_fit_exp <- tibble(y = predict(expmod, newdata = out_mct$df), x = out_mct$df$deficit)
+        
+      } else {
+        lue0_exp <- NA
+      }
+    } else {
+      is_sign_exp <- FALSE
+      lue0_exp <- NA
+    }
+    
+  } else {
+    is_sign_exp <- FALSE
+    lue0_exp <- NA
+  }
   
-  ## LUE vs CWD: ALEXI/WATCH-WFDEI
-  nyears <- mct_alexi$df %>% 
-    mutate(year = year(date)) %>% 
-    pull(year) %>% 
-    unique() %>% 
-    length()
-  biginstances <- mct_alexi$inst %>% 
-    arrange(-deficit) %>% 
-    slice(1:nyears) %>% 
-    pull(iinst)
-  
-  out <- mct_alexi$df %>% 
-    filter(iinst %in% biginstances) %>% 
-    ggplot(aes(x = deficit, y = gpp/ppfd)) +
+  out <- out_mct$df %>% 
+    ggplot(aes(x = deficit, y = lue)) +
     geom_point(alpha = 0.5) +
     labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
-    geom_smooth(aes(y =  gpp/ppfd), color = 'red', method = 'lm', se = TRUE)
-  if (!identical(gumbi_alexi, NA)){
-    mct20 <- gumbi_alexi %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
-      out +
-        geom_vline(xintercept = mct20, col = "tomato")
+    geom_hline(yintercept = 0.0, linetype = "dotted")
+
+  if (is_sign){
+    out <- out +
+      geom_vline(xintercept = lue0, linetype = "dotted", color = 'tomato') +
+      geom_line(data = df_fit, aes(x, y), col = "tomato")
+  }
+  if (is_sign_exp){
+    out <- out +
+      geom_vline(xintercept = lue0_exp, linetype = "dotted", color = 'royalblue') +
+      geom_line(data = df_fit_exp, aes(x, y), col = "royalblue")
+  }
+  if (!identical(gumbi$mod, NA)){
+    mctXX <- gumbi$df_return %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mctXX)){
+      out <- out +
+        geom_vline(xintercept = mctXX)
     } else {
       rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
     }
   } else {
     rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
+    mctXX <- NA
   }
   out
-  ggsave(paste0("fig/lue_cwd_alexi/lue_cwd_alexi_", sitename, ".pdf"), width = 6, height = 4)
+  ggsave(paste0(dir, "/lue_cwd/lue_cwd_", sitename, ".pdf"), width = 6, height = 4)
   
+
+  ##------------------------------------------
+  ## EOR vs CWD
+  ##------------------------------------------
+  ## retain only data from largest instances of each year
+  biginstances <- out_mct$inst %>% 
+    mutate(year = lubridate::year(date_start)) %>% 
+    group_by(year) %>% 
+    filter(deficit == max(deficit)) %>% 
+    pull(iinst)
+
+  out_mct$df <- out_mct$df %>% 
+    dplyr::filter(!is.na(dday)) %>% 
+    filter(iinst %in% biginstances) %>% 
+    mutate(eor = et/netrad) %>% 
+    mutate(eor = remove_outliers(eor, coef = 1.5))
   
-  ## WATCH vs FLUXNET precipitation
-  out <- try(
-    df_alexi %>%
-      rename(sitename = idx, prec_watch = prec) %>%
-      inner_join(
-        df_fluxnet %>%
-          rename(prec_fluxnet = prec),
-        by = c("sitename", "date")
-      ) %>%
-      rbeni::analyse_modobs2("prec_fluxnet", "prec_watch")
-  )
-  if (class(out)!="try-error"){
-    out$gg +
-      labs(title = sitename, y = expression(paste("WATCH-WFDEI precipitation (mm d"^{-1}, ")")), x = expression(paste("FLUXNET precipitation (mm d"^{-1}, ")")))
-    ggsave(paste0("fig/modobs_prec/modobs_prec_", sitename, ".pdf"), width = 5, height = 5)
+  ## get linear fit with outliers
+  linmod <- try(lm(eor ~ deficit, data = out_mct$df))
+  if (class(linmod) != "try-error"){
+
+    ## test: is slope negative?
+    is_neg <- coef(linmod)["deficit"] < 0.0
+    
+    if (is_neg){
+      ## test: is slope significantly (5% level) different from zero (t-test)?
+      is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
+      if (is_sign){
+        ## get x-axis cutoff
+        eor0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+        df_fit <- tibble(y = predict(linmod, newdata = out_mct$df), x = out_mct$df$deficit)
+      } else {
+        eor0 <- NA
+      }
+    } else {
+      is_sign <- FALSE
+      eor0 <- NA
+    }
+      
   } else {
-    rlang::warn(paste("Failed analyse_modobs2() for precip for site", sitename))
+    is_sign <- FALSE
+    eor0 <- NA
   }
-
-  ## ... over time
-  out <- df_alexi %>%
-    rename(sitename = idx, prec_watch = prec) %>%
-    inner_join(
-      df_fluxnet %>%
-        rename(prec_fluxnet = prec),
-      by = c("sitename", "date")
-    ) %>%
-    pivot_longer(cols = c(prec_watch, prec_fluxnet), names_to = "source", values_to = "prec") %>%
-    ggplot(aes(x = date, y = prec, color = source)) +
-    geom_line() +
-    labs(title = sitename, y = expression(paste("Precipitation (mm d"^{-1}, ")")), x = "Date")
-  out
-  ggsave(paste0("fig/prec/prec_", sitename, ".pdf"), width = 6, height = 3)
-
-  ## ALEXI vs FLUXNET ET
-  out <- try(
-    out <- df_alexi %>%
-      rename(sitename = idx, prec_watch = prec) %>%
-      inner_join(
-        df_fluxnet %>%
-          rename(prec_fluxnet = prec),
-        by = c("sitename", "date")
-      ) %>%
-      rbeni::analyse_modobs2("latenth_mm", "et_mm", type = "heat")
-      )
-  if (class(out)!="try-error"){
-    out$gg +
-      labs(title = sitename, y = expression(paste("ALEXI ET (mm d"^{-1}, ")")), x = expression(paste("FLUXNET ET (mm d"^{-1}, ")")))
-    ggsave(paste0("fig/modobs_et/modobs_et_", sitename, ".pdf"), width = 5, height = 5)
+  
+  ## get exponential fit
+  expmod <- try( nls(eor ~ a * exp(k * deficit), data = out_mct$df, start = list(a = 0.1, k = 1/50)) )
+  if (class(expmod) != "try-error"){
+    
+    df_coef <- summary(expmod) %>% coef()
+    
+    ## test: is slope negative?
+    is_neg_exp <- df_coef["k", "Estimate"] < 0
+    
+    if (is_neg_exp){
+      ## test: is slope significantly (5% level) different from zero (t-test)?
+      is_sign_exp <- df_coef["k", "Pr(>|t|)"] < 0.05
+      
+      if (is_sign_exp){
+        
+        ## get CWD at wich eor is at 1/2e
+        eor0_exp <- -1.0/coef(expmod)["k"]*2.0   ## CWD where eor is reduced to 1/2e
+        df_fit_exp <- tibble(y = predict(expmod, newdata = out_mct$df), x = out_mct$df$deficit)
+        
+      } else {
+        eor0_exp <- NA
+      }
+    } else {
+      is_sign_exp <- FALSE
+      eor0_exp <- NA
+    }
+    
   } else {
-    rlang::warn(paste("Failed analyse_modobs2() for ET for site", sitename))
+    is_sign_exp <- FALSE
+    eor0_exp <- NA
   }
-
-  ## ... over time
-  out <- df_alexi %>%
-    dplyr::select(-et) %>%
-    rename(sitename = idx, prec_watch = prec, et_alexi = et_mm) %>%
-    inner_join(
-      df_fluxnet %>%
-        rename(prec_fluxnet = prec, et_fluxnet = latenth_mm),
-      by = c("sitename", "date")
-    ) %>%
-    pivot_longer(cols = c(et_alexi, et_fluxnet), names_to = "source", values_to = "et") %>%
-    ggplot(aes(x = date, y = et, color = source)) +
-    geom_line() +
-    labs(title = sitename, y = expression(paste("ET (mm d"^{-1}, ")")), x = "Date")
+  
+  out <- out_mct$df %>% 
+    ggplot(aes(x = deficit, y = eor)) +
+    geom_point(alpha = 0.5) +
+    labs(title = sitename, x = "Cumulative water deficit (mm)", y = "GPP/PPFD", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, GPP: FLUXNET, PPFD: FLUXNET") +
+    geom_hline(yintercept = 0.0, linetype = "dotted")
+  
+  if (is_sign){
+    out <- out +
+      geom_vline(xintercept = eor0, linetype = "dotted", color = 'tomato') +
+      geom_line(data = df_fit, aes(x, y), col = "tomato")
+  }
+  if (is_sign_exp){
+    out <- out +
+      geom_vline(xintercept = eor0_exp, linetype = "dotted", color = 'royalbeor') +
+      geom_line(data = df_fit_exp, aes(x, y), col = "royalbeor")
+  }
+  if (!identical(gumbi$mod, NA)){
+    mctXX <- gumbi$df_return %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mctXX)){
+      out <- out +
+        geom_vline(xintercept = mctXX)
+    } else {
+      rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
+    }
+  } else {
+    rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
+    mctXX <- NA
+  }
   out
-  ggsave(paste0("./fig/et/et_", sitename, ".pdf"), width = 6, height = 3)
+  ggsave(paste0(dir, "/eor_cwd/eor_cwd_", sitename, ".pdf"), width = 6, height = 4)
 
-  ## Plot the distribution of cumulative deficits and the extreme values
+
+  ##------------------------------------------
+  ## Histogram: Distribution of cumulative deficits and the extreme values
+  ##------------------------------------------
   out <- ggplot() +
     geom_histogram(
-      data = mct_fluxnet$inst,
-      aes(x = deficit, y = ..density..),
-      color = "black", alpha = 0.5, fill = "black",
-      position="identity") +
-    geom_histogram(
-      data = mct_alexi$inst,
+      data = out_mct$inst,
       aes(x = deficit, y = ..density..),
       color = "black", alpha = 0.5, fill = "tomato", 
       position="identity") +
     labs(title = sitename, x = "Cumulative water deficit (mm)")
   
-  if (!identical(gumbi_fluxnet, NA)){
-    mct20 <- gumbi_fluxnet %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
+  if (!identical(gumbi$mod, NA)){
+    mctXX <- gumbi$df_return %>% filter(return_period == use_return_period) %>% pull(return_level)
+    if (!is.na(mctXX)){
       out +
-        geom_vline(xintercept = mct20, col = "black")
-    } else {
-      rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
-    }
-  } else {
-    rlang::warn(paste("No FLUXNET MCT outputs for site", sitename))
-  }
-  if (!identical(gumbi_alexi, NA)){
-    mct20 <- gumbi_alexi %>% filter(return_period == use_return_period) %>% pull(return_level)
-    if (!is.na(mct20)){
-      out +
-        geom_vline(xintercept = mct20, col = "tomato")
+        geom_vline(xintercept = mctXX, col = "tomato")
     } else {
       rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
     }
@@ -252,9 +294,18 @@ test_mct_bysite <- function(sitename, df_fluxnet, df_alexi, thresh_terminate = 0
     rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
   }
   out
-  ggsave(paste0("./fig/hist/hist_cwd_", sitename, ".pdf"), width = 6, height = 3)
+  ggsave(paste0(dir, "/hist/hist_cwd_", sitename, ".pdf"), width = 6, height = 3)
   
 
-  return(mct_alexi)
+  ##------------------------------------------
+  ## Output
+  ##------------------------------------------
+  return(
+    list(
+      mct = out_mct, 
+      gumbi = gumbi, 
+      mctXX = mctXX, 
+      lue0 = lue0, lue0_exp = lue0_exp )
+    )
   
 }
