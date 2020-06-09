@@ -1,8 +1,12 @@
-extract_points_filelist <- function(df, list, varnam, dirnam = "", fil_pattern = " ", filetype = "watch"){
+extract_points_filelist <- function(df, list, varnam, dirnam = "", fil_pattern = " ", filetype = "watch", use_nco = FALSE){
+  
+  # ## xxx debug
+  # df <- df %>% slice(50:51)
   
   for (ifil in list){
     
     filename <- paste0(dirnam, ifil) # "~/data/watch_wfdei/Rainf_daily/Rainf_daily_WFDEI_CRU_200309.nc"
+    print(paste0("Opening file ", filename, " as raster brick ..."))
     rasta <- raster::brick(filename, varname = varnam)
     
     if (!("data0" %in% names(df))){
@@ -30,7 +34,11 @@ extract_points_filelist <- function(df, list, varnam, dirnam = "", fil_pattern =
       datevals <- raster::getZ(rasta)
       datevals <- lubridate::ymd(datevals)
     }
-    
+
+    # if (use_nco){
+    #   vec <- extract_point_nc( df$lon, df$lat, filename, varnam )
+    # }
+        
     ## extract values from file and append it to 'data' (separate df for each point)
     df <- raster::extract(rasta, sp::SpatialPoints(dplyr::select(df, lon, lat)), sp = TRUE) %>% 
       as_tibble() %>% 
@@ -42,8 +50,8 @@ extract_points_filelist <- function(df, list, varnam, dirnam = "", fil_pattern =
       dplyr::mutate(data = purrr::map(data, ~bind_cols(., tibble(date = datevals)))) %>% 
       dplyr::mutate(data = purrr::map2(data0, data, ~bind_rows(.x, .y))) %>% 
       dplyr::select(-data0) %>% 
-      dplyr::rename(data0 = data)
-      # dplyr::mutate(data0 = purrr::map(data0, ~drop_na(.)))
+      dplyr::rename(data0 = data) %>% 
+      dplyr::mutate(data0 = purrr::map(data0, ~drop_na(., date)))
     
   }
   return(df)

@@ -15,7 +15,7 @@ get_data_mct_global <- function(df,
                                 dir_temp = NA, fil_temp_pattern = NA, varnam_temp = NA,
                                 dir_sif = NA, fil_sif_pattern = NA,
                                 get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE, get_sif = TRUE,
-                                year_start_watch = 1979, year_end_watch = 2018){
+                                year_start_watch = 1979, year_end_watch = 2018, ...){
   
 
   nchunk <- 1   # xxx test: change this back to 1000 (number of chunks)
@@ -32,7 +32,7 @@ get_data_mct_global <- function(df,
                          dir_temp, fil_temp_pattern, varnam_temp,
                          dir_sif = dir_sif, fil_sif_pattern = fil_sif_pattern,
                          get_watch = get_watch, get_landeval = get_landeval, get_alexi = get_alexi, get_sif = get_sif,
-                         year_start_watch = year_start_watch, year_end_watch = year_end_watch)
+                         year_start_watch = year_start_watch, year_end_watch = year_end_watch, ...)
   )
     
   return(df)
@@ -45,7 +45,7 @@ get_data_mct_chunk <- function(df, idx,
                                dir_temp = NA, fil_temp_pattern = NA, varnam_temp = NA,
                                dir_sif = NA, fil_sif_pattern = NA,
                                get_watch = TRUE, get_landeval = TRUE, get_alexi = TRUE, get_sif = TRUE,
-                               year_start_watch = 1979, year_end_watch = 2018){
+                               year_start_watch = 1979, year_end_watch = 2018, ...){
   
   print("----------------")
   print(paste("DOIN IT BY CHUNK", as.character(idx)))
@@ -73,7 +73,7 @@ get_data_mct_chunk <- function(df, idx,
     list_fil_prec <- paste0("Rainf_daily_WFDEI_CRU_", list_fil_prec, ".nc")
     
     ## xxx debug: get data for one year only. 2007: [337:348]
-    df_prec <- extract_points_filelist(df, list_fil_prec, varnam = "Rainf", dirnam = dir_prec, fil_pattern = fil_prec_pattern) %>%
+    df_prec <- extract_points_filelist(df, list_fil_prec, varnam = "Rainf", dirnam = dir_prec, fil_pattern = fil_prec_pattern, ...) %>%
       dplyr::rename(df_prec = data0) %>%
       dplyr::mutate(df_prec = purrr::map(df_prec, ~rename(., prec = V1))) %>%
       dplyr::mutate(df_prec = purrr::map(df_prec, ~mutate(., prec = convert_prec_watch(prec)))) %>%
@@ -95,7 +95,7 @@ get_data_mct_chunk <- function(df, idx,
     list_fil_snow <- paste0("Snowf_daily_WFDEI_CRU_", list_fil_snow, ".nc")
     
     
-    df_snow <- extract_points_filelist(df, list_fil_snow, varnam = "Snowf", dirnam = dir_snow, fil_pattern = fil_snow_pattern) %>%
+    df_snow <- extract_points_filelist(df, list_fil_snow, varnam = "Snowf", dirnam = dir_snow, fil_pattern = fil_snow_pattern, ...) %>%
       dplyr::rename(df_snow = data0) %>%
       dplyr::mutate(df_snow = purrr::map(df_snow, ~rename(., snow = V1))) %>%
       dplyr::mutate(df_snow = purrr::map(df_snow, ~mutate(., snow = convert_prec_watch(snow)))) %>%
@@ -118,7 +118,7 @@ get_data_mct_chunk <- function(df, idx,
     list_fil_temp <- paste0("Tair_daily_WFDEI_", list_fil_temp, ".nc")
     
     
-    df_temp <- extract_points_filelist(df, list_fil_temp, varnam = "Tair", dirnam = dir_temp, fil_pattern = fil_temp_pattern) %>%
+    df_temp <- extract_points_filelist(df, list_fil_temp, varnam = "Tair", dirnam = dir_temp, fil_pattern = fil_temp_pattern, ...) %>%
       dplyr::rename(df_temp = data0) %>%
       dplyr::mutate(df_temp = purrr::map(df_temp, ~rename(., temp = V1))) %>%
       dplyr::mutate(df_temp = purrr::map(df_temp, ~mutate(., temp = convert_temp_watch(temp)))) %>%
@@ -146,14 +146,14 @@ get_data_mct_chunk <- function(df, idx,
     convert_et_wm2 <- function(x){ x * 60 * 60 * 24 }  # W m-2 -> J m-2 d-1
     
     ## transpiration ("ET_tran")
-    df <- extract_points_filelist(df, list_fil_et, varnam = "ET_tran", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>% 
+    df <- extract_points_filelist(df, list_fil_et, varnam = "ET_tran", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux", ...) %>% 
       dplyr::rename(df_et = data0) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~rename(., transp = V1))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., transp = convert_et_wm2(transp))))
     
     ## soil evaportation ("ET_soil")
     df <- df %>% 
-      extract_points_filelist(list_fil_et, varnam = "ET_soil", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>% 
+      extract_points_filelist(list_fil_et, varnam = "ET_soil", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux", ...) %>% 
       dplyr::mutate(data0 = purrr::map(data0, ~rename(., evap_soil = V1))) %>% 
       dplyr::mutate(df_et = purrr::map2(df_et, data0, ~left_join(.x, .y, by = "date"))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., evap_soil = convert_et_wm2(evap_soil)))) %>% 
@@ -161,7 +161,7 @@ get_data_mct_chunk <- function(df, idx,
     
     ## (wet) canopy evaporation ("can_evap")
     df <- df %>% 
-      extract_points_filelist(list_fil_et, varnam = "can_evap", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux") %>%
+      extract_points_filelist(list_fil_et, varnam = "can_evap", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "landflux", ...) %>%
       dplyr::mutate(data0 = purrr::map(data0, ~dplyr::rename(., evap_canop = V1))) %>% 
       dplyr::mutate(df_et = purrr::map2(df_et, data0, ~left_join(.x, .y, by = "date"))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., evap_canop = convert_et_wm2(evap_canop)))) %>% 
@@ -182,7 +182,7 @@ get_data_mct_chunk <- function(df, idx,
     convert_et_MJ <- function(x){ x * 1e6 }  # MJ m-2 d-1 -> J m-2 d-1
     
     ## total ET
-    df <- extract_points_filelist(df, list_fil_et, varnam = "et", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "alexi") %>% 
+    df <- extract_points_filelist(df, list_fil_et, varnam = "et", dirnam = dir_et, fil_pattern = fil_et_pattern, filetype = "alexi", ...) %>% 
       dplyr::rename(df_et = data0) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~rename(., et = V1))) %>% 
       dplyr::mutate(df_et = purrr::map(df_et, ~mutate(., et = convert_et_MJ(et)))) 
@@ -195,7 +195,7 @@ get_data_mct_chunk <- function(df, idx,
     ##-------------------------------------------------
     print("getting SiF from Duveiller et al. (GOME2-SiF-downscaled) ...")
     list_fil_sif <- list.files(dir_sif, pattern = fil_sif_pattern, recursive = FALSE)
-    df <- extract_points_filelist(df, list_fil_sif, varnam = "SIF", dirnam = dir_sif, fil_pattern = fil_sif_pattern, filetype = "sif") %>% 
+    df <- extract_points_filelist(df, list_fil_sif, varnam = "SIF", dirnam = dir_sif, fil_pattern = fil_sif_pattern, filetype = "sif", ...) %>% 
       dplyr::rename(data0 = data) %>%
       dplyr::mutate(data0 = purrr::map(data0, ~rename(., sif = V1)))
   }

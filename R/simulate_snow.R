@@ -1,5 +1,7 @@
 simulate_snow <- function(df, varnam_prec = NULL, varnam_snow = NULL, varnam_temp = NULL){
   
+  ## This is for daily input data!
+
   ## initialise
   out_snow_pool <- rep(NA, nrow(df))
   out_liquid_to_soil <- rep(NA, nrow(df))

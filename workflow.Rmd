@@ -295,35 +295,311 @@ save(siteinfo, file = filn)
 `rscript_get_data.R`  Creates separate data frames for each data source, rows: site/gridcell, column: nested data, data: ET (W m-2), prec, snow, temp, elevation; large data! need to separate data frames by chunks for global analyses
 
 ### ALEXI
+
+```{r}
+##------------------------------------------------------------------------
+## ALEXI
+##------------------------------------------------------------------------
+filn <- paste0("data/df_alexi_", siteset,".RData")
+filn_csv <- str_replace(filn, "RData", "csv")
+if (!file.exists(filn)){
+  if (!file.exists(filn_csv)){
+    df_alexi <- get_data_mct_global(
+      df_grid,
+      dir_et   = "~/data/alexi_tir/netcdf/", fil_et_pattern = "EDAY_CERES_",
+      get_watch = FALSE, get_landeval = FALSE, get_alexi = TRUE
+    )
+    save(df_alexi, file = filn)
+    df_alexi %>%
+      tidyr::unnest(df) %>%
+      write_csv(path = filn_csv)
+  } else {
+    df_alexi <- read_csv(file = filn_csv) %>%
+      group_by(idx, lon, lat) %>%
+      tidyr::nest() %>%
+      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+      dplyr::rename(df = data)
+  }
+} else {
+  load(filn)
+  df_alexi %>%
+    tidyr::unnest(df) %>%
+    write_csv(path = filn_csv)
+}
+```
+
 ### WATCH
+
+```{r}
+##------------------------------------------------------------------------
+## WATCH
+##------------------------------------------------------------------------
+filn <- paste0("data/df_watch_", siteset,".RData")
+filn_csv <- str_replace(filn, "RData", "csv")
+if (!file.exists(filn)){
+  if (!file.exists(filn_csv)){
+    df_watch <- get_data_mct_global(
+      df_grid,
+      dir_prec = "~/data/watch_wfdei/Rainf_daily/", fil_prec_pattern = "Rainf_daily_WFDEI_CRU",
+      dir_snow = "~/data/watch_wfdei/Snowf_daily/", fil_snow_pattern = "Snowf_daily_WFDEI_CRU",
+      dir_temp = "~/data/watch_wfdei/Tair_daily/",  fil_temp_pattern = "Tair_daily_WFDEI",
+      get_watch = TRUE, get_landeval = FALSE, get_alexi = FALSE,
+      year_start_watch = 2003, year_end_watch = 2018
+    )
+    save(df_watch, file = filn)
+    df_watch %>%
+      tidyr::unnest(data) %>%
+      write_csv(path = filn_csv)
+  } else {
+    df_watch <- read_csv(file = filn_csv) %>%
+      group_by(sitename) %>%
+      tidyr::nest() %>%
+      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+      dplyr::rename(df = data)
+  }
+} else {
+  load(filn)
+  df_watch %>%
+    tidyr::unnest(data) %>%
+    write_csv(path = filn_csv)
+}
+```
+
 ### SIF
+
+```{r}
+source("R/get_data_mct_global.R") # because this function is defined also in another source file - mess
+##------------------------------------------------------------------------
+## SiF-downscaled from Duveiller
+##------------------------------------------------------------------------
+filn <- paste0("data/df_sif_", siteset, ".RData")
+filn_csv <- str_replace(filn, "Rdata", "csv")
+if (!file.exists(filn)){
+  if (!file.exists(filn_csv)){
+    df_sif_jj <- get_data_mct_global(
+      df_grid,
+      dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_",
+      get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
+    )
+    save(df_sif, file = filn)
+    df_sif %>%
+      tidyr::unnest(df) %>%
+      write_csv(path = filn_csv)
+  } else {
+    df_sif <- read_csv(file = filn_csv) %>%
+      group_by(idx, lon, lat) %>%
+      tidyr::nest() %>%
+      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+      dplyr::rename(df = data)
+  }
+} else {
+  load(filn)
+  df_sif %>%
+    tidyr::unnest(df) %>%
+    write_csv(path = filn)
+}
+```
+
 ### GLASS net radiation
+
+XXX TO BE COMPLETED
     
-## Convert units, complement, reduce 
+## Combine, convert units, complement, reduce 
 
 Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
 
-- ET to mm (done in step 1)
-- Snow water balance
+```{r}
+n_avl_et <- function(df){
+  sum(!is.na(df$et))
+}
+n_avl_et_mm <- function(df){
+  sum(!is.na(df$et_mm))
+}
+
+filn <- paste0("data/df_clean_", siteset, ".RData")
+if (!file.exists(filn)){
+
+  ## get flat table
+  df_clean <- df_alexi %>% 
     
-## CWD events
+    ## clean something weird
+    group_by(idx) %>% 
+    nest() %>% 
+    mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+    unnest(data) %>% 
+    
+    ## make flat
+    unnest(df) %>% 
+    rename(sitename = idx)
+
+  ## add prec and snow from df_watch
+  avl_prec_snow <- ("prec" %in% names(df_clean) && "snow" %in% names(df_clean))
+  if (!avl_prec_snow){
+    df_clean <- df_clean %>% 
+      left_join(df_watch %>% 
+                  unnest(data),
+                by = "sitename")
+  }
+
+  ## Get ET in mm
+  avl_et_mm <- "et_mm" %in% names(df_clean)
+  if (!avl_et_mm){
+    
+    avl_elv <- "elv" %in% names(df_clean)
+    if (!avl_elv){
+      ## get elevation data from siteinfo
+      df_clean <- df_clean %>% 
+        left_join(dplyr::select(siteinfo, sitename, elv),
+                  by = "sitename")
+    }
+    
+    avl_temp <- ("temp" %in% names(df_clean))
+    if (!avl_temp){
+      df_clean <- df_clean %>% 
+        left_join(df_watch %>% 
+                    unnest(data) %>% 
+                    dplyr::select(sitename, temp),
+                  by = "sitename"
+                 )
+    }
+    
+    ## Apply conversion function
+    df_clean <- df_clean %>% 
+      rowwise() %>% 
+      mutate(et_mm = convert_et(et, temp, elv)) %>% 
+      
+      ## nest again for next step
+      group_by(sitename) %>% 
+      tidyr::nest() %>% 
+      
+      ## interpolate missing values in et_mm
+      mutate(data = purrr::map(data, ~myapprox(.$et_mm)))
+    
+  }
+  
+  ## nest again, if unnested
+  unnested <- (df_clean$sitename %>% table() %>% as_tibble() %>% slice(1) %>% pull(n) > 1)
+  if (unnested){
+    df_clean <- df_clean %>% 
+      group_by(sitename) %>% 
+      nest()
+  }
+
+  ## Simulate snow water balance (no missing data allowed for 'prec', 'snow', or 'temp')
+  avl_snow_pool <- ("snow_pool" %in% names(df_clean$data[[1]]) && "liquid_to_soil" %in% names(df_clean$data[[1]]))
+  n_avl_prec <- function(df){
+    sum(is.na(df$prec))
+  }
+  n_avl_snow <- function(df){
+    sum(is.na(df$snow))
+  }
+  n_avl_temp <- function(df){
+    sum(is.na(df$temp))
+  }
+
+  # ## debug
+  # df_clean <- df_clean %>% 
+  #   mutate(missing_snow = purrr::map_int(data, ~n_avl_snow(.))) %>% 
+  #   mutate(missing_prec = purrr::map_int(data, ~n_avl_prec(.))) %>% 
+  #   mutate(missing_temp = purrr::map_int(data, ~n_avl_temp(.)))
+  # df_test <- df_clean %>% 
+  #   dplyr::filter(missing_snow > 1 | missing_prec > 1 | missing_temp > 1 )
+  
+  
+  if (!avl_snow_pool){
+      df_clean <- df_clean %>% 
+        mutate(data = purrr::map(data, ~drop_na(., date))) %>% 
+        # mutate(data = purrr::map(data, ~slice(., -1))) %>% 
+        mutate(data = purrr::map(data, ~simulate_snow(.)))
+  }
+  save(df_clean, file = filn)  
+
+} else {
+  load(filn)
+}
+```
+
+Get daily water balance and reduce data frames.
+```{r}  
+filn <- paste0("data/df_bal_", siteset, ".RData")
+if (!file.exists(filn)){
+  
+  # ## test plot visualising snow accumulation and mel
+  # df_clean$data[[1]] %>% 
+  #    dplyr::filter(lubridate::year(date) == 2005) %>%
+  #    ggplot() + 
+  #    geom_line(aes(date, snow_pool), col = "royalblue") +
+  #    geom_line(aes(date, liquid_to_soil), col = "springgreen4") +
+  #    geom_line(aes(date, prec), col = "tomato")
+
+  ## Get daily water balance after snow melt
+  get_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
+    
+    ## linearly interpolate ET
+    df[[varnam_et]] <- myapprox(df[[varnam_et]])
+      
+    ## re-calculate daily water balance
+    df[[varnam_bal]] <- df[[varnam_prec]] - df[[varnam_et]]
+
+    ## remove NAs at head and tail
+    df <- rbeni::cutna_headtail_df(df, varnam_bal)
+    
+    return(df)
+  }
+
+  avl_et <- function(df, varnam_et){
+    any(!is.na(df[varnam_et]))
+  }
+
+  df_bal <- df_clean %>%
+    dplyr::mutate( avl_et = purrr::map_lgl(data, ~avl_et(., varnam_et = "et_mm"))) %>%
+    dplyr::filter( avl_et ) %>% 
+    dplyr::mutate( data = purrr::map(data, ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))) %>% 
+    dplyr::mutate( data = purrr::map(data, ~dplyr::select(., date, bal)))
+    
+  save(df_bal, file = filn)  
+
+} else {
+  load(filn)
+}
+```
+
+    
+## CWD events and extremes
+
+Do both in one step. function `get_plantwhc_mct_bysite()` retruns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution 
 
 `mct2.R`  Creates list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
 
 - Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
 
+```{r}
+filn <- paste0("data/df_cwd_", siteset, ".RData")
+if (!file.exists(filn)){
+  df_cwd <- df_bal %>% 
+    dplyr::mutate(
+      out_mct_00_90 = purrr::map(
+        data,
+        ~get_plantwhc_mct_bysite(
+          .,
+          varname_wbal = "bal",
+          thresh_terminate = 0.0,
+          thresh_drop = 0.9,
+          fittype = "Gumbel"))
+      )
+  save(df_cwd, file = filn)
+} else {
+  load(filn)
+}
 
-## Water deficit extremes CWDX
-
-(maximum event with N year return period), `get_plantwhc_mct_bysite.R`  Creates data frame with return periods
-
-- Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
+```
 
 
 ## Rooting depth z(CWDX) 
 
 See `mct_sj02_simsuite.Rmd` → data frame with z(CWDX) for different return periods
 
+- Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
 - Use soil texture and WTD meta info prepared in step 1, see `mct_sj02_simsuite.Rmd`
 
 ## Implied zroot using SiF: CWD(LUE=0)
