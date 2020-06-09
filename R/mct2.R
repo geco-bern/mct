@@ -1,4 +1,4 @@
-mct <- function(df, varname_wbal, thresh_terminate = 0.1, thresh_drop = 0.9){
+mct <- function(df, varname_wbal, thresh_terminate = 0.0, thresh_drop = 0.9){
   
   if (thresh_terminate > thresh_drop) rlang::abort("Aborting. thresh_terminate must be smaller or equal thresh_drop.")
   
@@ -61,7 +61,7 @@ mct <- function(df, varname_wbal, thresh_terminate = 0.1, thresh_drop = 0.9){
           iidx_drop <- iidx
         }
 
-        # ## (even before "drop-day" is found), drop data of days where current CWD is below the maximum (previously) attained in the same event
+        # ## (even before "drop-day" is found), drop data of days after rain, i.e., where current CWD is below the maximum (previously) attained in the same event
         # if (deficit < max_deficit){
         #   df$iinst[iidx] <- NA
         #   df$dday[iidx]  <- NA

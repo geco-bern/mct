@@ -21,6 +21,7 @@ library(R.utils)
 library(readr)
 library(ggplot2)
 library(ingestr)
+library(ggridges)
 
 source("R/mct2.R")
 source("R/get_plantwhc_mct_bysite.R")
@@ -666,6 +667,7 @@ df_modobs <- df_wwf %>%
   unnest(data) %>% 
   dplyr::select(sitename, BIOME, biome_wwf = BIOME_NAME, ECO_NAME, ECO_NUM) %>% 
   right_join(df_modobs, by = "sitename")
+save(df_modobs, file = "data/df_modobs_sj02.RData")
 ```
 
 Plot.
@@ -689,6 +691,7 @@ Ridges.
 df_modobs %>% 
   dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot_wtd) %>% 
   tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_wwf)) %>% 
 
   ggplot(aes(x = zroot, y = biome_wwf, color = source, point_color = source, fill = source)) +
   geom_density_ridges(

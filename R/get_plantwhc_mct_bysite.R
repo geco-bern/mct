@@ -1,7 +1,7 @@
 get_plantwhc_mct_bysite <- function( df, 
                                      varname_wbal = "wbal", 
-                                     thresh_terminate = 0.2, 
-                                     thresh_drop = 0.8,
+                                     thresh_terminate = 0.0, 
+                                     thresh_drop = 0.9,
                                      return_period = c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800),
                                      verbose = FALSE, 
                                      fittype = NULL ){

@@ -1,0 +1,340 @@
+---
+title: "Workflow"
+author: "Beni Stocker"
+date: "6/8/2020"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(rbeni)
+library(tidyr)
+library(purrr)
+library(ncdf4)
+library(lubridate)
+library(ggplot2)
+library(readr)
+library(rsofun)
+library(ingestr)
+library(stringr)
+
+files.sources = list.files("./R")
+out <- sapply(paste0("R/", files.sources), source)
+```
+
+## Overview
+
+This workflow can be applied irrespective of the site set or global gridcells. Just need a "grid data frame".
+
+1. **Get site/grid meta info** → data frame with all meta info variables as separate columns
+    - elevation
+        - Site scale: data or ETOPO1
+        - Global: WFDEI
+    - soil texture, derive WHC top and bottom, and record obstacles to root used in function `calc_zroot.R`
+        - Site scale: HWSD
+        - Global: HWSD-Wieder
+    - WTD, Fan et al.
+        - Site scale: Hi-res Fan
+        - Global: Lo-res Fan
+    - Biome, WWF, NSCP?
+        - Site scale: WWF, extract from shapefile
+        - Global: rasterize WWF data?
+2. **Extract data**, `rscript_get_data.R`  → separate data frames for each data source, rows: site/gridcell, column: nested data, data: ET (W m-2), prec, snow, temp, elevation; large data! need to separate data frames by chunks for global analyses
+    - ALEXI
+    - WATCH
+    - SIF
+    - GLASS net radiation
+3. **Convert units, complement, reduce** → Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
+    - ET to mm (done in step 1)
+    - Snow water balance
+4. **CWD events**, `mct2.R`  → list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
+    - Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
+5. **Water deficit extremes CWDX** (maximum event with N year return period), `get_plantwhc_mct_bysite.R`  → data frame with return periods
+    - Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
+6. **Rooting depth z(CWDX)**, see `mct_sj02_simsuite.Rmd` → data frame with z(CWDX) for different return periods
+    - Use meta info prepared in step 1, including WTD  (Fan), see `mct_sj02_simsuite.Rmd`
+7. **Implied zroot using SiF: CWD(LUE=0)**, see `test_mct_bysite_alexi_fluxnet.R` 
+    - Use CWD events from step 3 and SiF from step 2
+8. **Implied zroot using Rn: CWD(fET=0)**, see `test_mct_bysite_alexi_fluxnet.R`
+    - Use CWD events from step 3 and GLASS net radiation from step 2
+
+
+## Settings
+
+The same overall workflow can be used for different site sets or for global simulations (treating each gridcell as a site). Depending on this scale, some data is read from different sources. 
+
+Define which set is used by uncommenting/commenting:
+```{r}
+siteset <- "sj02"
+# siteset <- "global"
+# siteset <- "fluxnet2015"
+# siteset <- "rsip"
+```
+
+## Meta info
+
+- Creates data frame with all meta info variables as separate columns.
+
+Read site location and direct observation data.
+```{r}
+if (siteset=="sj02"){
+  ##----------------------------------------------
+  ## Schenk & Jackson sites
+  ##----------------------------------------------
+  siteinfo <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>%
+    dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
+    dplyr::rename(sitename = ID, lat = Latitude, lon = Longitude) %>% 
+    dplyr::mutate(elv = ifelse(elv==-999, NA, elv)) %>% 
+    dplyr::filter(lon!=-999 & lat!=-999) %>% 
+    dplyr::mutate(year_start = 1982, year_end = 2011) %>% 
+    dplyr::select(sitename, lon, lat, elv, year_start, year_end)
+
+  df_grid_allsiteid <- siteinfo %>% 
+    dplyr::select(sitename, lon, lat, elv) %>% 
+    dplyr::rename(idx = sitename)
+
+  df_grid <- df_grid_allsiteid %>%
+    dplyr::select(lon, lat) %>%
+    distinct() %>%
+    mutate(idx = 1:n()) %>%
+    mutate(idx = paste0("i", idx))
+
+} else if (siteset == "fluxnet2015"){
+  ##----------------------------------------------
+  ## FLUXNET 2015 Tier 1 sites
+  ##----------------------------------------------
+  siteinfo <- ingestr::siteinfo_fluxnet2015 %>% 
+    rename(sitename = mysitename) %>% 
+    filter(!(classid %in% c("CRO", "WET"))) %>% 
+    #filter(year_start<=2007) %>%    # xxx USE ONLY FOR LANDEVAL xxx
+    mutate(date_start = lubridate::ymd(paste0(year_start, "-01-01"))) %>% 
+    mutate(date_end = lubridate::ymd(paste0(year_end, "-12-31")))
+
+  df_grid <- siteinfo %>% 
+    dplyr::select(sitename, lon, lat, elv) %>% 
+    dplyr::rename(idx = sitename)
+
+}
+```
+
+### Elevation
+
+- Fills missing values in column `elv`.
+    - Site scale: data or ETOPO1
+    - Global: WFDEI
+    
+```{r}
+if (siteset != "global"){
+  ##----------------------------------------------
+  ## Site-scale set
+  ##----------------------------------------------
+  siteinfo <- siteinfo %>% 
+    left_join(
+      ingest(
+        siteinfo %>% 
+          dplyr::select(sitename, lon, lat),
+        source = "etopo1",
+        dir = "~/data/etopo/"
+    ) %>% 
+    unnest(data) %>% 
+    rename(elv_etopo = elv),
+      by = "sitename"
+    )
+
+  ## Show a comparison
+  modobs_elv <- siteinfo %>% 
+    analyse_modobs2("elv", "elv_etopo")
+
+  ## Replace missing
+  siteinfo <- siteinfo %>% 
+    mutate(source_elv = ifelse(is.na(elv), "etopo1", "orig_data")) %>% 
+    mutate(elv = ifelse(is.na(elv), elv_etopo, elv)) %>% 
+    dplyr::select(-elv_etopo)
+  
+}
+```    
+    
+### Soil texture    
+-  Derive WHC top and bottom, and record obstacles to root used in function `calc_zroot.R`. Adds columns `data_soiltext_top` and `data_soiltext_sub`.
+    - Site scale: HWSD
+    - Global: HWSD-Wieder
+
+```{r}
+if (siteset != "global"){
+  ##----------------------------------------------
+  ## Site-scale set
+  ##----------------------------------------------
+  ## Collect HWSD data from database
+  filn <- paste0("data/df_hwsd_", siteset, ".RData")
+  if (!file.exists(filn)){
+    df_hwsd <- ingest(
+      siteinfo,
+      source = "hwsd",
+      settings = list(fil = "~/data/hwsd/HWSD_RASTER/hwsd.bil")
+      )
+    save(df_hwsd, file = filn)
+  } else {
+    load(filn)
+  }
+
+  ## Calculate FC, PWP, and WHC from texture data.
+  filn <- paste0("data/df_whc_", siteset, ".RData")
+  if (!file.exists(filn)){
+    df_whc <- df_hwsd %>% 
+      mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+      mutate(
+        data_soiltext_top = purrr::map(data, ~dplyr::select(
+          ., fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND, roots = ROOTS, imperm = IL)),
+        data_soiltext_sub = purrr::map(data, ~dplyr::select(
+          ., fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND, roots = ROOTS, imperm = IL))
+        ) %>% 
+      dplyr::select(-data) %>% 
+      mutate(data_soiltext_top = purrr::map(data_soiltext_top, ~calc_soilparams(., method = "balland")),
+             data_soiltext_sub = purrr::map(data_soiltext_sub, ~calc_soilparams(., method = "balland")))
+
+    save(df_whc, file = filn)
+  } else {
+    load(filn)
+  }
+
+}
+
+## add to meta data table
+siteinfo <- siteinfo %>% 
+  left_join(df_whc, by = "sitename")
+```
+
+### WTD
+
+- Fan et al.
+    - Site scale: Hi-res Fan
+    - Global: Lo-res Fan
+
+```{r}
+if (siteset != "global"){
+  ##----------------------------------------------
+  ## Site-scale set
+  ##----------------------------------------------
+  ## Collect HWSD data from database
+  filn <- paste0("data/df_wtd_fan_", siteset, ".RData")
+  if (!file.exists(filn)){
+    df_wtd <- siteinfo %>% 
+      dplyr::select(sitename, lon, lat) %>% 
+      ingest_wtd_fan()
+    save(df_wtd, file = filn)
+  } else {
+    load(filn)
+  }
+
+}
+
+## add to meta data table
+siteinfo <- siteinfo %>% 
+  left_join(df_wtd %>% 
+              dplyr::select(sitename, wtd), 
+            by = "sitename"
+            )
+```
+
+### Biome
+
+- WWF, NSCP?
+    - Site scale: WWF, extract from shapefile
+    - Global: rasterize WWF data?
+    
+```{r}
+if (siteset != "global"){
+  ##----------------------------------------------
+  ## Site-scale set
+  ##----------------------------------------------
+  ## WWF biome (Ecoregions dataset)
+  filn <- paste0("data/df_biome_wwf_", siteset, ".RData")
+  if (!file.exists(filn)){
+    df_wwf <- ingest(
+      dplyr::select(siteinfo, sitename, lon, lat),
+      source = "wwf",
+      dir = "~/data/biomes/wwf_ecoregions/official/",
+      settings = list(layer = "wwf_terr_ecos")
+      ) %>% 
+      mutate(data = purrr::map(data, ~slice(., 1)))
+    save(df_wwf, file = filn)
+  } else {
+    load(filn)
+  }
+}
+
+## add to meta data table
+siteinfo <- siteinfo %>% 
+  left_join(df_wwf %>% 
+              mutate(data = purrr::map(data, ~dplyr::select(., biome_id = BIOME, biome_name = BIOME_NAME))) %>%
+              tidyr::unnest(data), 
+            by = "sitename"
+            )
+```
+    
+### Save meta info
+
+```{r}
+filn <- paste0("data/siteinfo_", siteset, ".RData")
+save(siteinfo, file = filn)
+
+# filn <- paste0("data/siteinfo_", siteset, ".csv")
+# siteinfo %>% 
+#   tidyr::unnest(c(data_soiltext_top, data_soiltext_sub)) %>% 
+#   write_csv(path = filn)
+```
+
+
+## Extract data
+
+`rscript_get_data.R`  Creates separate data frames for each data source, rows: site/gridcell, column: nested data, data: ET (W m-2), prec, snow, temp, elevation; large data! need to separate data frames by chunks for global analyses
+
+### ALEXI
+### WATCH
+### SIF
+### GLASS net radiation
+    
+## Convert units, complement, reduce 
+
+Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
+
+- ET to mm (done in step 1)
+- Snow water balance
+    
+## CWD events
+
+`mct2.R`  Creates list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
+
+- Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
+
+
+## Water deficit extremes CWDX
+
+(maximum event with N year return period), `get_plantwhc_mct_bysite.R`  Creates data frame with return periods
+
+- Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
+
+
+## Rooting depth z(CWDX) 
+
+See `mct_sj02_simsuite.Rmd` → data frame with z(CWDX) for different return periods
+
+- Use soil texture and WTD meta info prepared in step 1, see `mct_sj02_simsuite.Rmd`
+
+## Implied zroot using SiF: CWD(LUE=0)
+
+`test_mct_bysite_alexi_fluxnet.R` 
+
+- Use CWD events from step 3 and SiF from step 2
+    
+    
+## Implied zroot using Rn: CWD(fET=0)
+
+`test_mct_bysite_alexi_fluxnet.R`
+
+- Use CWD events from step 3 and GLASS net radiation from step 2

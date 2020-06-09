@@ -933,9 +933,11 @@ df_corr_alexi <- purrr::map(out, "gumbi_alexi") %>%
     lue0 = purrr::map_dbl(out, "lue0_alexi")) %>% 
   dplyr::select(sitename, mct, lue0)
   
-df_corr_alexi %>%
+out_modobs <- df_corr_alexi %>%
   # dplyr::filter(lue0 < 1000 & mct < 1000) %>%
   rbeni::analyse_modobs2("lue0", "mct")
+out_modobs$gg
+ggsave("fig/modobs_whcx_lue0.pdf", width = 6, height = 5)
 
 ## biggest outlier
 df_corr_alexi %>% 
