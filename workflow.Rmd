@@ -408,6 +408,8 @@ XXX TO BE COMPLETED
 
 Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
 
+XXXXX THIS DOESNT' WORK - SHOULD DO THE SAME WAY AS BEFORE: WITH PURRR::MAP
+
 ```{r}
 n_avl_et <- function(df){
   sum(!is.na(df$et))
@@ -555,7 +557,8 @@ if (!file.exists(filn)){
     dplyr::mutate( avl_et = purrr::map_lgl(data, ~avl_et(., varnam_et = "et_mm"))) %>%
     dplyr::filter( avl_et ) %>% 
     dplyr::mutate( data = purrr::map(data, ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))) %>% 
-    dplyr::mutate( data = purrr::map(data, ~dplyr::select(., date, bal)))
+    dplyr::mutate( data = purrr::map(data, ~dplyr::select(., date, bal))) %>% 
+    dplyr::mutate( data = purrr::map(data, ~cutna_headtail_df(., "bal")))
     
   save(df_bal, file = filn)  
 
