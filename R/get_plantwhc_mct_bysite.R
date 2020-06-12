@@ -42,6 +42,7 @@ get_plantwhc_mct_bysite <- function( df,
       ## get annual maximum CWD
       ##--------------------------------
       vals <- out_mct$inst %>% 
+        ungroup() %>% 
         group_by(lubridate::year(date_start)) %>% 
         summarise(deficit = max(deficit, na.rm = TRUE)) %>% 
         pull(deficit)      
