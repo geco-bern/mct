@@ -1,4 +1,4 @@
-calc_cwd_lue0 <- function(df, inst){  
+calc_cwd_lue0 <- function(df, inst, do_plot = FALSE){  
 
   ## SiF vs CWD: ALEXI/WATCH-WFDEI------------------------------------------
   ## retain only data from largest instances of each year
@@ -93,48 +93,54 @@ calc_cwd_lue0 <- function(df, inst){
       lue0_exp <- NA
       k_lue <- NA
     }
-    
-    # out <- df %>% 
-    #   mutate(iinst = as.factor(iinst)) %>% 
-    #   ggplot() +
-    #   geom_point(aes(x = deficit, y = lue, color = iinst), alpha = 0.5) +
-    #   labs(title = sitename, x = "Cumulative water deficit (mm)", y = "SiF", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, SiF: Duveiller et al.") +
-    #   geom_hline(yintercept = 0.0, linetype = "dotted")
-    #   # ylim(-0.1, 0.5)
-    
-    # if (is_sign){
-    #   out <- out +
-    #     geom_vline(xintercept = lue0, linetype = "dotted", color = 'tomato') +
-    #     geom_line(data = df_fit, aes(x, y), col = "tomato")
-    # }
-    # if (is_sign_exp){
-    #   out <- out +
-    #     geom_vline(xintercept = lue0_exp, linetype = "dotted", color = 'royalblue') +
-    #     geom_line(data = df_fit_exp, aes(x, y), col = "royalblue")
-    # }
-    # if (!identical(gumbi_alexi$mod, NA)){
-    #   mctXX_alexi <- gumbi_alexi$df_return %>% dplyr::filter(return_period == use_return_period) %>% pull(return_level)
-    #   if (!is.na(mctXX_alexi)){
-    #     out <- out +
-    #       geom_vline(xintercept = mctXX_alexi)
-    #   } else {
-    #     rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
-    #   }
-    # } else {
-    #   rlang::warn(paste("No ALEXI MCT outputs for site", sitename))
-    #   mctXX_alexi <- NA
-    # }
+
+    if (do_plot){
+      gg <- df %>%
+        mutate(iinst = as.factor(iinst)) %>%
+        ggplot() +
+        geom_point(aes(x = deficit, y = lue, color = iinst), alpha = 0.5) +
+        labs( x = "Cumulative water deficit (mm)", y = "SiF", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, SiF: Duveiller et al.") +
+        geom_hline(yintercept = 0.0, linetype = "dotted")
+      # ylim(-0.1, 0.5)
+      
+      if (is_sign){
+        gg <- gg +
+          geom_vline(xintercept = lue0, linetype = "dotted", color = 'tomato') +
+          geom_line(data = df_fit, aes(x, y), col = "tomato")
+      }
+      if (is_sign_exp){
+        gg <- gg +
+          geom_vline(xintercept = lue0_exp, linetype = "dotted", color = 'royalblue') +
+          geom_line(data = df_fit_exp, aes(x, y), col = "royalblue")
+      }
+      # if (!identical(gumbi_alexi$mod, NA)){
+      #   mctXX_alexi <- gumbi_alexi$df_return %>% dplyr::filter(return_period == use_return_period) %>% pull(return_level)
+      #   if (!is.na(mctXX_alexi)){
+      #     gg <- gg +
+      #       geom_vline(xintercept = mctXX_alexi)
+      #   } else {
+      #     rlang::warn(paste("No ALEXI MCT outputs for site"))
+      #   }
+      # } else {
+      #   rlang::warn(paste("No ALEXI MCT outputs for site"))
+      #   mctXX_alexi <- NA
+      # }
+      
+    } else {
+      gg <- NA
+    }    
 
   } else {
 
-    rlang::inform(paste0("Not enough SiF data points for site ", sitename))
+    # rlang::inform(paste0("Not enough SiF data points for site ", sitename))
     lue0 <- NA
     slope_lue <- NA
     lue0_exp <- NA
     k_lue <- NA
+    gg <- NA
 
   }
 
-  return(tibble(lue0 = lue0, slope_lue = slope_lue, lue0_exp = lue0_exp, k_lue = k_lue))
+  return(list(lue0 = lue0, slope_lue = slope_lue, lue0_exp = lue0_exp, k_lue = k_lue, gg = gg))
 
 }
