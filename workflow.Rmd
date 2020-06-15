@@ -71,8 +71,8 @@ The same overall workflow can be used for different site sets or for global simu
 
 Define which set is used by uncommenting/commenting:
 ```{r}
-siteset <- "sj02"
-# siteset <- "global"
+# siteset <- "sj02"
+siteset <- "global"
 # siteset <- "fluxnet2015"
 # siteset <- "rsip"
 ```
@@ -119,6 +119,15 @@ if (siteset=="sj02"){
     dplyr::select(sitename, lon, lat, elv) %>% 
     dplyr::rename(idx = sitename)
 
+} else if (siteset == "global"){
+  ##----------------------------------------------
+  ## Global simulations at 0.5 degrees
+  ##----------------------------------------------
+  ## use WFDEI land mask and read its elevation
+  df <- nc_to_df("~/data/watch_wfdei/WFDEI-elevation.nc", dropna = TRUE) %>% 
+    mutate(sitename = paste0("i", 1:n())) %>% 
+    rename(elv = myvar) %>% 
+    dplyr::select(sitename, lon, lat, elv)
 }
 ```
 
@@ -155,7 +164,6 @@ if (siteset != "global"){
     mutate(source_elv = ifelse(is.na(elv), "etopo1", "orig_data")) %>% 
     mutate(elv = ifelse(is.na(elv), elv_etopo, elv)) %>% 
     dplyr::select(-elv_etopo)
-  
 }
 ```    
     
@@ -202,6 +210,10 @@ if (siteset != "global"){
     load(filn)
   }
 
+} else {
+  
+    
+  
 }
 
 ## add to meta data table
@@ -299,34 +311,51 @@ save(siteinfo, file = filn)
 ### ALEXI
 
 ```{r}
-##------------------------------------------------------------------------
-## ALEXI
-##------------------------------------------------------------------------
-filn <- paste0("data/df_alexi_", siteset,".Rdata")
-filn_csv <- str_replace(filn, "RData", "csv")
-if (!file.exists(filn)){
-  if (!file.exists(filn_csv)){
-    df_alexi <- get_data_mct_global(
-      df_grid,
-      dir_et   = "~/data/alexi_tir/netcdf/", fil_et_pattern = "EDAY_CERES_",
-      get_watch = FALSE, get_landeval = FALSE, get_alexi = TRUE
-    )
-    save(df_alexi, file = filn)
+if (siteset=="global"){
+  ##------------------------------------------------------------------------
+  ## Extract point data and construct separate nested time series data frame
+  ## for each longitde slice
+  ##------------------------------------------------------------------------
+  dir <- "~/data/alexi_tir/netcdf/"
+  nclist <- paste0(dir, list.files(dir, pattern = "EDAY_CERES_"))
+  outdir <- "~/data/alexi_tir/data_tidy/"
+  varnam <- "et"
+  lonnam <- "lon"
+  fileprefix <- "EDAY_CERES_"
+  
+  ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
+  nclist_to_df(nclist[1:365], outdir, fileprefix, varnam, lonnam, timenam = "time", ncores = 2)
+  
+} else {
+  ##------------------------------------------------------------------------
+  ## Extract point data and construct single nested time series data frame
+  ##------------------------------------------------------------------------
+  filn <- paste0("data/df_alexi_", siteset,".Rdata")
+  filn_csv <- str_replace(filn, "RData", "csv")
+  if (!file.exists(filn)){
+    if (!file.exists(filn_csv)){
+      df_alexi <- get_data_mct_global(
+        df_grid,
+        dir_et   = "~/data/alexi_tir/netcdf/", fil_et_pattern = "EDAY_CERES_",
+        get_watch = FALSE, get_landeval = FALSE, get_alexi = TRUE
+      )
+      save(df_alexi, file = filn)
+      df_alexi %>%
+        tidyr::unnest(df) %>%
+        write_csv(path = filn_csv)
+    } else {
+      df_alexi <- read_csv(file = filn_csv) %>%
+        group_by(idx, lon, lat) %>%
+        tidyr::nest() %>%
+        dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+        dplyr::rename(df = data)
+    }
+  } else {
+    load(filn)
     df_alexi %>%
       tidyr::unnest(df) %>%
       write_csv(path = filn_csv)
-  } else {
-    df_alexi <- read_csv(file = filn_csv) %>%
-      group_by(idx, lon, lat) %>%
-      tidyr::nest() %>%
-      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
-      dplyr::rename(df = data)
-  }
-} else {
-  load(filn)
-  df_alexi %>%
-    tidyr::unnest(df) %>%
-    write_csv(path = filn_csv)
+  } 
 }
 ```
 
@@ -824,12 +853,12 @@ df_modobs <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/ro
               dplyr::select(sitename, biome_wwf = biome_name),
             by = "sitename")
 
-save(df_modobs, file = "data/df_modobs_WF.Rdata")
+save(df_modobs, file = paste0("data/df_modobs_", siteset, "WF.Rdata"))
 ```
 
 Distribution by biomes.
 ```{r}
-df_modobs %>% dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot, lon = Longitude, lat = Latitude) %>% 
+df_modobs %>% dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot, lon, lat) %>% 
   tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
   dplyr::filter(!is.na(biome_wwf)) %>% 
   dplyr::filter(biome_wwf!="Mangroves") %>%   
@@ -854,7 +883,7 @@ df_modobs %>% dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = z
   ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
   theme_ridges(center = TRUE)
 
-ggsave("fig/modobs_ridges_zroot_biome_wwf_NEW.pdf", width = 15, height = 10)
+ggsave(paste0("fig/modobs_ridges_zroot_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
 ```
 
 Where are locations of points with largest mismatch?
@@ -862,13 +891,13 @@ Where are locations of points with largest mismatch?
 df_tmp <- df_modobs %>% 
   mutate(error = zroot - D95_extrapolated) %>% 
   arrange(desc(error)) %>% 
-  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf, lon = Longitude, lat = Latitude)
+  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf, lon, lat)
 
 plot_map_simpl() +
   geom_point(data = df_tmp, 
-             aes(lon, lat, color = error))
+             aes(lon, lat, color = error)) +
+  scale_colour_gradient(low = "grey30", high = "red")
 ```
-
 
 Are sites with largest mismatch characterised by a small reduction in flue (indicating groundwater access)?
 ```{r}
@@ -921,7 +950,7 @@ df_sif %>%
   ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
   theme_ridges(center = TRUE)
 
-ggsave("fig/modobs_ridges_cwd_biome_wwf_NEW.pdf", width = 15, height = 10)
+ggsave(paste0("fig/modobs_ridges_cwd_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
 ```
 
 Something is wrong: Sites missing when applying new workflow. This is due to missing et_mm (elv was not ingested)
