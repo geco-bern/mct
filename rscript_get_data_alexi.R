@@ -1,3 +1,10 @@
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(lubridate)
+library(magrittr)
+library(tidync)
+
 ##------------------------------------------------------------------------
 ## Extract point data and construct separate nested time series data frame
 ## for each longitde slice
@@ -10,4 +17,4 @@ lonnam <- "lon"
 fileprefix <- "EDAY_CERES_"
 
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-rbeni::nclist_to_df(nclist[1:10], outdir, fileprefix, varnam, lonnam, timenam = "time", ncores = 2)
+rbeni::nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, timenam = "time", ncores = 160) # ncores = nnodes * 16; nnodes is requested in submission file 
