@@ -22,6 +22,7 @@ library(readr)
 library(rsofun)
 library(ingestr)
 library(stringr)
+library(ggridges)
 
 files.sources = list.files("./R")
 out <- sapply(paste0("R/", files.sources), source)
@@ -70,8 +71,8 @@ The same overall workflow can be used for different site sets or for global simu
 
 Define which set is used by uncommenting/commenting:
 ```{r}
-siteset <- "sj02"
-# siteset <- "global"
+# siteset <- "sj02"
+siteset <- "global"
 # siteset <- "fluxnet2015"
 # siteset <- "rsip"
 ```
@@ -91,8 +92,7 @@ if (siteset=="sj02"){
     dplyr::rename(sitename = ID, lat = Latitude, lon = Longitude) %>% 
     dplyr::mutate(elv = ifelse(elv==-999, NA, elv)) %>% 
     dplyr::filter(lon!=-999 & lat!=-999) %>% 
-    dplyr::mutate(year_start = 1982, year_end = 2011) %>% 
-    dplyr::select(sitename, lon, lat, elv, year_start, year_end)
+    dplyr::select(sitename, lon, lat, elv)
 
   df_grid_allsiteid <- siteinfo %>% 
     dplyr::select(sitename, lon, lat, elv) %>% 
@@ -119,6 +119,15 @@ if (siteset=="sj02"){
     dplyr::select(sitename, lon, lat, elv) %>% 
     dplyr::rename(idx = sitename)
 
+} else if (siteset == "global"){
+  ##----------------------------------------------
+  ## Global simulations at 0.5 degrees
+  ##----------------------------------------------
+  ## use WFDEI land mask and read its elevation
+  df <- nc_to_df("~/data/watch_wfdei/WFDEI-elevation.nc", dropna = TRUE) %>% 
+    mutate(sitename = paste0("i", 1:n())) %>% 
+    rename(elv = myvar) %>% 
+    dplyr::select(sitename, lon, lat, elv)
 }
 ```
 
@@ -155,7 +164,6 @@ if (siteset != "global"){
     mutate(source_elv = ifelse(is.na(elv), "etopo1", "orig_data")) %>% 
     mutate(elv = ifelse(is.na(elv), elv_etopo, elv)) %>% 
     dplyr::select(-elv_etopo)
-  
 }
 ```    
     
@@ -202,6 +210,10 @@ if (siteset != "global"){
     load(filn)
   }
 
+} else {
+  
+    
+  
 }
 
 ## add to meta data table
@@ -255,6 +267,7 @@ if (siteset != "global"){
   ## WWF biome (Ecoregions dataset)
   filn <- paste0("data/df_biome_wwf_", siteset, ".RData")
   if (!file.exists(filn)){
+    
     df_wwf <- ingest(
       dplyr::select(siteinfo, sitename, lon, lat),
       source = "wwf",
@@ -262,6 +275,7 @@ if (siteset != "global"){
       settings = list(layer = "wwf_terr_ecos")
       ) %>% 
       mutate(data = purrr::map(data, ~slice(., 1)))
+    
     save(df_wwf, file = filn)
   } else {
     load(filn)
@@ -298,34 +312,52 @@ load(filn)
 ### ALEXI
 
 ```{r}
-##------------------------------------------------------------------------
-## ALEXI
-##------------------------------------------------------------------------
-filn <- paste0("data/df_alexi_", siteset,".RData")
-filn_csv <- str_replace(filn, "RData", "csv")
-if (!file.exists(filn)){
-  if (!file.exists(filn_csv)){
-    df_alexi <- get_data_mct_global(
-      df_grid,
-      dir_et   = "~/data/alexi_tir/netcdf/", fil_et_pattern = "EDAY_CERES_",
-      get_watch = FALSE, get_landeval = FALSE, get_alexi = TRUE
-    )
-    save(df_alexi, file = filn)
+if (siteset=="global"){
+  ##------------------------------------------------------------------------
+  ## Extract point data and construct separate nested time series data frame
+  ## for each longitde slice
+  ##------------------------------------------------------------------------
+  dir <- "~/data/alexi_tir/netcdf/"
+  nclist <- paste0(dir, list.files(dir, pattern = "EDAY_CERES_"))
+  outdir <- "~/data/alexi_tir/data_tidy/"
+  varnam <- "et"
+  lonnam <- "lon"
+  fileprefix <- "EDAY_CERES_"
+  
+  ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
+  ## this is done using rscript_get_data_alexi.R and submit_get_data_alexi.sh
+  nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, timenam = "time", ncores = 2)
+  
+} else {
+  ##------------------------------------------------------------------------
+  ## Extract point data and construct single nested time series data frame
+  ##------------------------------------------------------------------------
+  filn <- paste0("data/df_alexi_", siteset,".Rdata")
+  filn_csv <- str_replace(filn, "RData", "csv")
+  if (!file.exists(filn)){
+    if (!file.exists(filn_csv)){
+      df_alexi <- get_data_mct_global(
+        df_grid,
+        dir_et   = "~/data/alexi_tir/netcdf/", fil_et_pattern = "EDAY_CERES_",
+        get_watch = FALSE, get_landeval = FALSE, get_alexi = TRUE
+      )
+      save(df_alexi, file = filn)
+      df_alexi %>%
+        tidyr::unnest(df) %>%
+        write_csv(path = filn_csv)
+    } else {
+      df_alexi <- read_csv(file = filn_csv) %>%
+        group_by(idx, lon, lat) %>%
+        tidyr::nest() %>%
+        dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
+        dplyr::rename(df = data)
+    }
+  } else {
+    load(filn)
     df_alexi %>%
       tidyr::unnest(df) %>%
       write_csv(path = filn_csv)
-  } else {
-    df_alexi <- read_csv(file = filn_csv) %>%
-      group_by(idx, lon, lat) %>%
-      tidyr::nest() %>%
-      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
-      dplyr::rename(df = data)
-  }
-} else {
-  load(filn)
-  df_alexi %>%
-    tidyr::unnest(df) %>%
-    write_csv(path = filn_csv)
+  } 
 }
 ```
 
@@ -377,12 +409,31 @@ filn <- paste0("data/df_sif_", siteset, ".RData")
 filn_csv <- str_replace(filn, "Rdata", "csv")
 if (!file.exists(filn)){
   if (!file.exists(filn_csv)){
+
+    ## version 'JJ'  
     df_sif_jj <- get_data_mct_global(
       df_grid,
       dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_",
       get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
     )
-    save(df_sif, file = filn)
+    df_sif_jj <- df_sif_jj %>% 
+      rename(idx_uniquelonlat = idx) %>% 
+      right_join(df_grid_allsiteid,
+                 by = c("lon", "lat"))
+    save(df_sif_jj, file = filn)
+
+    ## version 'PK'  
+    df_sif_pk <- get_data_mct_global(
+      df_grid,
+      dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_PK_dcSIF_005deg_8day_",
+      get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
+    )
+    df_sif_pk <- df_sif_pk %>% 
+      rename(idx_uniquelonlat = idx) %>% 
+      right_join(df_grid_allsiteid,
+                 by = c("lon", "lat"))
+    save(df_sif_pk, file = filn)    
+    
     df_sif %>%
       tidyr::unnest(df) %>%
       write_csv(path = filn_csv)
@@ -407,86 +458,139 @@ XXX TO BE COMPLETED
     
 ## Combine, convert units, complement, reduce 
 
-Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
+### Data filtering
 
-XXXXX THIS DOESNT' WORK - SHOULD DO THE SAME WAY AS BEFORE: WITH PURRR::MAP
-
+Some ET data seem to be missing. Retain only sites with more than 3000 ET dates.
 ```{r}
 n_avl_et <- function(df){
   sum(!is.na(df$et))
 }
-n_avl_et_mm <- function(df){
-  sum(!is.na(df$et_mm))
-}
 
+df_alexi <- df_alexi %>% 
+  mutate(avl_et = purrr::map_int(df, ~n_avl_et(.))) 
+
+## where are they? They are along coasts. Ok, valid to remove them.
+plot_map_simpl() +
+  geom_point(
+    data = df_alexi %>% 
+      dplyr::filter(avl_et < 3000),
+    aes(lon, lat),
+    color = 'red')
+
+df_alexi <- df_alexi %>% 
+  dplyr::filter(avl_et > 3000)
+```
+
+Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
+
+### ET in mm
+
+```{r}
 filn <- paste0("data/df_clean_", siteset, ".RData")
 if (!file.exists(filn)){
-
-  ## get flat table
-  df_clean <- df_alexi %>% 
-    
-    ## clean something weird
-    group_by(idx) %>% 
-    nest() %>% 
-    mutate(data = purrr::map(data, ~slice(., 1))) %>% 
-    unnest(data) %>% 
-    
-    ## make flat
-    unnest(df) %>% 
-    rename(sitename = idx)
-
-  ## add prec and snow from df_watch
-  avl_prec_snow <- ("prec" %in% names(df_clean) && "snow" %in% names(df_clean))
-  if (!avl_prec_snow){
-    df_clean <- df_clean %>% 
-      left_join(df_watch %>% 
-                  unnest(data),
-                by = "sitename")
-  }
-
-  ## Get ET in mm
-  avl_et_mm <- "et_mm" %in% names(df_clean)
-  if (!avl_et_mm){
-    
-    avl_elv <- "elv" %in% names(df_clean)
-    if (!avl_elv){
-      ## get elevation data from siteinfo
-      df_clean <- df_clean %>% 
-        left_join(dplyr::select(siteinfo, sitename, elv),
-                  by = "sitename")
-    }
-    
-    avl_temp <- ("temp" %in% names(df_clean))
-    if (!avl_temp){
-      df_clean <- df_clean %>% 
-        left_join(df_watch %>% 
-                    unnest(data) %>% 
-                    dplyr::select(sitename, temp),
-                  by = "sitename"
-                 )
-    }
-    
-    ## Apply conversion function
-    df_clean <- df_clean %>% 
-      rowwise() %>% 
-      mutate(et_mm = convert_et(et, temp, elv)) %>% 
-      
-      ## nest again for next step
-      group_by(sitename) %>% 
-      tidyr::nest() %>% 
-      
-      ## interpolate missing values in et_mm
-      mutate(data = purrr::map(data, ~myapprox(.$et_mm)))
-    
-  }
   
-  ## nest again, if unnested
-  unnested <- (df_clean$sitename %>% table() %>% as_tibble() %>% slice(1) %>% pull(n) > 1)
-  if (unnested){
-    df_clean <- df_clean %>% 
-      group_by(sitename) %>% 
-      nest()
-  }
+  df_clean <- df_alexi %>%
+    ungroup() %>% 
+    
+    # ## xxx debug
+    # dplyr::filter(idx == "BF03a") %>%
+
+    ## add elevation to the nested dataframes (repeating same value for each time step)
+    tidyr::unnest(df) %>%
+    drop_na(date) %>% 
+    dplyr::select(-elv) %>% 
+    left_join(dplyr::select(siteinfo, idx = sitename, elv),
+              by = "idx") %>%
+    dplyr::group_by(lon, lat, idx) %>%
+    tidyr::nest() %>%
+
+    ## convert units: get ET in mm d-1
+    ## total ET
+    dplyr::mutate(et_mm = purrr::map(data, ~convert_et(.$et, .$temp, .$elv))) %>% 
+    dplyr::mutate(et_mm = purrr::map(et_mm, ~tibble(et_mm = .))) %>% 
+    dplyr::mutate(data    = purrr::map(data, ~dplyr::select(., -et_mm))) %>% 
+    dplyr::mutate(data    = purrr::map2(data, et_mm, ~bind_cols(.x, .y))) %>% 
+    dplyr::select(-et_mm) %>% 
+    dplyr::mutate(data    = purrr::map(data, ~drop_na(., date)))  # Problem: The first row in `df_alexi$df` is always NA. This is a bug. Drop the row.
+
+  # ## get flat table
+  # df_clean <- df_alexi %>% 
+  #   
+  #   ## clean something weird
+  #   group_by(idx) %>% 
+  #   nest() %>% 
+  #   mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  #   unnest(data) %>% 
+  #   
+  #   ## make flat
+  #   unnest(df) %>% 
+  #   rename(sitename = idx)
+  # 
+  # ## add prec and snow from df_watch
+  # avl_prec_snow <- ("prec" %in% names(df_clean) && "snow" %in% names(df_clean))
+  # if (!avl_prec_snow){
+  #   df_clean <- df_clean %>% 
+  #     left_join(df_watch %>% 
+  #                 unnest(data),
+  #               by = "sitename")
+  # }
+  # 
+  # ## Get ET in mm
+  # avl_et_mm <- "et_mm" %in% names(df_clean)
+  # if (!avl_et_mm){
+  #   
+  #   avl_elv <- "elv" %in% names(df_clean)
+  #   if (!avl_elv){
+  #     ## get elevation data from siteinfo
+  #     df_clean <- df_clean %>% 
+  #       left_join(dplyr::select(siteinfo, sitename, elv),
+  #                 by = "sitename")
+  #   }
+  #   
+  #   avl_temp <- ("temp" %in% names(df_clean))
+  #   if (!avl_temp){
+  #     df_clean <- df_clean %>% 
+  #       left_join(df_watch %>% 
+  #                   unnest(data) %>% 
+  #                   dplyr::select(sitename, temp),
+  #                 by = "sitename"
+  #                )
+  #   }
+  #   
+  #   ## Apply conversion function
+  #   df_clean <- df_clean %>% 
+  #     rowwise() %>% 
+  #     mutate(et_mm = convert_et(et, temp, elv)) %>% 
+  #     
+  #     ## nest again for next step
+  #     group_by(sitename) %>% 
+  #     tidyr::nest() %>% 
+  #     
+  #     ## interpolate missing values in et_mm
+  #     mutate(data = purrr::map(data, ~myapprox(.$et_mm)))
+  #   
+  # }
+  
+  # ## nest again, if unnested
+  # unnested <- (df_clean$sitename %>% table() %>% as_tibble() %>% slice(1) %>% pull(n) > 1)
+  # if (unnested){
+  #   df_clean <- df_clean %>% 
+  #     group_by(sitename) %>% 
+  #     nest()
+  # }
+    
+  save(df_clean, file = filn)  
+
+} else {
+  load(filn)
+}
+```
+
+### Snow
+
+```{r}
+filn <- paste0("data/df_snow_", siteset, ".RData")
+if (!file.exists(filn)){
 
   ## Simulate snow water balance (no missing data allowed for 'prec', 'snow', or 'temp')
   avl_snow_pool <- ("snow_pool" %in% names(df_clean$data[[1]]) && "liquid_to_soil" %in% names(df_clean$data[[1]]))
@@ -509,57 +613,47 @@ if (!file.exists(filn)){
   #   dplyr::filter(missing_snow > 1 | missing_prec > 1 | missing_temp > 1 )
   
   
-  if (!avl_snow_pool){
-      df_clean <- df_clean %>% 
-        mutate(data = purrr::map(data, ~drop_na(., date))) %>% 
-        # mutate(data = purrr::map(data, ~slice(., -1))) %>% 
-        mutate(data = purrr::map(data, ~simulate_snow(.)))
-  }
-  save(df_clean, file = filn)  
+  df_snow <- df_clean %>% 
+    mutate(data = purrr::map(data, ~drop_na(., date))) %>% 
+    mutate(data = purrr::map(data, ~simulate_snow(.)))
+  
+  save(df_snow, file = filn)
+  
+  # ## test plot visualising snow accumulation and melt
+  # df_snow$data[[1]] %>%
+  #    dplyr::filter(lubridate::year(date) == 2005) %>%
+  #    ggplot() +
+  #    geom_line(aes(date, snow_pool), col = "royalblue") +
+  #    geom_line(aes(date, liquid_to_soil), col = "springgreen4") +
+  #    geom_line(aes(date, prec), col = "tomato")
 
 } else {
   load(filn)
 }
 ```
 
-Get daily water balance and reduce data frames.
-```{r}  
+### Daily water balance 
+
+... and reduce data frames.
+```{r} 
+source("R/get_bal.R")
+
 filn <- paste0("data/df_bal_", siteset, ".RData")
 if (!file.exists(filn)){
-  
-  # ## test plot visualising snow accumulation and mel
-  # df_clean$data[[1]] %>% 
-  #    dplyr::filter(lubridate::year(date) == 2005) %>%
-  #    ggplot() + 
-  #    geom_line(aes(date, snow_pool), col = "royalblue") +
-  #    geom_line(aes(date, liquid_to_soil), col = "springgreen4") +
-  #    geom_line(aes(date, prec), col = "tomato")
-
-  ## Get daily water balance after snow melt
-  get_bal <- function(df, varnam_bal, varnam_et, varnam_prec){
-    
-    ## linearly interpolate ET
-    df[[varnam_et]] <- myapprox(df[[varnam_et]])
-      
-    ## re-calculate daily water balance
-    df[[varnam_bal]] <- df[[varnam_prec]] - df[[varnam_et]]
-
-    ## remove NAs at head and tail
-    df <- rbeni::cutna_headtail_df(df, varnam_bal)
-    
-    return(df)
-  }
 
   avl_et <- function(df, varnam_et){
     any(!is.na(df[varnam_et]))
   }
 
-  df_bal <- df_clean %>%
+  df_bal <- df_snow %>%
+    
+    # ## xxx debug
+    # dplyr::filter(idx == "BF03a")
+    
+    dplyr::mutate( data = purrr::map(data, ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))) %>% 
     dplyr::mutate( avl_et = purrr::map_lgl(data, ~avl_et(., varnam_et = "et_mm"))) %>%
     dplyr::filter( avl_et ) %>% 
-    dplyr::mutate( data = purrr::map(data, ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))) %>% 
-    dplyr::mutate( data = purrr::map(data, ~dplyr::select(., date, bal))) %>% 
-    dplyr::mutate( data = purrr::map(data, ~cutna_headtail_df(., "bal")))
+    dplyr::mutate( data = purrr::map(data, ~dplyr::select(., date, bal)))
     
   save(df_bal, file = filn)  
 
@@ -582,7 +676,7 @@ filn <- paste0("data/df_cwd_", siteset, ".RData")
 if (!file.exists(filn)){
   df_cwd <- df_bal %>% 
     dplyr::mutate(
-      out_mct_00_90 = purrr::map(
+      out_mct = purrr::map(
         data,
         ~get_plantwhc_mct_bysite(
           .,
@@ -595,22 +689,146 @@ if (!file.exists(filn)){
 } else {
   load(filn)
 }
-
 ```
 
 
 ## Rooting depth z(CWDX) 
 
-See `mct_sj02_simsuite.Rmd` → data frame with z(CWDX) for different return periods
+### Calculate
+
+See `mct_sj02_simsuite.Rmd`, creates data frame with z(CWDX) for different return periods
 
 - Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
 - Use soil texture and WTD meta info prepared in step 1, see `mct_sj02_simsuite.Rmd`
+
+```{r}
+filn <- paste0("data/df_zroot_", siteset, ".RData")
+if (!file.exists(filn)){
+
+  ## use CWDXX for zroot, no root obstacles accounted for now
+  df_zroot <- df_cwd %>%
+    ungroup() %>% 
+    dplyr::select(sitename = idx, out_mct) %>% 
+    left_join(
+      df_whc %>% 
+        unnest(data_soiltext_sub) %>%
+        dplyr::select(sitename, whc_s = whc),
+      by = "sitename"
+    ) %>% 
+    left_join(
+      df_whc %>% 
+        unnest(data_soiltext_top) %>%
+        dplyr::select(sitename, whc_t = whc, roots, imperm),
+      by = "sitename"
+    ) %>% 
+    # dplyr::select(sitename) %>% 
+    
+    ## rooting depth from 20-year extreme
+    dplyr::mutate(cwdx10 = purrr::map_dbl(out_mct, ~extract_return_level(., 10)),
+                  cwdx20 = purrr::map_dbl(out_mct, ~extract_return_level(., 20)),
+                  cwdx30 = purrr::map_dbl(out_mct, ~extract_return_level(., 30))
+                  ) %>% 
+
+    ## rooting depth from 10-year extreme
+    rowwise() %>% 
+    dplyr::mutate(zroot_cwd10 = calc_zroot(cwdx10, whc_t, whc_s, roots, imperm),
+                  zroot_cwd20 = calc_zroot(cwdx20, whc_t, whc_s, roots, imperm),
+                  zroot_cwd30 = calc_zroot(cwdx30, whc_t, whc_s, roots, imperm)
+                  )
+
+  save(df_zroot, file = filn)
+  
+} else {
+  load(filn)
+}
+```
+
 
 ## Implied zroot using SiF: CWD(LUE=0)
 
 `test_mct_bysite_alexi_fluxnet.R` 
 
 - Use CWD events from step 3 and SiF from step 2
+
+Add SiF data to 
+```{r}
+source("R/get_flue_cwdmax.R")
+load("data/df_sif_jj_sj02.Rdata")
+load("data/df_sif_pk_sj02.Rdata")
+
+filn <- paste0("data/df_sif_lue0", siteset, ".Rdata")
+  if (!file.exists(filn)){
+    add_mean_sif <- function(df){
+    rowMeans( cbind(df$sif_jj, df$sif_pk) )
+  }
+    
+  df_sif <- df_cwd %>% 
+    dplyr::select(-data) %>% 
+    mutate(cwdx20 = purrr::map_dbl(out_mct, ~extract_return_level(., 20))) %>% 
+    mutate(mct = purrr::map(out_mct, "mct")) %>% 
+    ungroup() %>% 
+    dplyr::select(idx, mct, cwdx20) %>% 
+    mutate(df = purrr::map(mct, "df"),
+           inst = purrr::map(mct, "inst")) %>% 
+    dplyr::select(-mct) %>% 
+    
+    ## add sif data
+    left_join(
+      df_sif_jj %>% dplyr::select(idx, df_jj = data),
+      by = "idx"
+    ) %>% 
+    left_join(
+      df_sif_pk %>% dplyr::select(idx, df_pk = data),
+      by = "idx"
+    ) %>% 
+    dplyr::filter(!is.null(df) & !is.null(df_jj) & !is.null(df_pk) & !is.na(cwdx20)) %>% 
+    mutate(df = purrr::map2(df, df_jj, ~left_join(.x, .y, by = "date"))) %>% 
+    mutate(df = purrr::map(df, ~rename(., sif_jj = sif))) %>% 
+    mutate(df = purrr::map2(df, df_pk, ~left_join(.x, .y, by = "date"))) %>% 
+    mutate(df = purrr::map(df, ~rename(., sif_pk = sif))) %>% 
+    # mutate(df = purrr::map(df, ~add_mean_sif(.))) %>% 
+    mutate(df = purrr::map(df, ~rename(., lue = sif_jj))) %>%
+    
+    ## get CWD at LUE0=0
+    mutate(out_lue0 = purrr::map2(df, inst, ~calc_cwd_lue0(.x, .y, do_plot = TRUE))) %>% 
+    mutate(cwd_lue0 = purrr::map_dbl(out_lue0, "lue0")) %>% 
+    mutate(cwd_lue0_exp = purrr::map_dbl(out_lue0, "lue0_exp")) %>% 
+    mutate(gg = purrr::map(out_lue0, "gg")) %>% 
+    
+    ## get fLUE at CWDmax
+    mutate(out_flue = purrr::map(df, ~get_flue_cwdmax(.))) %>% 
+    mutate(flue = purrr::map_dbl(out_flue, "flue")) %>% 
+    mutate(cwdmax = purrr::map_dbl(out_flue, "cwdmax")) %>% 
+
+    dplyr::select(idx, cwdx20, cwd_lue0, cwd_lue0_exp, gg, flue, cwdmax)
+    
+  save(df_sif, file = filn)
+} else {
+  load(filn)
+}
+
+df_sif %>% 
+  mutate(cwd_lue0 = remove_outliers(cwd_lue0)) %>% 
+  analyse_modobs2("cwd_lue0", "cwdx20")
+```
+    
+    
+    
+    
+### LUE reduction at maximum CWD
+
+Doesn't work well.
+```{r}
+df <- df_sif %>% 
+  arrange(desc(flue)) %>% 
+  slice(1) %>% 
+  pull(df)
+
+df_sif %>% 
+  dplyr::filter(!is.na(cwd_lue0))%>% 
+  ggplot(aes(x = cwdmax, y = flue)) +
+  geom_point()
+```
     
     
 ## Implied zroot using Rn: CWD(fET=0)
@@ -618,3 +836,142 @@ See `mct_sj02_simsuite.Rmd` → data frame with z(CWDX) for different return per
 `test_mct_bysite_alexi_fluxnet.R`
 
 - Use CWD events from step 3 and GLASS net radiation from step 2
+
+
+## Plot 
+
+### Rooting depth distribution
+
+Use simulated zroot based on CWD extremes with 20-year return period.
+```{r}
+df_modobs <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
+  dplyr::rename(lon = Longitude, lat = Latitude) %>% 
+  dplyr::filter(lon > -180 & lat > -90) %>% 
+  dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
+  dplyr::rename(sitename = ID) %>% 
+  dplyr::mutate(D50 = 1000 * D50, D95 = 1000 * D95, D50_extrapolated = 1000 * D50_extrapolated, D95_extrapolated = 1000 * D95_extrapolated) %>% 
+  dplyr::left_join(dplyr::select(df_zroot, cwdx20, zroot = zroot_cwd20, sitename), by = "sitename") %>% 
+  left_join(siteinfo %>% 
+              dplyr::select(sitename, biome_wwf = biome_name),
+            by = "sitename")
+
+save(df_modobs, file = paste0("data/df_modobs_", siteset, "WF.Rdata"))
+```
+
+Distribution by biomes.
+```{r}
+df_modobs %>% dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot, lon, lat) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_wwf)) %>% 
+  dplyr::filter(biome_wwf!="Mangroves") %>%   
+  ggplot(aes(x = zroot, y = biome_wwf, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave(paste0("fig/modobs_ridges_zroot_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
+```
+
+Where are locations of points with largest mismatch?
+```{r}
+df_tmp <- df_modobs %>% 
+  mutate(error = zroot - D95_extrapolated) %>% 
+  arrange(desc(error)) %>% 
+  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf, lon, lat)
+
+plot_map_simpl() +
+  geom_point(data = df_tmp, 
+             aes(lon, lat, color = error)) +
+  scale_colour_gradient(low = "grey30", high = "red")
+```
+
+Are sites with largest mismatch characterised by a small reduction in flue (indicating groundwater access)?
+```{r}
+df_modobs %>% 
+  left_join(siteinfo %>% 
+              dplyr::select(sitename, biome_wwf = biome_name),
+            by = "sitename") %>% 
+  mutate(error = zroot - D95_extrapolated) %>% 
+  arrange(desc(error)) %>% 
+  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf) %>% 
+  left_join(df_sif %>% 
+              dplyr::select(sitename = idx, flue, cwdmax),
+            by = "sitename") %>% 
+  ggplot(aes(x = flue, y = error)) +
+  geom_point()
+```
+
+
+### CWDX distribution
+
+By biomes.
+```{r}
+df_sif %>% 
+  rename(sitename = idx) %>% 
+  left_join(siteinfo %>% 
+              dplyr::select(sitename, biome_wwf = biome_name),
+            by = "sitename") %>% 
+  tidyr::pivot_longer(cols = c(cwdx20, cwd_lue0), names_to = "source", values_to = "cwd") %>% 
+  dplyr::filter(!is.na(biome_wwf)) %>% 
+  dplyr::filter(biome_wwf!="Mangroves") %>% 
+
+  ggplot(aes(x = cwd, y = biome_wwf, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = FALSE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("CWD(LUE=0)", "CWDX")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave(paste0("fig/modobs_ridges_cwd_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
+```
+
+Something is wrong: Sites missing when applying new workflow. This is due to missing et_mm (elv was not ingested)
+```{r}
+load("data/df_modobs_reOLD.Rdata")
+df_modobs_new <- dplyr::select(df_modobs, sitename, cwdx20, zroot)
+
+df_test <- df_modobs_reOLD %>%
+  dplyr::select(zroot_old = zroot, cwdx20_old = cwd20) %>%
+  left_join(df_modobs_new, by = "sitename")
+
+out <- df_test %>%
+  analyse_modobs2("zroot_old", "zroot")
+out$gg
+
+out <- df_test %>%
+  analyse_modobs2("cwdx20_old", "cwdx20")
+out$gg
+```
+
+
+

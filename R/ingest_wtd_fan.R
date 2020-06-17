@@ -12,6 +12,7 @@ ingest_wtd_fan <- function(df){
     )
 
   df_cont <- df %>% 
+    ungroup() %>% 
     rowwise() %>% 
     mutate(cont = get_continent(lon, lat)) %>%
     left_join(

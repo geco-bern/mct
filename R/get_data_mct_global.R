@@ -196,8 +196,8 @@ get_data_mct_chunk <- function(df, idx,
     print("getting SiF from Duveiller et al. (GOME2-SiF-downscaled) ...")
     list_fil_sif <- list.files(dir_sif, pattern = fil_sif_pattern, recursive = FALSE)
     df <- extract_points_filelist(df, list_fil_sif, varnam = "SIF", dirnam = dir_sif, fil_pattern = fil_sif_pattern, filetype = "sif", ...) %>% 
-      dplyr::rename(data0 = data) %>%
-      dplyr::mutate(data0 = purrr::map(data0, ~rename(., sif = V1)))
+      dplyr::rename(data = data0) %>%
+      dplyr::mutate(data = purrr::map(data, ~rename(., sif = V1)))
   }
   
   if (get_watch && get_landeval){
