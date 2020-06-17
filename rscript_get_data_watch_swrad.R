@@ -11,7 +11,7 @@ library(tidync)
 ##------------------------------------------------------------------------
 fileprefix <- "SWdown_daily_WFDEI_"
 dir <- "~/data/watch_wfdei/"
-nclist <- paste0(dir, list.files(dir, pattern = fileprefix, recursive = TRUE))
+nclist <- paste0(dir, list.files(dir, pattern = paste0(fileprefix, ".*.nc"), recursive = TRUE))
 outdir <- "~/data/watch_wfdei/data_tidy/"
 varnam <- "SWdown"
 lonnam <- "lon"
