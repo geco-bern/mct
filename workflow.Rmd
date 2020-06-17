@@ -283,6 +283,7 @@ siteinfo <- siteinfo %>%
 filn <- paste0("data/siteinfo_", siteset, ".RData")
 save(siteinfo, file = filn)
 
+load(filn)
 # filn <- paste0("data/siteinfo_", siteset, ".csv")
 # siteinfo %>% 
 #   tidyr::unnest(c(data_soiltext_top, data_soiltext_sub)) %>% 
