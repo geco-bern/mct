@@ -19,4 +19,4 @@ timenam <- "timestp"
 timedimnam <- "tstep"
 
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-rbeni::nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, timenam, timedimnam, ncores = 32, single_basedate = FALSE)
+rbeni::nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, timenam, timedimnam, ncores = 1, single_basedate = FALSE) # 32 cores
