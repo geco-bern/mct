@@ -311,6 +311,24 @@ load(filn)
 
 ### ALEXI
 
+Test plot.
+```{r}
+library(sf)
+library(raster)
+library(rasterVis)
+nc <- read_nc_onefile("~/data/alexi_tir/netcdf/EDAY_CERES_2006200.nc")
+
+## crop and write smaller file
+rasta <- raster("~/data/alexi_tir/netcdf/EDAY_CERES_2006200.nc")
+lonmin <- 0
+lonmax <- 180
+latmin <- 50
+latmax <- 80
+rasta2 <- crop(rasta, extent(lonmin, lonmax, latmin, latmax))
+raster::writeRaster(rasta2, filename = "./data/maptest.nc", format = "CDF", overwrite = TRUE )
+plot_map3("./data/maptest.nc", lonmin = lonmin, lonmax = lonmax, latmin = latmin, latmax = latmax)
+```
+
 ```{r}
 if (siteset=="global"){
   ##------------------------------------------------------------------------
