@@ -1,1 +1,0 @@
-/alphadata01/bstocker/rsofun/vignettes/schenkjackson02ecolmono_zroot.Rmd
