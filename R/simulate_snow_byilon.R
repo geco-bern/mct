@@ -41,7 +41,7 @@ simulate_snow_byilon <- function(ilon){
     dplyr::mutate(data = purrr::map(data, ~mutate(., snow = convert_prec_watch(snow)))) 
   
   ## Merge all three variables
-  df_test <- df_temp %>% 
+  df <- df_temp %>% 
     
     ## merge prec 
     left_join(df_prec %>% 
@@ -61,10 +61,13 @@ simulate_snow_byilon <- function(ilon){
     mutate(data = purrr::map(data, ~drop_na(., time))) %>% 
     mutate(data = purrr::map(data, ~simulate_snow(.)))
   
+  rm("df_temp")
+  rm("df_prec")
+  rm("df_prec")
   dirn <- "~/mct/data/df_snow/"
-  filn <- paste0("df_snow_ilon_", ilon_hires, ".RData")
+  filn <- paste0("df_snow_ilon_", ilon, ".RData")
   if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_snow")
-  save(df_alexi, file = paste0(dirn, filn))
+  save(df, file = paste0(dirn, filn))
   
   error = 0
   return(error)
