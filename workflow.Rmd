@@ -331,20 +331,10 @@ plot_map3("./data/maptest.nc", lonmin = lonmin, lonmax = lonmax, latmin = latmin
 
 ```{r}
 if (siteset=="global"){
-  ##------------------------------------------------------------------------
-  ## Extract point data and construct separate nested time series data frame
-  ## for each longitde slice
-  ##------------------------------------------------------------------------
-  dir <- "~/data/alexi_tir/netcdf/"
-  nclist <- paste0(dir, list.files(dir, pattern = "EDAY_CERES_"))
-  outdir <- "~/data/alexi_tir/data_tidy/"
-  varnam <- "et"
-  lonnam <- "lon"
-  fileprefix <- "EDAY_CERES_"
   
-  ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-  ## this is done using rscript_get_data_alexi.R and submit_get_data_alexi.sh
-  nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, timenam = "time", ncores = 2)
+  ## run scripts `rscript_get_data_alexi.sh` and `rscript_get_data_alexi_lores.sh` on Euler by
+  # system("./submit_get_data_alexi.sh")
+  # system("./submit_get_data_alexi_lores.sh")
   
 } else {
   ##------------------------------------------------------------------------
@@ -473,6 +463,25 @@ if (!file.exists(filn)){
 ### GLASS net radiation
 
 XXX TO BE COMPLETED
+
+Test plot.
+```{r}
+library(sf)
+library(raster)
+library(rasterVis)
+nc <- read_nc_onefile("~/data/alexi_tir/netcdf/EDAY_CERES_2006200.nc")
+
+## crop and write smaller file
+rasta <- raster("~/data/glass/data_netcdf/2001/GLASS07B01.V41.A2001166.2018264.nc")
+lonmin <- 0
+lonmax <- 180
+latmin <- 50
+latmax <- 80
+rasta2 <- crop(rasta, extent(lonmin, lonmax, latmin, latmax))
+raster::writeRaster(rasta2, filename = "./data/maptest.nc", format = "CDF", overwrite = TRUE )
+plot_map3("./data/maptest.nc", lonmin = lonmin, lonmax = lonmax, latmin = latmin, latmax = latmax)
+```
+
     
 ## Combine, convert units, complement, reduce 
 
@@ -503,6 +512,11 @@ Manipulates data frames prepared by step 2, reduced data frames with only 1 colu
 
 ### ET in mm
 
+#### Global
+
+Run script `rscript_get_et_mm.R` on Euler (submission file: `submit_get_et_mm.R`).
+
+#### Site-level
 ```{r}
 filn <- paste0("data/df_clean_", siteset, ".RData")
 if (!file.exists(filn)){
@@ -605,6 +619,12 @@ if (!file.exists(filn)){
 ```
 
 ### Snow
+
+#### Global
+
+Run script `rscript_simulate_snow.R` on Euler (submission file: `submit_simulate_snow.R`).
+
+#### Site-level
 
 ```{r}
 filn <- paste0("data/df_snow_", siteset, ".RData")

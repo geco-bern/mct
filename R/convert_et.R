@@ -1,5 +1,5 @@
 ## Adopted from SPLASH
-convert_et <- function(et_e, tc, elv){ 
+convert_et <- function(et_e, tc, elv, return_df = FALSE){ 
   
   ## et_e : ET in energy units (W m-2; representative for mean value over one day)
   ## tc   : temperature in degrees Celsius
@@ -30,8 +30,12 @@ convert_et <- function(et_e, tc, elv){
   ## J m-2 d-1 -> mm / d
   et_mm <- et_e * econ * 1000
 
-  return(et_mm)
-  
+  if (return_df){
+    return(tibble(et_mm = et_mm))
+  } else {
+    return(et_mm)
+  }
+
 }
 
 
