@@ -72,8 +72,11 @@ simulate_snow_byilon <- function(ilon){
     rm("df_prec")
     rm("df_prec")
     
+    print(paste("Writing file: ", path))
     save(df, file = path) 
     
+  } else {
+    print(paste("File exists already: ", path))
   }
   
   error = 0

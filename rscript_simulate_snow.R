@@ -5,8 +5,8 @@ library(magrittr)
 library(multidplyr)
 source("R/simulate_snow_byilon.R")
 
-nlon <- 360
-ncores <- 32
+nlon <- 720
+ncores <-32
 
 if (ncores > 1){
   
