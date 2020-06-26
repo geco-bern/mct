@@ -20,7 +20,7 @@ if (!file.exists(path)){
   ## split it up into chunks (total number of chunks provided by argument 2)
   ##------------------------------------------------------------------------
   nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
-  nlon <- 7200
+  nlon <- nrow(df_hwsd)
   nrows_chunk <- ceiling(nlon/nchunk)
   ilon <- seq(1:nlon)
   irow_chunk <- split(ilon, ceiling(seq_along(ilon)/nrows_chunk))

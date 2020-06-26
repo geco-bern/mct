@@ -241,7 +241,7 @@ df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SA
 save(df_hwsd, file = "data/df_hwsd_hires.RData")
 ```
 
-For global simulations, get soil parameters using the R script `rscript_calc_soilparams.R`.
+For global simulations, get soil parameters using the R script `rscript_calc_soilparams.R` (with `submit_calc_soilparams.sh`) and combine files with `rscript_combine_df_whc.R`.
 
 For site-level simulations do:
 ```{r}
