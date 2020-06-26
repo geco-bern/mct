@@ -22,6 +22,6 @@ if (ncores > 1){
     
 } else {
   
-  purrr::map(as.list(seq(nlon)), ~simulate_snow_byilon(.))
+  df_out <- purrr::map(as.list(seq(nlon)[1000]), ~simulate_snow_byilon(.))
   
 }

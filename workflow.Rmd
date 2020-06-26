@@ -137,6 +137,19 @@ if (siteset=="sj02"){
     - Site scale: data or ETOPO1
     - Global: WFDEI
     
+#### Global
+
+First, regrid ETOPO1 file and save as NetCDF (Done with `~/data/etopo/proc_etopo.R`). Then read it in.
+```{r}
+df_elv <- nc_to_df(
+  "/Users/bestocke/data/etopo/ETOPO1_Bed_g_gef.tif_halfdeg.nc",
+  varnam = "ETOPO1_Bed_g_geotiff"
+  )
+```
+
+#### Site-level
+
+Extract points from ETOPO1 GeoTIFF file and add to siteinfo.
 ```{r}
 if (siteset != "global"){
   ##----------------------------------------------
@@ -171,7 +184,80 @@ if (siteset != "global"){
 -  Derive WHC top and bottom, and record obstacles to root used in function `calc_zroot.R`. Adds columns `data_soiltext_top` and `data_soiltext_sub`.
     - Site scale: HWSD
     - Global: HWSD-Wieder
+    
+#### Global
 
+Get data from rasterized HWSD data by Wieder. Data frame has row for each gridcell and nested data frames in `data`,  containing columns `T_CLAY, T_GRAVEL, T_OC, T_SAND, S_CLAY, S_GRAVEL, S_OC, S_SAND, ROOTS, IL`
+```{r}
+## first get subsoil parameters
+df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SAND") %>%
+  rename( S_SAND = myvar ) %>%
+  tidyr::drop_na() %>% 
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_CLAY.nc4", "S_CLAY") %>%
+      rename( S_CLAY = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_OC.nc4", "S_OC") %>%
+      rename( S_OC = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_GRAVEL.nc4", "S_GRAVEL") %>%
+      rename( S_GRAVEL = myvar ),
+    by = c("lon", "lat")
+  ) %>% 
+
+  ## get topsoil parameters
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_SAND.nc4", "T_SAND") %>%
+      rename( T_SAND = myvar ),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_CLAY.nc4", "T_CLAY") %>%
+      rename( T_CLAY = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_OC.nc4", "T_OC") %>%
+      rename( T_OC = myvar ),
+    by = c("lon", "lat")
+  ) %>%
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_GRAVEL.nc4", "T_GRAVEL") %>%
+      rename( T_GRAVEL = myvar ),
+    by = c("lon", "lat")
+  ) %>% 
+
+  left_join(
+    rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/ROOTS.nc4", "ROOTS") %>%
+      rename( ROOTS = myvar ),
+    by = c("lon", "lat")
+  ) %>% 
+  tidyr::drop_na()
+
+save(df_hwsd, file = "data/df_hwsd_hires.RData")
+
+df_whc <- df_hwsd %>% 
+  slice(100000:100020) %>% ## this takes forever. send it to cluster,
+  group_by(lon, lat) %>% 
+  nest() %>% 
+  mutate(
+    data_soiltext_top = purrr::map(data, ~dplyr::select(
+      ., fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND, roots = ROOTS)),
+    data_soiltext_sub = purrr::map(data, ~dplyr::select(
+      ., fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND, roots = ROOTS))
+    ) %>% 
+  dplyr::select(-data) %>% 
+  mutate(data_soiltext_top = purrr::map(data_soiltext_top, ~calc_soilparams(., method = "balland")),
+         data_soiltext_sub = purrr::map(data_soiltext_sub, ~calc_soilparams(., method = "balland")))
+```
+
+#### Site-level
+
+Extract point data from shapefile using `ingestr::ingest()`.
 ```{r}
 if (siteset != "global"){
   ##----------------------------------------------
@@ -672,6 +758,12 @@ if (!file.exists(filn)){
 
 ### Daily water balance 
 
+#### Global
+
+Run script `rscript_get_bal.R` on Euler (submission file: `submit_get_bal.R`).
+
+#### Site-level
+
 ... and reduce data frames.
 ```{r} 
 source("R/get_bal.R")
@@ -708,6 +800,15 @@ Do both in one step. function `get_plantwhc_mct_bysite()` retruns the CWD time s
 `mct2.R`  Creates list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
 
 - Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
+
+
+#### Global
+
+1. Run script `rscript_get_cwd.R` on Euler (submission file: `submit_get_cwd.R`) 
+2. Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
+
+
+#### Site-level
 
 ```{r}
 filn <- paste0("data/df_cwd_", siteset, ".RData")

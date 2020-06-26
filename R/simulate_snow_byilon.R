@@ -70,7 +70,7 @@ simulate_snow_byilon <- function(ilon){
     
     rm("df_temp")
     rm("df_prec")
-    rm("df_prec")
+    rm("df_snow")
     
     print(paste("Writing file: ", path))
     save(df, file = path) 

@@ -1,7 +1,13 @@
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(magrittr)
+library(multidplyr)
+
 source("R/get_et_mm_bylon.R")
 
-nlon <- 3600
-ncores <- 2
+nlon <- 7200
+ncores <- 1
 
 if (ncores > 1){
   
@@ -17,6 +23,6 @@ if (ncores > 1){
     
 } else {
   
-  purrr::map(as.list(seq(nlon)), ~get_et_mm_byilon(.))
+  df_out <- purrr::map(as.list(seq(nlon)[1000]), ~get_et_mm_byilon(.))
   
 }
