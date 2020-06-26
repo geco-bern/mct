@@ -193,6 +193,7 @@ Get data from rasterized HWSD data by Wieder. Data frame has row for each gridce
 df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SAND") %>%
   rename( S_SAND = myvar ) %>%
   tidyr::drop_na() %>% 
+  
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_CLAY.nc4", "S_CLAY") %>%
       rename( S_CLAY = myvar ),
@@ -207,14 +208,14 @@ df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SA
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_GRAVEL.nc4", "S_GRAVEL") %>%
       rename( S_GRAVEL = myvar ),
     by = c("lon", "lat")
-  ) %>% 
+  ) %>%
 
   ## get topsoil parameters
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_SAND.nc4", "T_SAND") %>%
       rename( T_SAND = myvar ),
     by = c("lon", "lat")
-  ) %>% 
+  ) %>%
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_CLAY.nc4", "T_CLAY") %>%
       rename( T_CLAY = myvar ),
@@ -235,12 +236,20 @@ df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SA
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/ROOTS.nc4", "ROOTS") %>%
       rename( ROOTS = myvar ),
     by = c("lon", "lat")
-  ) %>% 
-  tidyr::drop_na()
+  )
 
 save(df_hwsd, file = "data/df_hwsd_hires.RData")
+```
 
-df_whc <- df_hwsd %>% 
+For global simulations, get soil parameters using the R script `rscript_calc_soilparams.R`.
+
+For site-level simulations do:
+```{r}
+load("data/df_hwsd_hires.RData")
+
+if (siteset!="global"){
+ 
+  df_whc <- df_hwsd %>% 
   slice(100000:100020) %>% ## this takes forever. send it to cluster,
   group_by(lon, lat) %>% 
   nest() %>% 
@@ -253,6 +262,8 @@ df_whc <- df_hwsd %>%
   dplyr::select(-data) %>% 
   mutate(data_soiltext_top = purrr::map(data_soiltext_top, ~calc_soilparams(., method = "balland")),
          data_soiltext_sub = purrr::map(data_soiltext_sub, ~calc_soilparams(., method = "balland")))
+ 
+}
 ```
 
 #### Site-level

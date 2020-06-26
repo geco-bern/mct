@@ -20,7 +20,9 @@ lonnam <- "lon"
 latnam <- "lat"
 fileprefix <- "EDAY_CERES_"
 
-# print(as.numeric(args[1]))
+##------------------------------------------------------------------------
+## split it up into chunks (total number of chunks provided by argument 2)
+##------------------------------------------------------------------------
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
 nlon <- 7200
 nrows_chunk <- ceiling(nlon/nchunk)
@@ -29,10 +31,6 @@ irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
 
 print("getting data for longitude indices:")
 print(irow_chunk[[as.integer(args[1])]]) 
-
-# ## xxx test
-# out <- irow_chunk[[as.integer(args[1])]]
-# save(out, file = paste0("~/mct/test_", as.character(args[1]), ".RData"))
 
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
 rbeni::nclist_to_df(

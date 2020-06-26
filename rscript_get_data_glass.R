@@ -1,3 +1,6 @@
+#!/usr/bin/env Rscript
+args = commandArgs(trailingOnly=TRUE)
+
 library(dplyr)
 library(tidyr)
 library(purrr)
@@ -26,5 +29,29 @@ fgetdate_glass <- function(filnam){
   return(date)
 }
 
+##------------------------------------------------------------------------
+## split it up into chunks (total number of chunks provided by argument 2)
+##------------------------------------------------------------------------
+nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
+nlon <- 7200
+nrows_chunk <- ceiling(nlon/nchunk)
+ilat <- seq(1:nlon)
+irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
+
+print("getting data for longitude indices:")
+print(irow_chunk[[as.integer(args[1])]]) 
+
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-rbeni::nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, latnam, timenam, timedimnam, ncores = 160, single_basedate = FALSE, fgetdate = fgetdate_glass)
+rbeni::nclist_to_df(nclist, 
+	outdir = outdir, 
+	fileprefix = fileprefix, 
+	varnam = varnam, 
+	ilon = irow_chunk[[as.integer(args[1])]],
+	lonnam = lonnam, 
+	latnam = latnam, 
+	timenam = timenam, 
+	timedimnam = timedimnam, 
+	ncores = "all", 
+	single_basedate = FALSE, 
+	fgetdate = fgetdate_glass
+	)
