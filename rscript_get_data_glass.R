@@ -14,8 +14,8 @@ fileprefix <- "GLASS07B01.V41."
 nclist <- paste0(dir, list.files(dir, pattern = paste0(fileprefix, ".*.nc"), recursive = TRUE))
 outdir <- "~/data/glass/data_tidy/"
 varnam <- "NR"
-lonnam <- "lon"
-latnam <- "lat"
+lonnam <- "longitude"
+latnam <- "latitude"
 timenam <- "time"
 timedimnam <- "time"
 
