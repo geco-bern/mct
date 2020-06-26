@@ -18,4 +18,4 @@ latnam <- "lat"
 fileprefix <- "EDAY_CERES_"
 
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-rbeni::nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, latnam, timenam = "time", ncores = 80, single_basedate = TRUE) # 2400  ncores = nnodes * 16; nnodes is requested in submission file 
+rbeni::nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, latnam, timenam = "time", ncores = 512, single_basedate = TRUE) # 2400  ncores = nnodes * 16; nnodes is requested in submission file 
