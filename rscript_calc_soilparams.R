@@ -18,8 +18,8 @@ load("data/df_hwsd_hires.RData") # loads 'df_hwsd'
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
 nlon <- 7200
 nrows_chunk <- ceiling(nlon/nchunk)
-ilat <- seq(1:nlon)
-irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
+ilon <- seq(1:nlon)
+irow_chunk <- split(ilon, ceiling(seq_along(ilon)/nrows_chunk))
 
 print("getting data for longitude indices:")
 print(irow_chunk[[as.integer(args[1])]]) 
@@ -62,4 +62,4 @@ if (ncores > 1){
   
 }
 
-save(df_whc, "data/df_whc_hires.RData")
+save(df_whc, file = paste0("~/mct/data/df_whc_hires_chunk_", as.integer(args[1]), ".RData"))
