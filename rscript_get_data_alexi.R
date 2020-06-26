@@ -13,7 +13,7 @@ library(tidync)
 ## for each longitde slice
 ##------------------------------------------------------------------------
 dir <- "~/data/alexi_tir/netcdf/"
-nclist <- paste0(dir, list.files(dir, pattern = "EDAY_CERES_.?.?.?.?.?.?.?.nc"))
+nclist <- paste0(dir, list.files(dir, pattern = "EDAY_CERES_.?.?.?.?.nc"))
 outdir <- "~/data/alexi_tir/data_tidy/"
 varnam <- "et"
 lonnam <- "lon"
