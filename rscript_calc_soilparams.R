@@ -10,56 +10,66 @@ library(rbeni)
 
 source("R/calc_soilparams_byilon.R")
 
-load("data/df_hwsd_hires.RData") # loads 'df_hwsd'
+path <- paste0("~/mct/data/df_whc_hires_chunk_", as.integer(args[1]), ".RData")
 
-##------------------------------------------------------------------------
-## split it up into chunks (total number of chunks provided by argument 2)
-##------------------------------------------------------------------------
-nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
-nlon <- 7200
-nrows_chunk <- ceiling(nlon/nchunk)
-ilon <- seq(1:nlon)
-irow_chunk <- split(ilon, ceiling(seq_along(ilon)/nrows_chunk))
+if (!file.exists(path)){
 
-print("getting data for longitude indices:")
-print(irow_chunk[[as.integer(args[1])]]) 
-
-## get all available cores
-ncores <- parallel::detectCores()
-
-if (ncores > 1){
+  load("data/df_hwsd_hires.RData") # loads 'df_hwsd'
   
-  cl <- multidplyr::new_cluster(ncores) %>%
-    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni")) %>%
-    multidplyr::cluster_assign(calc_soilparams_byilon = calc_soilparams_byilon)
+  ##------------------------------------------------------------------------
+  ## split it up into chunks (total number of chunks provided by argument 2)
+  ##------------------------------------------------------------------------
+  nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
+  nlon <- 7200
+  nrows_chunk <- ceiling(nlon/nchunk)
+  ilon <- seq(1:nlon)
+  irow_chunk <- split(ilon, ceiling(seq_along(ilon)/nrows_chunk))
+  
+  print("getting data for longitude indices:")
+  print(irow_chunk[[as.integer(args[1])]]) 
+  
+  ## get all available cores
+  ncores <- parallel::detectCores()
+  
+  if (ncores > 1){
     
-  ## distribute to cores, making sure all data from a specific site is sent to the same core
-  df_whc <- df_hwsd %>%
-    ungroup() %>%
-    mutate(idx = 1:n()) %>% 
-    dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
-    group_by(lon, lat) %>% 
-    nest() %>% 
-    multidplyr::partition(cl) %>%
-    dplyr::mutate(out = purrr::map( data,
-                                    ~calc_soilparams_byilon(.))) %>% 
-    dplyr::collect() %>% 
-    dplyr::select(lon, lat, out) %>% 
-    tidyr::unnest(out)
+    cl <- multidplyr::new_cluster(ncores) %>%
+      multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni")) %>%
+      multidplyr::cluster_assign(calc_soilparams_byilon = calc_soilparams_byilon)
     
+    ## distribute to cores, making sure all data from a specific site is sent to the same core
+    df_whc <- df_hwsd %>%
+      ungroup() %>%
+      mutate(idx = 1:n()) %>% 
+      dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
+      group_by(lon, lat) %>% 
+      nest() %>% 
+      multidplyr::partition(cl) %>%
+      dplyr::mutate(out = purrr::map( data,
+                                      ~calc_soilparams_byilon(.))) %>% 
+      dplyr::collect() %>% 
+      dplyr::select(lon, lat, out) %>% 
+      tidyr::unnest(out)
+    
+  } else {
+    
+    df_whc <- df_hwsd %>%
+      ungroup() %>%
+      mutate(idx = 1:n()) %>% 
+      dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
+      group_by(lon, lat) %>% 
+      nest() %>% 
+      dplyr::mutate(out = purrr::map( data,
+                                      ~calc_soilparams_byilon(.))) %>% 
+      dplyr::select(lon, lat, out) %>% 
+      tidyr::unnest(out)
+    
+  }
+  
+  save(df_whc, file = path)
+  
 } else {
   
-  df_whc <- df_hwsd %>%
-    ungroup() %>%
-    mutate(idx = 1:n()) %>% 
-    dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
-    group_by(lon, lat) %>% 
-    nest() %>% 
-    dplyr::mutate(out = purrr::map( data,
-                                    ~calc_soilparams_byilon(.))) %>% 
-    dplyr::select(lon, lat, out) %>% 
-    tidyr::unnest(out)
-  
-}
+  print(paste("File exists already:", path))
 
-save(df_whc, file = paste0("~/mct/data/df_whc_hires_chunk_", as.integer(args[1]), ".RData"))
+}
