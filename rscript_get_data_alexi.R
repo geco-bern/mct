@@ -28,9 +28,6 @@ ilat <- seq(1:nlon)
 irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
 
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-<<<<<<< HEAD
-rbeni::nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, latnam, timenam = "time", ncores = 512, single_basedate = TRUE) # 2400  ncores = nnodes * 16; nnodes is requested in submission file 
-=======
 rbeni::nclist_to_df(
 	nclist = nclist[1], 
 	outdir = outdir, 
@@ -43,4 +40,3 @@ rbeni::nclist_to_df(
 	ncores = 1, 
 	single_basedate = TRUE
 	) # 2400  ncores = nnodes * 16; nnodes is requested in submission file 
->>>>>>> be7bcbb6d208e00bff3e2747817de1b382cb7c1c
