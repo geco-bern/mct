@@ -1,4 +1,5 @@
 get_plantwhc_mct_bysite <- function( df, 
+                                     out_mct = NULL,
                                      varname_wbal = "wbal", 
                                      thresh_terminate = 0.0, 
                                      thresh_drop = 0.9,

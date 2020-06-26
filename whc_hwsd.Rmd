@@ -26,20 +26,20 @@ zid <- "S" # for sub soil
 
 Read HWSD NetCDF files into a data frame
 ```{r}
-df <- rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), paste0(zid, "_SAND")) %>%
+df <- rbeni::nc_to_df(paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), paste0(zid, "_SAND")) %>%
   rename( fsand = myvar ) %>%
   left_join(
-    rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_CLAY.nc4"), paste0(zid, "_CLAY")) %>%
+    rbeni::nc_to_df(paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_CLAY.nc4"), paste0(zid, "_CLAY")) %>%
       rename( fclay = myvar ),
     by = c("lon", "lat")
   ) %>%
   left_join(
-    rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_OC.nc4"), paste0(zid, "_OC")) %>%
+    rbeni::nc_to_df(paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_OC.nc4"), paste0(zid, "_OC")) %>%
       rename( forg = myvar ),
     by = c("lon", "lat")
   ) %>%
   left_join(
-    rbeni::nc_to_df(paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_GRAVEL.nc4"), paste0(zid, "_GRAVEL")) %>%
+    rbeni::nc_to_df(paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_GRAVEL.nc4"), paste0(zid, "_GRAVEL")) %>%
       rename( fgravel = myvar ),
     by = c("lon", "lat")
   ) %>% 
@@ -142,40 +142,40 @@ ggsave(paste0("fig/hist_whc_", zid, "_saxtonrawls_balland.pdf"), width=7, height
 ```{r}
 ## convert data frame to matrix (2D)
 arr_sr <- df_sr %>% 
-  df_to_grid("whc", paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"))
+  df_to_grid("whc", paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"))
 
 arr_bl <- df_bl %>% 
-  df_to_grid("whc", paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"))
+  df_to_grid("whc", paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"))
 
 ## write matrix to NetCDF 
 write_nc2(
   var = arr_sr, 
   varnam = "whc", 
-  filnam_template = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), 
-  outfilnam = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc"),
+  filnam_template = paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), 
+  outfilnam = paste0("~/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc"),
   lonnam_template = "lon", 
   latnam_template = "lat"
   )
 write_nc2(
   var = arr_bl, 
   varnam = "whc", 
-  filnam_template = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), 
-  outfilnam = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_bl_WHC.nc"),
+  filnam_template = paste0("~/data/soil/hwsd/hwsd_wieder/data/", zid, "_SAND.nc4"), 
+  outfilnam = paste0("~/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_bl_WHC.nc"),
   lonnam_template = "lon", 
   latnam_template = "lat"
   )
 
 ## read NetCDF as test
-test <- rbeni::read_nc_onefile(filn = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc"))
+test <- rbeni::read_nc_onefile(filn = paste0("~/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc"))
 print(dim(test$vars$whc))
 
 ## regrid to half degree
-system(paste0("cdo remapbil,gridfile_halfdeg.txt /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_sr_WHC.nc"))
+system(paste0("cdo remapbil,gridfile_halfdeg.txt ~/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_sr_WHC.nc ~/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_sr_WHC.nc"))
 
-system(paste0("cdo remapbil,gridfile_halfdeg.txt /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_bl_WHC.nc /alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_bl_WHC.nc"))
+system(paste0("cdo remapbil,gridfile_halfdeg.txt ~/data/soil/hwsd/hwsd_wieder/data_calculated/", zid, "_bl_WHC.nc ~/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_bl_WHC.nc"))
 
 ## read NetCDF as test
-test <- rbeni::read_nc_onefile(filn = paste0("/alphadata01/bstocker/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_bl_WHC.nc"))
+test <- rbeni::read_nc_onefile(filn = paste0("~/data/soil/hwsd/hwsd_wieder/data_calculated_halfdeg/", zid, "_bl_WHC.nc"))
 print(dim(test$vars$whc))
 plot_map(test$vars$whc, lev = c(0,0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 1))
 ```
