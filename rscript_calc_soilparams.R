@@ -31,10 +31,10 @@ if (ncores > 1){
   
   cl <- multidplyr::new_cluster(ncores) %>%
     multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni")) %>%
-    multidplyr::cluster_assign(calc_soilparams_byilon = calc_soilparams_byilon) %>%
+    multidplyr::cluster_assign(calc_soilparams_byilon = calc_soilparams_byilon)
     
   ## distribute to cores, making sure all data from a specific site is sent to the same core
-  df_out <- df_hwsd %>%
+  df_whc <- df_hwsd %>%
     ungroup() %>%
     mutate(idx = 1:n()) %>% 
     dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
@@ -49,8 +49,7 @@ if (ncores > 1){
     
 } else {
   
-  df_out <- df_hwsd %>%
-    # slice(100000:100020) %>%       ## xxx test
+  df_whc <- df_hwsd %>%
     ungroup() %>%
     mutate(idx = 1:n()) %>% 
     dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
@@ -62,3 +61,5 @@ if (ncores > 1){
     tidyr::unnest(out)
   
 }
+
+save(df_whc, "data/df_whc_hires.RData")

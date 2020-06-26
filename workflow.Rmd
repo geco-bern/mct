@@ -249,7 +249,7 @@ load("data/df_hwsd_hires.RData")
 
 if (siteset!="global"){
  
-  df_whc <- df_hwsd %>% 
+df_whc <- df_hwsd %>% 
   slice(100000:100020) %>% ## this takes forever. send it to cluster,
   group_by(lon, lat) %>% 
   nest() %>% 
