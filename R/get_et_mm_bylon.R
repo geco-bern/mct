@@ -39,17 +39,19 @@ get_et_mm_byilon <- function(ilon_hires){
     #   slice(1:100)
     
     ## get elevation data from ETOPO1 for each hires point
-    df_elv <- ingestr::ingest(
-      df_alexi %>% 
-        ungroup() %>% 
-        mutate(sitename = 1:n()) %>% 
-        dplyr::select(sitename, lon, lat),
-      source = "etopo1",
-      dir = "~/data/etopo/") %>% 
-      tidyr::unnest(data) %>% 
-      ungroup() %>% 
-      bind_cols(., dplyr::select(df_alexi, lon, lat)) %>% 
-      dplyr::select(lon, lat, elv)
+    df_elv <- nc_to_df("~/data/etopo/ETOPO1_Bed_g_gef_0.05deg_STANDARD.nc", varnam = "ETOPO1_Bed_g_geotiff")
+    
+    # df_elv <- ingestr::ingest(
+    #   df_alexi %>% 
+    #     ungroup() %>% 
+    #     mutate(sitename = 1:n()) %>% 
+    #     dplyr::select(sitename, lon, lat),
+    #   source = "etopo1",
+    #   dir = "~/data/etopo/") %>% 
+    #   tidyr::unnest(data) %>% 
+    #   ungroup() %>% 
+    #   bind_cols(., dplyr::select(df_alexi, lon, lat)) %>% 
+    #   dplyr::select(lon, lat, elv)
     
     ## filter watch data to years within ALEXI data availability (2003-2017)
     df_watch <- df_watch %>% 
