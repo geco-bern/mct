@@ -1,5 +1,5 @@
 library(dplyr)
-dir <- "~/data/mct_data/df_whc_hires_chunks2/"
+dir <- "~/data/mct_data/df_whc_hires_chunks/"
 filelist <- paste0(dir, list.files(dir, pattern = "df_whc_hires_chunk_.*.RData"))
 
 list_whc_out <- list()

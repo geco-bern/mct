@@ -616,6 +616,10 @@ plot_map3("./data/maptest.nc", lonmin = lonmin, lonmax = lonmax, latmin = latmin
     
 ## Combine, convert units, complement, reduce 
 
+### Global
+
+Convert units to get ET in mm.
+
 ### Data filtering
 
 Some ET data seem to be missing. Retain only sites with more than 3000 ET dates.

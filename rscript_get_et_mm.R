@@ -27,7 +27,7 @@ ncores <- parallel::detectCores()
 if (ncores > 1){
   
   cl <- multidplyr::new_cluster(ncores) %>%
-    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr")) %>%
+    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni")) %>%
     multidplyr::cluster_assign(get_et_mm_bylon = get_et_mm_bylon) %>%
     
 	## distribute to cores, making sure all data from a specific site is sent to the same core
