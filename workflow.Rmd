@@ -142,7 +142,7 @@ if (siteset=="sj02"){
 First, regrid ETOPO1 file and save as NetCDF (Done with `~/data/etopo/proc_etopo.R`). Then read it in.
 ```{r}
 df_elv <- nc_to_df(
-  "/Users/bestocke/data/etopo/ETOPO1_Bed_g_gef.tif_halfdeg.nc",
+  "~/data/etopo/ETOPO1_Bed_g_gef.tif_halfdeg.nc",
   varnam = "ETOPO1_Bed_g_geotiff"
   )
 ```
@@ -355,6 +355,40 @@ siteinfo <- siteinfo %>%
 - WWF, NSCP?
     - Site scale: WWF, extract from shapefile
     - Global: rasterize WWF data?
+    
+#### Global
+
+Rasterize shapefile to high resolution global map.
+```{r}
+library(rgdal)
+
+# read in the polygons
+# shape <- readOGR("/alphadata01/bstocker/data/biomes/olson2001_teow/wwf_terr_ecos.shp")
+shape <- readOGR("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos.shp")
+
+# create empty raster
+rasta <- raster(nrows=3600, ncols=7200, xmx=180, ymn=-90, ymx=90, crs=CRS("+init=EPSG:4326"))
+
+# convert polygons to 1x1 raster
+rasta_biome <- rasterize(shape, rasta, background=NA, field="BIOME")
+#plot(rasta_biome)
+
+# remove no data values
+rasta_biome[rasta_biome %in% c(98, 99)] <- NA
+
+# convert raster to factor
+rasta_biome <- as.factor(rasta_biome)
+
+# save to files
+saveRDS( rasta_biome, "~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.rds")
+
+writeRaster( rasta_biome, "~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", 
+             overwrite=TRUE, format="CDF", varname="biome", varunit="category", 
+             longname="WWF ecoregions biome", xname="lon", yname="lat"
+             )
+```
+
+#### Site-level
     
 ```{r}
 if (siteset != "global"){
