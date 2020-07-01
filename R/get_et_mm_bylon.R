@@ -76,8 +76,8 @@ get_et_mm_byilon <- function(ilon_hires){
     ## get closest matching latitude indices and merge data frames
     vec_lat_lores <- df_watch$lat %>% unique()
     
-    df_alexi <- df_alexi %>% 
-      
+    df_alexi <- df_alexi %>%
+
       mutate(lat_lores = purrr::map_dbl(lat, ~find_lat_lores(., vec_lat_lores = vec_lat_lores))) %>% 
       left_join(df_watch %>% 
                   rename(lon_lores = lon, lat_lores = lat, data_watch = data),
@@ -87,10 +87,8 @@ get_et_mm_byilon <- function(ilon_hires){
       
       ## wrap elevation into data frames
       left_join(df_elv, by = c("lon", "lat")) %>% 
-      tidyr::unnest(data) %>% 
-      group_by(lon, lat, lon_lores, lat_lores) %>% 
-      tidyr::nest() %>%
-      
+      mutate(data = purrr::map(data, ~mutate(., elv))) %>% 
+
       ## convert units
       dplyr::mutate(data = purrr::map(data, ~mutate(., et = convert_et_MJ(et)))) %>%  
       dplyr::mutate(data_et_mm = purrr::map(data, ~convert_et(.$et, .$temp, .$elv, return_df = TRUE))) %>% 
