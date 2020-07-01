@@ -38,12 +38,15 @@ get_et_mm_byilon <- function(ilon_hires){
     #   ungroup() %>% 
     #   slice(1:100)
     
-    thislon <- df_test$lon %>% unique()
+    thislon <- df_alexi$lon %>% unique()
     
     ## get elevation data from ETOPO1 for this longitude slice
-    df_elv <- rbeni::nc_to_df("~/data/etopo/ETOPO1_Bed_g_gef_0.05deg_STANDARD.nc", varnam = "ETOPO1_Bed_g_geotiff") %>% 
-      rename(elv = myvar) %>% 
-      dplyr::filter(lon == thislon)
+    df_elv <- rbeni::extract_pointdata_allsites("~/data/etopo/ETOPO1_Bed_g_gef_0.05deg_STANDARD.nc", 
+                                         dplyr::select(df_alexi, lon, lat))
+    
+    # df_elv <- rbeni::nc_to_df("~/data/etopo/ETOPO1_Bed_g_gef_0.05deg_STANDARD.nc", varnam = "ETOPO1_Bed_g_geotiff") %>% 
+    #   rename(elv = myvar) %>% 
+    #   dplyr::filter(lon == thislon)
     
     # df_elv <- ingestr::ingest(
     #   df_alexi %>% 
