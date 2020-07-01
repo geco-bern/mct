@@ -42,7 +42,10 @@ get_et_mm_byilon <- function(ilon_hires){
     
     ## get elevation data from ETOPO1 for this longitude slice
     df_elv <- rbeni::extract_pointdata_allsites("~/data/etopo/ETOPO1_Bed_g_gef_0.05deg_STANDARD.nc", 
-                                         dplyr::select(df_alexi, lon, lat))
+                                         dplyr::select(df_alexi, lon, lat),
+                                         time = FALSE
+                                         ) %>% 
+      rename(elv = ETOPO1_Bed_g_geotiff)
     
     # df_elv <- rbeni::nc_to_df("~/data/etopo/ETOPO1_Bed_g_gef_0.05deg_STANDARD.nc", varnam = "ETOPO1_Bed_g_geotiff") %>% 
     #   rename(elv = myvar) %>% 
