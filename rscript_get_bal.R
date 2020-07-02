@@ -28,14 +28,14 @@ ncores <- parallel::detectCores()
 if (ncores > 1){
   
   cl <- multidplyr::new_cluster(ncores) %>%
-    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni")) %>%
-    multidplyr::cluster_assign(get_bal_byilon = get_bal_byilon) %>%
+    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni", "rlang")) %>%
+    multidplyr::cluster_assign(get_bal_byilon = get_bal_byilon)
     
     ## distribute to cores, making sure all data from a specific site is sent to the same core
     df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
       multidplyr::partition(cl) %>%
-      dplyr::mutate(out = purrr::map_int( ilon,
-                                          ~get_bal_byilon(.)))
+      dplyr::mutate(out = purrr::map( ilon,
+                                      ~get_bal_byilon(.)))
     
 } else {
   

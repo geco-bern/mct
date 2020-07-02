@@ -616,10 +616,6 @@ plot_map3("./data/maptest.nc", lonmin = lonmin, lonmax = lonmax, latmin = latmin
     
 ## Combine, convert units, complement, reduce 
 
-### Global
-
-Convert units to get ET in mm.
-
 ### Data filtering
 
 Some ET data seem to be missing. Retain only sites with more than 3000 ET dates.
@@ -649,7 +645,7 @@ Manipulates data frames prepared by step 2, reduced data frames with only 1 colu
 
 #### Global
 
-Run script `rscript_get_et_mm.R` on Euler (submission file: `submit_get_et_mm.R`).
+- Convert units to get ET in mm. Run scripts `submit_get_et_mm.sh` to run `rscript_get_et_mm.R`.
 
 #### Site-level
 ```{r}

@@ -12,7 +12,7 @@ source("R/simulate_snow_byilon.R")
 ## split it up into chunks (total number of chunks provided by argument 2)
 ##------------------------------------------------------------------------
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
-nlon <- 7200
+nlon <- 720
 nrows_chunk <- ceiling(nlon/nchunk)
 ilat <- seq(1:nlon)
 irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
@@ -22,7 +22,6 @@ print(irow_chunk[[as.integer(args[1])]])
 
 ## get all available cores
 ncores <- parallel::detectCores()
-
 
 if (ncores > 1){
   

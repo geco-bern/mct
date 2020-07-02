@@ -22,13 +22,15 @@ get_bal_byilon <- function(ilon_hires){
     ## open snow file of corresponding longitude slice
     dirn <- "~/mct/data/df_snow/"
     filn <- paste0("df_snow_ilon_", ilon_lores, ".RData")
-    path <- paste0(dirn, filn)
-    load(path)  # loads 'df'
+    load(paste0(dirn, filn))  # loads 'df'
     df_watch <- df # rename
     rm("df")
     
     ## get closest matching latitude indices and merge data frames
     df <- df_alexi %>% 
+      
+      ## xxx debug
+      # dplyr::filter(lon == -60.375 & lat == -52.125) %>% 
       
       ## merge watch data into alexi data frame
       left_join(df_watch %>% 
@@ -37,6 +39,9 @@ get_bal_byilon <- function(ilon_hires){
       
       ## select only time and liquid water to soil
       mutate(data_watch = purrr::map(data_watch, ~dplyr::select(., time, liquid_to_soil))) %>% 
+      
+      ## drop columns no longer used
+      dplyr::select(-lon_lores, -lat_lores, -elv) %>% 
       
       ## remove rows where watch data is missing
       ungroup() %>% 
@@ -53,10 +58,11 @@ get_bal_byilon <- function(ilon_hires){
         ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))
       ) 
     
+    rlang::inform(paste("Writing file:", path))    
     save(df, file = path)
     
   } else {
-    print(paste("File exists already:", path))
+    rlang::inform(paste("File exists already:", path))
   } 
   
   error = 0
