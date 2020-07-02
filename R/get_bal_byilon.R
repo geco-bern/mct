@@ -34,15 +34,15 @@ get_bal_byilon <- function(ilon_hires){
       ## get closest matching latitude indices and merge data frames
       df <- df_alexi %>% 
         
-        ## xxx debug
-        # dplyr::filter(lon == -60.375 & lat == -52.125) %>% 
+        ## select only time and et_mm from alexi dataframe
+        mutate(data = purrr::map(data, ~dplyr::select(., time, et_mm))) %>% 
         
         ## merge watch data into alexi data frame
         left_join(df_watch %>% 
                     rename(lon_lores = lon, lat_lores = lat, data_watch = data),
                   by = c("lon_lores", "lat_lores")) %>% 
         
-        ## select only time and liquid water to soil
+        ## select only time and liquid water to soil from watch data frame
         mutate(data_watch = purrr::map(data_watch, ~dplyr::select(., time, liquid_to_soil))) %>% 
         
         ## drop columns no longer used
