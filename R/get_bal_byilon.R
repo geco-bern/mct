@@ -5,9 +5,9 @@ get_bal_byilon <- function(ilon_hires){
   dirn <- "~/mct/data/df_bal/"
   filn <- paste0("df_bal_ilon_", ilon_hires, ".RData")
   if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_bal")
-  path <- paste0(dirn, filn)
+  path_out <- paste0(dirn, filn)
 
-  if (!file.exists(path)){
+  if (!file.exists(path_out)){
   
     ## determine closest longitude in 0.5 res files (WATCH)
     lon_lores <- seq(-179.75, 179.75, by = 0.5)
@@ -17,52 +17,64 @@ get_bal_byilon <- function(ilon_hires){
     ## Open ET-mm file
     dirn <- "~/mct/data/df_alexi_et_mm/"
     filn <- paste0("df_alexi_et_mm_ilon_", ilon_hires, ".RData")
-    load(paste0(dirn, filn)) # loads 'df_alexi'
+    path_et_mm <- paste0(dirn, filn)
     
     ## open snow file of corresponding longitude slice
     dirn <- "~/mct/data/df_snow/"
     filn <- paste0("df_snow_ilon_", ilon_lores, ".RData")
-    load(paste0(dirn, filn))  # loads 'df'
-    df_watch <- df # rename
-    rm("df")
+    path_snow <- paste0(dirn, filn)
     
-    ## get closest matching latitude indices and merge data frames
-    df <- df_alexi %>% 
+    if (file.exists(path_et_mm) && file.exists(path_snow)){
+     
+      load(path_et_mm) # loads 'df_alexi'
+      load(path_snow)  # loads 'df'
+      df_watch <- df # rename
+      rm("df")
       
-      ## xxx debug
-      # dplyr::filter(lon == -60.375 & lat == -52.125) %>% 
+      ## get closest matching latitude indices and merge data frames
+      df <- df_alexi %>% 
+        
+        ## xxx debug
+        # dplyr::filter(lon == -60.375 & lat == -52.125) %>% 
+        
+        ## merge watch data into alexi data frame
+        left_join(df_watch %>% 
+                    rename(lon_lores = lon, lat_lores = lat, data_watch = data),
+                  by = c("lon_lores", "lat_lores")) %>% 
+        
+        ## select only time and liquid water to soil
+        mutate(data_watch = purrr::map(data_watch, ~dplyr::select(., time, liquid_to_soil))) %>% 
+        
+        ## drop columns no longer used
+        dplyr::select(-lon_lores, -lat_lores, -elv) %>% 
+        
+        ## remove rows where watch data is missing
+        ungroup() %>% 
+        dplyr::filter(!is.null(data_watch)) %>% 
+        
+        ## merge liquid into 'data'
+        mutate(data = purrr::map2(data, data_watch, ~left_join(.x, .y, by = "time"))) %>% 
+        dplyr::select(-data_watch) %>% 
+        
+        ## interpolate ET, get water balance, and cut NA from head and tail
+        # slice(50) %>% 
+        dplyr::mutate( data = purrr::map(
+          data, 
+          ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))
+        ) 
       
-      ## merge watch data into alexi data frame
-      left_join(df_watch %>% 
-                  rename(lon_lores = lon, lat_lores = lat, data_watch = data),
-                by = c("lon_lores", "lat_lores")) %>% 
+      rlang::inform(paste("Writing file:", path_out))    
+      save(df, file = path_out)
       
-      ## select only time and liquid water to soil
-      mutate(data_watch = purrr::map(data_watch, ~dplyr::select(., time, liquid_to_soil))) %>% 
+    } else {
       
-      ## drop columns no longer used
-      dplyr::select(-lon_lores, -lat_lores, -elv) %>% 
-      
-      ## remove rows where watch data is missing
-      ungroup() %>% 
-      dplyr::filter(!is.null(data_watch)) %>% 
-      
-      ## merge liquid into 'data'
-      mutate(data = purrr::map2(data, data_watch, ~left_join(.x, .y, by = "time"))) %>% 
-      dplyr::select(-data_watch) %>% 
-      
-      ## interpolate ET, get water balance, and cut NA from head and tail
-      # slice(50) %>% 
-      dplyr::mutate( data = purrr::map(
-        data, 
-        ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))
-      ) 
+      if (!file.exists(path_et_mm)) rlang::warn(paste0("File missing:", path_et_mm))
+      if (!file.exists(path_snow))  rlang::warn(paste0("File missing:", path_snow))
     
-    rlang::inform(paste("Writing file:", path))    
-    save(df, file = path)
+    }
     
   } else {
-    rlang::inform(paste("File exists already:", path))
+    rlang::inform(paste("File exists already:", path_out))
   } 
   
   error = 0
