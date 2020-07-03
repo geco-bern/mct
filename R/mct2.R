@@ -1,4 +1,4 @@
-mct <- function(df, varname_wbal, thresh_terminate = 0.0, thresh_drop = 0.9){
+mct <- function(df, varname_wbal, varname_date, thresh_terminate = 0.0, thresh_drop = 0.9){
   
   if (thresh_terminate > thresh_drop) rlang::abort("Aborting. thresh_terminate must be smaller or equal thresh_drop.")
   
@@ -84,7 +84,7 @@ mct <- function(df, varname_wbal, thresh_terminate = 0.0, thresh_drop = 0.9){
       # }
       
       ## record instance
-      this_inst <- tibble( idx_start = idx, len = iidx_drop-idx, iinst = iinst, date_start=df$date[idx], date_end = df$date[iidx_drop-1], deficit = max_deficit )
+      this_inst <- tibble( idx_start = idx, len = iidx_drop-idx, iinst = iinst, date_start=df[[varname_date]][idx], date_end = df[[varname_date]][iidx_drop-1], deficit = max_deficit )
       inst <- inst %>% bind_rows(this_inst)
       
       ## update

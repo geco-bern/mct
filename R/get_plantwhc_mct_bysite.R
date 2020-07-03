@@ -1,6 +1,7 @@
 get_plantwhc_mct_bysite <- function( df, 
                                      out_mct = NULL,
                                      varname_wbal = "wbal", 
+                                     varname_date = "date",
                                      thresh_terminate = 0.0, 
                                      thresh_drop = 0.9,
                                      return_period = c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800),
@@ -35,7 +36,7 @@ get_plantwhc_mct_bysite <- function( df,
     ##--------------------------------
     ## Get events of consecutive water deficit and accumulated deficit
     ##--------------------------------
-    out_mct <- mct(df, varname_wbal = varname_wbal, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
+    out_mct <- mct(df, varname_wbal = varname_wbal, varname_date = varname_date, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
     
     if (nrow(out_mct$inst)>0){
 
@@ -45,7 +46,7 @@ get_plantwhc_mct_bysite <- function( df,
       vals <- out_mct$inst %>% 
         ungroup() %>% 
         group_by(lubridate::year(date_start)) %>% 
-        summarise(deficit = max(deficit, na.rm = TRUE)) %>% 
+        summarise(deficit = max(deficit, na.rm = TRUE), .groups = 'drop') %>% 
         pull(deficit)      
       
       if (length(vals)>3){

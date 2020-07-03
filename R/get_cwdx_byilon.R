@@ -17,17 +17,21 @@ get_cwdx_byilon <- function(ilon_hires){
     
     ## determine CWD and events
     df <- df %>% 
+      
       dplyr::mutate(
         out_mct = purrr::map(
           data,
           ~get_plantwhc_mct_bysite(
             .,
             varname_wbal = "bal",
+            varname_date = "time",
             thresh_terminate = 0.0,
             thresh_drop = 0.9,
             fittype = "Gumbel"))
-      )
-    
+      ) %>% 
+      dplyr::select(-data)
+
+    print(paste("Writing file:", path))
     save(df, file = path)
     
   } else {
