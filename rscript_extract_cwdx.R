@@ -67,7 +67,8 @@ if (ncores > 1){
 } else {
   
   ## testing
-  df <- purrr::map(as.list(seq(nlon)), ~collect_cwdx_byilon(.))
+  df <- purrr::map(as.list(seq(nlon)), ~collect_cwdx_byilon(.)) %>% 
+    bind_rows()
   
 }
 

@@ -1,6 +1,7 @@
 extract_cwdx_byilon <- function(ilon){
   
   infil <- paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData")
+  
   if (file.exists(infil)){
     
     load(infil)
@@ -29,7 +30,7 @@ extract_cwdx_byilon <- function(ilon){
     
   } else {
     
-    print(paste("File missing:", path))
+    print(paste("File missing:", infil))
     
   }
   
