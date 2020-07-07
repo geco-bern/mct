@@ -45,4 +45,3 @@ if (ncores > 1){
   df <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~extract_cwdx_byilon(.))
   
 }
-
