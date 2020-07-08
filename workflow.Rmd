@@ -875,6 +875,56 @@ if (!file.exists(filn)){
 }
 ```
 
+## Check file availability
+
+On Euler, run `rscript_check_files.R` and download the overview dataframe it writes (`data/df_file_availability.RData`)
+
+```{r}
+load("data/df_file_availability.RData")
+```
+
+Longitude slices for which now snow files are available -> Possibly no WATCH-WFDEI gridcell at respective longitude? All available!
+```{r}
+df %>% 
+  dplyr::filter(!avl_snow)
+```
+
+Longitude slices without tidy ALEXI data. All available!
+```{r}
+df %>% 
+  dplyr::filter(!avl_tidy)
+```
+
+Longitude slices without ET-mm data (written by `R/get_et_mm_bylon.R`). 
+364 not available!
+```{r}
+df %>% 
+  dplyr::filter(!avl_et_mm)
+```
+
+Longitude slices without `bal` data. 174 additional ones not available!
+```{r}
+df %>% 
+  dplyr::filter(!avl_bal & avl_et_mm)
+```
+
+Longitude slices without CWDX data. 480 additional ones not available!
+```{r}
+df %>% 
+  dplyr::filter(!avl_cwdx & avl_bal & avl_et_mm)
+```
+
+Longitude slices without extracted CWDX data. 348 additional ones not available!
+```{r}
+df %>% 
+  dplyr::filter(!avl_cwdx_10_20_40 & avl_cwdx & avl_bal & avl_et_mm)
+```
+
+Total not available extracted CWDX data (longitude slices): 1,476
+```{r}
+df %>% 
+  dplyr::filter(!avl_cwdx_10_20_40)
+```
 
 ## Rooting depth z(CWDX) 
 
