@@ -46,6 +46,7 @@ print(irow_chunk[[as.integer(args[1])]])
 # }
 
 ## second round
+source("rscript_check_files.R")
 load("data/df_file_availability.RData")
 ilon <- df %>% 
   dplyr::filter(!avl_et_mm) %>% 

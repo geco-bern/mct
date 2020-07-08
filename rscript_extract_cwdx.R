@@ -27,21 +27,33 @@ irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
 print("getting data for longitude indices:")
 print(irow_chunk[[as.integer(args[1])]]) 
 
-if (ncores > 1){
-  
-  cl <- multidplyr::new_cluster(ncores) %>%
-    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rlang")) %>%
-    multidplyr::cluster_assign(extract_cwdx_byilon = extract_cwdx_byilon)
-  
-  ## distribute to cores, making sure all data from a specific site is sent to the same core
-  df <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
-    multidplyr::partition(cl) %>%
-    dplyr::mutate(out = purrr::map( ilon,
-                                    ~extract_cwdx_byilon(.)))
-  
-} else {
-  
-  ## testing
-  df <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~extract_cwdx_byilon(.))
-  
-}
+# if (ncores > 1){
+#   
+#   cl <- multidplyr::new_cluster(ncores) %>%
+#     multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rlang")) %>%
+#     multidplyr::cluster_assign(extract_cwdx_byilon = extract_cwdx_byilon)
+#   
+#   ## distribute to cores, making sure all data from a specific site is sent to the same core
+#   df <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
+#     multidplyr::partition(cl) %>%
+#     dplyr::mutate(out = purrr::map( ilon,
+#                                     ~extract_cwdx_byilon(.)))
+#   
+# } else {
+#   
+#   ## testing
+#   df <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~extract_cwdx_byilon(.))
+#   
+# }
+
+## second round
+source("rscript_check_files.R")
+load("data/df_file_availability.RData")
+ilon <- df %>% 
+  dplyr::filter(!avl_cwdx_10_20_40) %>% 
+  pull(ilon)
+
+df_out <- purrr::map(
+  as.list(ilon), 
+  ~try(extract_cwdx_byilon(.))
+)

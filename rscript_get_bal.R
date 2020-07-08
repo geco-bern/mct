@@ -25,20 +25,33 @@ print(irow_chunk[[as.integer(args[1])]])
 ncores <- parallel::detectCores()
 
 
-if (ncores > 1){
-  
-  cl <- multidplyr::new_cluster(ncores) %>%
-    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni", "rlang")) %>%
-    multidplyr::cluster_assign(get_bal_byilon = get_bal_byilon)
-    
-    ## distribute to cores, making sure all data from a specific site is sent to the same core
-    df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
-      multidplyr::partition(cl) %>%
-      dplyr::mutate(out = purrr::map( ilon,
-                                      ~get_bal_byilon(.)))
-    
-} else {
-  
-  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~get_bal_byilon(.))
-  
-}
+# if (ncores > 1){
+#   
+#   cl <- multidplyr::new_cluster(ncores) %>%
+#     multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "rbeni", "rlang")) %>%
+#     multidplyr::cluster_assign(get_bal_byilon = get_bal_byilon)
+#     
+#     ## distribute to cores, making sure all data from a specific site is sent to the same core
+#     df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
+#       multidplyr::partition(cl) %>%
+#       dplyr::mutate(out = purrr::map( ilon,
+#                                       ~get_bal_byilon(.)))
+#     
+# } else {
+#   
+#   df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~get_bal_byilon(.))
+#   
+# }
+
+
+## second round
+source("rscript_check_files.R")
+load("data/df_file_availability.RData")
+ilon <- df %>% 
+  dplyr::filter(!avl_bal) %>% 
+  pull(ilon)
+
+df_out <- purrr::map(
+  as.list(ilon), 
+  ~try(get_bal_byilon(.))
+)
