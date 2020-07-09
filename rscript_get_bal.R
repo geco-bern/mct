@@ -71,8 +71,3 @@ if (ncores > 1){
 }
 
 
-
-df_out <- purrr::map(
-  as.list(ilon), 
-  ~try(get_bal_byilon(.))
-)
