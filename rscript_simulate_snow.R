@@ -52,7 +52,8 @@ source("rscript_check_files.R")
 load("data/df_file_availability.RData")
 ilon <- df %>% 
   dplyr::filter(!avl_snow) %>% 
-  pull(ilon)
+  pull(ilon_lores) %>% 
+  unique()
 
 ## get all available cores
 ncores <- parallel::detectCores()
