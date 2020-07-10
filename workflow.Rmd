@@ -896,7 +896,7 @@ df %>%
 ```
 
 Longitude slices without ET-mm data (written by `R/get_et_mm_bylon.R`). 
-364 not available!
+297 not available.
 ```{r}
 df %>% 
   dplyr::filter(!avl_et_mm)
