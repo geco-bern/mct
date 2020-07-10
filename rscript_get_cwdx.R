@@ -55,7 +55,7 @@ ncores <- parallel::detectCores()
 source("rscript_check_files.R")
 load("data/df_file_availability.RData")
 ilon <- df %>% 
-  dplyr::filter(!avl_cwdx) %>% 
+  dplyr::filter(!avl_cwdx & avl_bal) %>% 
   pull(ilon)
 
 if (ncores > 1){
