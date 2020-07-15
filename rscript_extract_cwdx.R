@@ -73,8 +73,3 @@ if (ncores > 1){
   df <- purrr::map(as.list(ilon), ~try(extract_cwdx_byilon(.)))
 
 }
-
-df_out <- purrr::map(
-  as.list(ilon), 
-  ~try(extract_cwdx_byilon(.))
-)
