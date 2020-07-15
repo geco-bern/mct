@@ -932,7 +932,7 @@ For the global application, combine WHCX and soil texture information into a glo
 
 ```{r}
 ## CWDX data
-source("rscript_collect_cwdx.R")
+#source("rscript_collect_cwdx.R")
 load("data/df_cwdx_10_20_40.RData") # loads 'df'
 
 ## biome info
@@ -942,6 +942,40 @@ df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster
 
 ## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
 load("data/df_whc_hires.RData") # loads 'df_whc'
+
+## merge
+df <- df %>% 
+  left_join(df_biome, by = c("lon", "lat")) %>% 
+  left_join(df_whc, by = c("lon", "lat"))
+```
+
+Test plots WHC
+```{r}
+## spain
+df_whc %>% 
+  dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
+  plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
+```
+
+Test plots CWDX
+```{r}
+## spain
+df %>% 
+  dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
+
+## andalusia
+df %>% 
+  dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5)
+
+## take example of missing cells in andalusia:
+df_test <- df %>% 
+  dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
+  dplyr::filter(is.na(cwdx20)) %>% 
+  slice(1)
+lon <- df_test$lon
+lat <- df_test$lat
 ```
 
 ## Rooting depth z(CWDX) 

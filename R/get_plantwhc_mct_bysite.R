@@ -6,7 +6,8 @@ get_plantwhc_mct_bysite <- function( df,
                                      thresh_drop = 0.9,
                                      return_period = c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800),
                                      verbose = FALSE, 
-                                     fittype = NULL ){
+                                     fittype = NULL,
+                                     max_nyear_acc_cwd = 5){
 
   # ## Get data frame in shape (renaming columns)
   # df <- df %>%
@@ -43,10 +44,30 @@ get_plantwhc_mct_bysite <- function( df,
       ##--------------------------------
       ## get annual maximum CWD
       ##--------------------------------
-      vals <- out_mct$inst %>% 
+      df <- df %>% 
+        mutate(year = lubridate::year(time))
+      
+      out_mct$inst <- out_mct$inst %>% 
         ungroup() %>% 
-        group_by(lubridate::year(date_start)) %>% 
-        summarise(deficit = max(deficit, na.rm = TRUE), .groups = 'drop') %>% 
+        mutate(year = lubridate::year(date_start))
+      
+      ## test if cwd continues accumulating with events spanning more than one year
+      while (sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd){
+        
+        ## if CWD accumulates over more than 'max_nyear_acc_cwd', run 'mct()' again with relaxed 'thresh_terminate'
+        thresh_terminate <- thresh_terminate + 0.2
+        
+        out_mct <- mct(df, varname_wbal = varname_wbal, varname_date = varname_date, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
+        
+        out_mct$inst <- out_mct$inst %>% 
+          ungroup() %>% 
+          mutate(year = lubridate::year(date_start))
+        
+      }
+      
+      vals <- out_mct$inst %>% 
+        group_by(year) %>% 
+        summarise(deficit = max(deficit, na.rm = TRUE), .groups = 'drop') %>%       
         pull(deficit)      
       
       if (length(vals)>3){

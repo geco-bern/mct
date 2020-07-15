@@ -7,20 +7,10 @@ library(magrittr)
 library(multidplyr)
 library(rlang)
 
+source("R/extract_whc_byfil.R")
+
 dir <- "~/data/mct_data/df_whc_hires_chunks/"
 filelist <- paste0(dir, list.files(dir, pattern = "df_whc_hires_chunk_.*.RData"))
-
-## function to extract info by file
-extract_whc_byfil <- function(ifil){
-  load(ifil) # should load 'df_whc'
-  df <- df_whc %>% 
-    dplyr::ungroup() %>% 
-    tidyr::unnest(data_soiltext_top) %>% 
-    dplyr::select(lon, lat, fc_top = fc, pwp_top = pwp, whc_top = whc, data_soiltext_sub) %>% 
-    tidyr::unnest(data_soiltext_sub) %>% 
-    dplyr::select(lon, lat, fc_top, pwp_top, whc_top, fc_sub = fc, pwp_sub = pwp, whc_sub = whc)
-  return(df)
-}
 
 ## get all available cores
 ncores <- parallel::detectCores()
