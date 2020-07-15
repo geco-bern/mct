@@ -896,22 +896,22 @@ df %>%
 ```
 
 Longitude slices without ET-mm data (written by `R/get_et_mm_bylon.R`). 
-297 not available.
+All available.
 ```{r}
 df %>% 
   dplyr::filter(!avl_et_mm)
 ```
 
-Longitude slices without `bal` data. 174 additional ones not available!
+Longitude slices without `bal` data. All available.
 ```{r}
 df %>% 
-  dplyr::filter(!avl_bal & avl_et_mm)
+  dplyr::filter(!avl_bal)
 ```
 
-Longitude slices without CWDX data. 480 additional ones not available!
+Longitude slices without CWDX data. All available.
 ```{r}
 df %>% 
-  dplyr::filter(!avl_cwdx & avl_bal & avl_et_mm)
+  dplyr::filter(!avl_cwdx)
 ```
 
 Longitude slices without extracted CWDX data. 348 additional ones not available!
@@ -924,6 +924,15 @@ Total not available extracted CWDX data (longitude slices): 1,476
 ```{r}
 df %>% 
   dplyr::filter(!avl_cwdx_10_20_40)
+```
+
+
+## Collect data
+
+For the global application, combine WHCX and soil texture information into a global common data frame.
+```{r}
+source("rscript_collect_cwdx.R")
+load("data/df_cwdx_10_20_40.RData") # loads 'df'
 ```
 
 ## Rooting depth z(CWDX) 

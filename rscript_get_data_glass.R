@@ -7,6 +7,7 @@ library(purrr)
 library(lubridate)
 library(magrittr)
 library(tidync)
+library(rbeni)
 
 ##------------------------------------------------------------------------
 ## Extract point data and construct separate nested time series data frame
@@ -17,14 +18,15 @@ fileprefix <- "GLASS07B01.V41."
 nclist <- paste0(dir, list.files(dir, pattern = paste0(fileprefix, ".*.nc"), recursive = TRUE))
 outdir <- "~/data/glass/data_tidy/"
 varnam <- "NR"
-lonnam <- "longitude"
-latnam <- "latitude"
+lonnam <- "lon"
+latnam <- "lat"
 timenam <- "time"
 timedimnam <- "time"
 
 fgetdate_glass <- function(filnam){
-  year <- stringr::str_sub(filnam, 47, 50)
-  doy <- stringr::str_sub(filnam, 51, 53)
+  filnam <- basename(filnam)
+  year <- stringr::str_sub(filnam, 17, 20)
+  doy <- stringr::str_sub(filnam, 21, 23)
   date <- lubridate::ymd(paste0(year, "-01-01")) + lubridate::days(as.numeric(doy)) - lubridate::days(1)
   return(date)
 }
@@ -42,7 +44,8 @@ print("getting data for longitude indices:")
 print(irow_chunk[[as.integer(args[1])]]) 
 
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-rbeni::nclist_to_df(nclist, 
+nclist_to_df(
+  nclist, 
 	outdir = outdir, 
 	fileprefix = fileprefix, 
 	varnam = varnam, 

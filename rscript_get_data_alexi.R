@@ -7,6 +7,7 @@ library(purrr)
 library(lubridate)
 library(magrittr)
 library(tidync)
+library(rbeni)
 
 ##------------------------------------------------------------------------
 ## Extract point data and construct separate nested time series data frame
@@ -33,7 +34,7 @@ print("getting data for longitude indices:")
 print(irow_chunk[[as.integer(args[1])]]) 
 
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-rbeni::nclist_to_df(
+nclist_to_df(
 	nclist = nclist, 
 	outdir = outdir, 
 	fileprefix = fileprefix, 

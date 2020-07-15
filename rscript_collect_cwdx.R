@@ -8,7 +8,6 @@ library(multidplyr)
 library(rlang)
 library(lubridate)
 
-source("R/extract_cwdx_byilon.R")
 source("R/collect_cwdx_byilon.R")
 
 ## get all available cores
@@ -35,7 +34,8 @@ if (ncores > 1){
 } else {
   
   ## testing
-  df <- purrr::map(as.list(seq(nlon)), ~collect_cwdx_byilon(.))
+  df <- purrr::map(as.list(seq(nlon)), ~try(collect_cwdx_byilon(.))) %>% 
+    bind_rows()
   
 }
 
