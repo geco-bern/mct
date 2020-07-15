@@ -262,7 +262,6 @@ df_whc <- df_hwsd %>%
   dplyr::select(-data) %>% 
   mutate(data_soiltext_top = purrr::map(data_soiltext_top, ~calc_soilparams(., method = "balland")),
          data_soiltext_sub = purrr::map(data_soiltext_sub, ~calc_soilparams(., method = "balland")))
- 
 }
 ```
 
@@ -930,9 +929,19 @@ df %>%
 ## Collect data
 
 For the global application, combine WHCX and soil texture information into a global common data frame.
+
 ```{r}
+## CWDX data
 source("rscript_collect_cwdx.R")
 load("data/df_cwdx_10_20_40.RData") # loads 'df'
+
+## biome info
+df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", varnam = "biome") %>% 
+  rename(biome = myvar) %>% 
+  tidyr::drop_na(biome)
+
+## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
+load("data/df_whc_hires.RData") # loads 'df_whc'
 ```
 
 ## Rooting depth z(CWDX) 
