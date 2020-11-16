@@ -19,7 +19,7 @@ ncores <- parallel::detectCores()
 ##------------------------------------------------------------------------
 ## Determine failed cells
 ##------------------------------------------------------------------------
-load("data/df_cwdx_10_20_40.RData") # loads 'df'
+load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
 
 lon_hires <- seq(-179.975, 179.975, by = 0.05)
 
