@@ -850,7 +850,7 @@ Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time s
 
 #### Global
 
-1. Run script `rscript_get_cwd.R` on Euler (submission file: `submit_get_cwd.R`) 
+<!-- 1. Run script `rscript_get_cwd.R` on Euler (submission file: `submit_get_cwd.R`)  -->
 2. Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
 
 
@@ -932,24 +932,11 @@ df %>%
 
 ## Collect data
 
-For the global application, combine WHCX and soil texture information into a global common data frame.
+For the global application, combine WHCX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
 ```{r}
 ## CWDX data
 #source("rscript_collect_cwdx.R")
 load("data/df_cwdx_10_20_40.RData") # loads 'df'
-
-## biome info
-df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", varnam = "biome") %>% 
-  rename(biome = myvar) %>% 
-  tidyr::drop_na(biome)
-
-## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
-load("data/df_whc_hires.RData") # loads 'df_whc'
-
-## merge
-df <- df %>% 
-  left_join(df_biome, by = c("lon", "lat")) %>% 
-  left_join(df_whc, by = c("lon", "lat"))
 ```
 
 Test plots WHC
@@ -959,7 +946,6 @@ df %>%
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
   plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
 ```
-
 Test plots CWDX
 ```{r}
 ## spain
@@ -982,36 +968,39 @@ lon <- df_test$lon  # is -6.225
 uselat <- df_test$lat  # is 37.025
 lon_hires <- seq(-179.975, 179.975, by = 0.05)
 ilon_hires <- which.min(abs(lon_hires - -6.225))
-
-dirn <- "~/mct/data/df_bal/"
-filn <- paste0("df_bal_ilon_", ilon_hires, ".RData")
-load(paste0(dirn, filn)) # loads 'df'
-
-## determine CWD and events
-tmp <- df %>%
-  dplyr::filter(lat == uselat) %>% 
-  dplyr::mutate(
-    out_mct = purrr::map(
-      data,
-      ~get_plantwhc_mct_bysite(
-        .,
-        varname_wbal = "bal",
-        varname_date = "time",
-        thresh_terminate = 0.0,
-        thresh_drop = 0.9,
-        fittype = "Gumbel"))
-  )
-
-get_plantwhc_mct_bysite(
-            .,
-            varname_wbal = "bal",
-            varname_date = "time",
-            thresh_terminate = 0.0,
-            thresh_drop = 0.9,
-            fittype = "Gumbel")
+```
+More test plots
+```{r}
+## spain
+df %>% 
+  dplyr::filter(lon > -5 & lon < 25 & lat > 35 & lat < 55) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -5, lonmax = 25, latmin = 35, latmax = 55)
 ```
 
+## Re-do failed
+
+Method failed for some pixes, where CWD events spanned multiple years (terminate-threshold was never reached). Re-run them with updated function where `thresh_terminate` is successively increased by 0.2. This is done by `rscript_redo_failed.R` (submitted via `submit_redo_failed.sh`)
+
+
 ## Rooting depth z(CWDX) 
+
+This requires WHC data.
+```{r}
+## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
+load("data/df_whc_hires.RData") # loads 'df_whc'
+
+## biome info
+df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", varnam = "biome") %>% 
+  rename(biome = myvar) %>% 
+  tidyr::drop_na(biome)
+
+load("data/df_cwdx_10_20_40.RData") # loads 'df', as done already above
+
+## merge
+df <- df %>% 
+  left_join(df_biome, by = c("lon", "lat")) %>% 
+  left_join(df_whc, by = c("lon", "lat"))
+```
 
 ### Calculate
 
