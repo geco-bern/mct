@@ -90,7 +90,7 @@ df_fluxnet <- siteinfo_fluxnet2015 %>%
   dplyr::filter(sitename %in% usesites$sitename) %>% 
   mutate(ilon_hires = which.min(abs(lon_hires - lon)))
 
-save(df_fluxnet, file = "data/df_fluxnet.Rdata")
+write_csv(df_fluxnet, path = "data/df_fluxnet.csv")
 
 siteinfo_fluxnet2015 <- siteinfo_fluxnet2015 %>% 
   mutate(data = purrr::map2(ilon_hires, lat, ~load_alexi_et_mm_byilon(.x, .y)))
