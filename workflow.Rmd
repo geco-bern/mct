@@ -575,7 +575,9 @@ if (!file.exists(filn)){
     df_sif %>%
       tidyr::unnest(df) %>%
       write_csv(path = filn_csv)
+    
   } else {
+    
     df_sif <- read_csv(file = filn_csv) %>%
       group_by(idx, lon, lat) %>%
       tidyr::nest() %>%
@@ -839,7 +841,7 @@ if (!file.exists(filn)){
     
 ## CWD events and extremes
 
-Do both in one step. function `get_plantwhc_mct_bysite()` retruns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution 
+Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution 
 
 `mct2.R`  Creates list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
 
@@ -910,10 +912,11 @@ df %>%
 Longitude slices without CWDX data. All available.
 ```{r}
 df %>% 
+  ungroup() %>% 
   dplyr::filter(!avl_cwdx)
 ```
 
-Longitude slices without extracted CWDX data. 348 additional ones not available!
+Longitude slices without extracted CWDX data. All available.
 ```{r}
 df %>% 
   dplyr::filter(!avl_cwdx_10_20_40 & avl_cwdx & avl_bal & avl_et_mm)
@@ -922,6 +925,7 @@ df %>%
 Total not available extracted CWDX data (longitude slices): 1,476
 ```{r}
 df %>% 
+  ungroup() %>% 
   dplyr::filter(!avl_cwdx_10_20_40)
 ```
 
@@ -929,7 +933,6 @@ df %>%
 ## Collect data
 
 For the global application, combine WHCX and soil texture information into a global common data frame.
-
 ```{r}
 ## CWDX data
 #source("rscript_collect_cwdx.R")
@@ -952,7 +955,7 @@ df <- df %>%
 Test plots WHC
 ```{r}
 ## spain
-df_whc %>% 
+df %>% 
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
   plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
 ```
@@ -974,8 +977,38 @@ df_test <- df %>%
   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
   dplyr::filter(is.na(cwdx20)) %>% 
   slice(1)
-lon <- df_test$lon
-lat <- df_test$lat
+
+lon <- df_test$lon  # is -6.225
+uselat <- df_test$lat  # is 37.025
+lon_hires <- seq(-179.975, 179.975, by = 0.05)
+ilon_hires <- which.min(abs(lon_hires - -6.225))
+
+dirn <- "~/mct/data/df_bal/"
+filn <- paste0("df_bal_ilon_", ilon_hires, ".RData")
+load(paste0(dirn, filn)) # loads 'df'
+
+## determine CWD and events
+tmp <- df %>%
+  dplyr::filter(lat == uselat) %>% 
+  dplyr::mutate(
+    out_mct = purrr::map(
+      data,
+      ~get_plantwhc_mct_bysite(
+        .,
+        varname_wbal = "bal",
+        varname_date = "time",
+        thresh_terminate = 0.0,
+        thresh_drop = 0.9,
+        fittype = "Gumbel"))
+  )
+
+get_plantwhc_mct_bysite(
+            .,
+            varname_wbal = "bal",
+            varname_date = "time",
+            thresh_terminate = 0.0,
+            thresh_drop = 0.9,
+            fittype = "Gumbel")
 ```
 
 ## Rooting depth z(CWDX) 
