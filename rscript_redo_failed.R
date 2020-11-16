@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
+#args <- c(105,3000)
 
 library(dplyr)
 library(purrr)
@@ -15,6 +16,7 @@ source("R/get_cwdx_byilon.R")
 
 ## get all available cores
 ncores <- parallel::detectCores()
+#ncores <- 2
 
 ##------------------------------------------------------------------------
 ## Determine failed cells
@@ -38,8 +40,8 @@ df <- df %>%
   
   ## determine ilon
   rowwise() %>% 
-  mutate(ilon_hires = which.min(abs(lon_hires - lon))) %>% 
-  mutate(ilon_hires_test = (lon + 179.975)/0.05 + 1)
+  #mutate(ilon_hires = which.min(abs(lon_hires - lon))) %>% 
+  mutate(ilon_hires = (lon + 179.975)/0.05 + 1)
 
 df_nested <- df %>% 
   dplyr::select(lat, ilon_hires) %>% 
