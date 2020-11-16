@@ -1,3 +1,5 @@
+#!/usr/bin/env Rscript
+
 library(dplyr)
 library(tidyr)
 library(purrr)
@@ -20,5 +22,10 @@ latnam <- "lat"
 timenam <- "time"
 timedimnam <- "time"
 
+## get all available cores
+ncores <- parallel::detectCores()
+
 ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude), function from rbeni package
-nclist_to_df(nclist, outdir, fileprefix, varnam, ilon = NA, lonnam = lonnam, latnam = latnam, timenam = timenam, timedimnam = timedimnam, ncores = 1, single_basedate = TRUE)
+nclist_to_df(nclist, outdir, fileprefix, varnam, ilon = NA, 
+             lonnam = lonnam, latnam = latnam, timenam = timenam, timedimnam = timedimnam, 
+             ncores = ncores, single_basedate = TRUE, overwrite = FALSE)
