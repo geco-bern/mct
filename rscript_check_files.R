@@ -73,10 +73,10 @@ df <- tibble(ilon = 1:7200) %>%
   rowwise() %>%
   mutate(ilon_lores = get_ilon_lores(ilon)) %>% 
   mutate(
-    avl_tidy = check_avail_alexi_tidy(ilon),
-    avl_et_mm = check_avail_et_mm(ilon),
-    avl_snow = check_avail_snow(ilon_lores),
-    avl_bal = check_avail_bal(ilon),
+#     avl_tidy = check_avail_alexi_tidy(ilon),
+#     avl_et_mm = check_avail_et_mm(ilon),
+#     avl_snow = check_avail_snow(ilon_lores),
+#     avl_bal = check_avail_bal(ilon),
     avl_cwdx = check_avail_cwdx(ilon),
     avl_cwdx_10_20_40 = check_avail_10_20_40(ilon)
   )

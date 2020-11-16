@@ -69,10 +69,10 @@ Check for systemaic bias in ALEXI-ET at FLUXNET sites.
 
 Get ALEXI-ET estimates (originals, in W m-2) around FLUXNET sites.
 ```{r}
-library(ingestr)
+#library(ingestr)
 
 load_alexi_et_mm_byilon <- function(ilon_hires, lat){
-  load(paste("~/mct/data/df_alexi_et_mm/df_alexi_et_mm_ilon_", ilon_hires, ".RData"))  # loads df_alexi
+  load(paste0("~/mct/data/df_alexi_et_mm/df_alexi_et_mm_ilon_", ilon_hires, ".RData"))  # loads df_alexi
   lat_hires <- pull(df_alexi, lat)
   idx <- which.min(abs(lat - lat_hires))
   df_alexi %>% 
@@ -85,16 +85,17 @@ lon_hires <- seq(-179.975, 179.975, by = 0.05)
 ## use sites based on Manuela Balzarolo's selection.
 usesites <- read_csv("~/rsvi/data/sites2.csv")
 
-df_fluxnet <- siteinfo_fluxnet2015 %>% 
-  rowwise() %>% 
-  dplyr::filter(sitename %in% usesites$sitename) %>% 
-  mutate(ilon_hires = which.min(abs(lon_hires - lon)))
+# df_fluxnet <- siteinfo_fluxnet2015 %>% 
+#   rowwise() %>% 
+#   dplyr::filter(sitename %in% usesites$sitename) %>% 
+#   mutate(ilon_hires = which.min(abs(lon_hires - lon)))
 
-save(df_fluxnet, file = "data/df_fluxnet.Rdata")
+df_fluxnet <- read_csv("data/df_fluxnet.csv")
 
-siteinfo_fluxnet2015 <- siteinfo_fluxnet2015 %>% 
+df_fluxnet <- df_fluxnet %>% 
   mutate(data = purrr::map2(ilon_hires, lat, ~load_alexi_et_mm_byilon(.x, .y)))
 
+save(df_fluxnet, file = "data/df_fluxnet.Rdata")
 
 ## example
 
