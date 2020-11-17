@@ -841,7 +841,7 @@ if (!file.exists(filn)){
 ```
 
     
-## CWD events and extremes
+### CWD events and extremes
 
 Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution 
 
