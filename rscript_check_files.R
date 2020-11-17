@@ -107,4 +107,7 @@ save(df, file = "./data/df_file_availability.RData")
 
 ## display missing
 df %>% 
-  dplyr::filter(!avl_sif_jj | !avl_sif_pk)
+  dplyr::filter(!avl_sif_pk)
+
+df %>% 
+  dplyr::filter(!avl_sif_jj)
