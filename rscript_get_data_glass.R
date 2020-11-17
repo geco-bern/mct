@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(100, 3000)
+# args <- c(100, 7200)
 
 library(dplyr)
 library(tidyr)
@@ -56,8 +56,6 @@ nclist_to_df(
 	latnam = latnam, 
 	timenam = timenam, 
 	timedimnam = timedimnam, 
-	# ncores = "all", 
-  ncores = 1,
+	ncores = "all",
 	single_basedate = FALSE
-	# fgetdate = fgetdate_glass
 	)
