@@ -50,15 +50,22 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
     # tmp$out_mct[[1]]$df_return
     
     ## overwrite respective column in previous one (warning: for some reason the ifelse only retains df_return)
-    out_cwdx <- out_cwdx %>% 
-      left_join(out_cwdx_sub %>% rename(out_mct_redo = out_mct), by = c("lon", "lat")) %>%
-      rowwise() %>% 
-      ungroup() %>% 
-      mutate(avl_redo = purrr::map_lgl(out_mct_redo, ~!is.null(.))) %>% 
-      mutate(out_mct_save = out_mct) %>% 
-      rowwise() %>% 
-      mutate(out_mct = ifelse(avl_redo, out_mct_redo, out_mct)) %>% 
-      dplyr::select(-avl_redo, -out_mct_redo)
+    out_cwdx$out_mct_save <- out_cwdx$out_mct
+    for (idx in seq(nrow(out_cwdx_sub))){
+      idx_out_cwdx <- which(out_cwdx$lon == out_cwdx_sub$lon[idx] & out_cwdx$lat == out_cwdx_sub$lat[idx])
+      out_cwdx$out_mct[idx_out_cwdx] <- out_cwdx_sub$out_mct[idx]
+    }
+    
+    ## this code doesn't work for some reason:
+    # out_cwdx <- out_cwdx %>% 
+    #   left_join(out_cwdx_sub %>% rename(out_mct_redo = out_mct), by = c("lon", "lat")) %>%
+    #   rowwise() %>% 
+    #   ungroup() %>% 
+    #   mutate(avl_redo = purrr::map_lgl(out_mct_redo, ~!is.null(.))) %>% 
+    #   mutate(out_mct_save = out_mct) %>% 
+    #   rowwise() %>% 
+    #   mutate(out_mct = ifelse(avl_redo, out_mct_redo, out_mct)) %>% 
+    #   dplyr::select(-avl_redo, -out_mct_redo)
     
     ## write to file
     df <- out_cwdx
