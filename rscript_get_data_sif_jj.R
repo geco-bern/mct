@@ -49,6 +49,6 @@ nclist_to_df(
 	latnam = latnam, 
 	timenam = timenam, 
 	timedimnam = timedimnam, 
-	ncores = "all", 
+	ncores = 1, # "all", 
 	single_basedate = TRUE
 	)
