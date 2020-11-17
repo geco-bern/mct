@@ -852,8 +852,7 @@ Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time s
 
 #### Global
 
-<!-- 1. Run script `rscript_get_cwd.R` on Euler (submission file: `submit_get_cwd.R`)  -->
-2. Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
+Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
 
 
 #### Site-level

@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-args <- c(100, 3000)
+# args <- c(100, 3000)
 
 library(dplyr)
 library(tidyr)
