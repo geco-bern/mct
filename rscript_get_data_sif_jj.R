@@ -47,5 +47,5 @@ nclist_to_df(
 	timenam = timenam, 
 	timedimnam = timedimnam, 
 	ncores = "all", 
-	single_basedate = FALSE xxxxxx
+	single_basedate = TRUE
 	)
