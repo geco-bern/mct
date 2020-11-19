@@ -85,6 +85,10 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
       ## determine CWD and events
       df <- df %>% 
         
+        # ## xxx test
+        # ungroup() %>% 
+        # slice(110:120) %>% 
+        
         dplyr::mutate(
           out_mct = purrr::map(
             data,

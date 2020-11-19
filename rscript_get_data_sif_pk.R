@@ -23,9 +23,6 @@ latnam <- "lat"
 timenam <- "time"
 timedimnam <- "time"
 
-# ## get all available cores
-# ncores <- parallel::detectCores()
-
 ##------------------------------------------------------------------------
 ## split it up into chunks (total number of chunks provided by argument 2)
 ##------------------------------------------------------------------------

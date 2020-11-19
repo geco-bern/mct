@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(500,7000)
 
 library(dplyr)
 library(tidyr)
@@ -23,9 +22,6 @@ lonnam <- "lon"
 latnam <- "lat"
 timenam <- "time"
 timedimnam <- "time"
-
-# ## get all available cores
-# ncores <- parallel::detectCores()
 
 ##------------------------------------------------------------------------
 ## split it up into chunks (total number of chunks provided by argument 2)
