@@ -23,13 +23,14 @@ latnam <- "lat"
 timenam <- "time"
 timedimnam <- "time"
 
-fgetdate_glass <- function(filnam){
-  filnam <- basename(filnam)
-  year <- stringr::str_sub(filnam, 17, 20)
-  doy <- stringr::str_sub(filnam, 21, 23)
-  date <- lubridate::ymd(paste0(year, "-01-01")) + lubridate::days(as.numeric(doy)) - lubridate::days(1)
-  return(date)
-}
+## not necessary anymore after files have been combined into annual files 
+# fgetdate_glass <- function(filnam){
+#   filnam <- basename(filnam)
+#   year <- stringr::str_sub(filnam, 17, 20)
+#   doy <- stringr::str_sub(filnam, 21, 23)
+#   date <- lubridate::ymd(paste0(year, "-01-01")) + lubridate::days(as.numeric(doy)) - lubridate::days(1)
+#   return(date)
+# }
 
 ##------------------------------------------------------------------------
 ## split it up into chunks (total number of chunks provided by argument 2)
@@ -54,7 +55,6 @@ nclist_to_df(
 	latnam = latnam, 
 	timenam = timenam, 
 	timedimnam = timedimnam, 
-	ncores = "all", 
+	ncores = "all",
 	single_basedate = FALSE
-	# fgetdate = fgetdate_glass
 	)

@@ -23,9 +23,6 @@ latnam <- "lat"
 timenam <- "time"
 timedimnam <- "time"
 
-# ## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
-# nclist_to_df(nclist, outdir, fileprefix, varnam, lonnam, timenam, timedimnam, ncores = 80, single_basedate = FALSE)
-
 ##------------------------------------------------------------------------
 ## split it up into chunks (total number of chunks provided by argument 2)
 ##------------------------------------------------------------------------
@@ -51,5 +48,4 @@ nclist_to_df(
 	timedimnam = timedimnam, 
 	ncores = "all", 
 	single_basedate = FALSE
-	# fgetdate = fgetdate_glass
 	)

@@ -538,57 +538,61 @@ if (!file.exists(filn)){
 
 ### SIF
 
-```{r}
-source("R/get_data_mct_global.R") # because this function is defined also in another source file - mess
-##------------------------------------------------------------------------
-## SiF-downscaled from Duveiller
-##------------------------------------------------------------------------
-filn <- paste0("data/df_sif_", siteset, ".RData")
-filn_csv <- str_replace(filn, "Rdata", "csv")
-if (!file.exists(filn)){
-  if (!file.exists(filn_csv)){
+`rscript_get_data_sif_jj.R` and `rscript_get_data_sif_pk.R`: Rearranging data from maps to time series data frames. Output is stored in `~/data/gome_2_sif_downscaled/data_tidy/`.
 
-    ## version 'JJ'  
-    df_sif_jj <- get_data_mct_global(
-      df_grid,
-      dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_",
-      get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
-    )
-    df_sif_jj <- df_sif_jj %>% 
-      rename(idx_uniquelonlat = idx) %>% 
-      right_join(df_grid_allsiteid,
-                 by = c("lon", "lat"))
-    save(df_sif_jj, file = filn)
+<!-- ```{r} -->
+<!-- source("R/get_data_mct_global.R") # because this function is defined also in another source file - mess -->
+<!-- ##------------------------------------------------------------------------ -->
+<!-- ## SiF-downscaled from Duveiller -->
+<!-- ##------------------------------------------------------------------------ -->
+<!-- filn <- paste0("data/df_sif_", siteset, ".RData") -->
+<!-- filn_csv <- str_replace(filn, "Rdata", "csv") -->
+<!-- if (!file.exists(filn)){ -->
+<!--   if (!file.exists(filn_csv)){ -->
 
-    ## version 'PK'  
-    df_sif_pk <- get_data_mct_global(
-      df_grid,
-      dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_PK_dcSIF_005deg_8day_",
-      get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE
-    )
-    df_sif_pk <- df_sif_pk %>% 
-      rename(idx_uniquelonlat = idx) %>% 
-      right_join(df_grid_allsiteid,
-                 by = c("lon", "lat"))
-    save(df_sif_pk, file = filn)    
-    
-    df_sif %>%
-      tidyr::unnest(df) %>%
-      write_csv(path = filn_csv)
-  } else {
-    df_sif <- read_csv(file = filn_csv) %>%
-      group_by(idx, lon, lat) %>%
-      tidyr::nest() %>%
-      dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>%
-      dplyr::rename(df = data)
-  }
-} else {
-  load(filn)
-  df_sif %>%
-    tidyr::unnest(df) %>%
-    write_csv(path = filn)
-}
-```
+<!--     ## version 'JJ'   -->
+<!--     df_sif_jj <- get_data_mct_global( -->
+<!--       df_grid, -->
+<!--       dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_", -->
+<!--       get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE -->
+<!--     ) -->
+<!--     df_sif_jj <- df_sif_jj %>%  -->
+<!--       rename(idx_uniquelonlat = idx) %>%  -->
+<!--       right_join(df_grid_allsiteid, -->
+<!--                  by = c("lon", "lat")) -->
+<!--     save(df_sif_jj, file = filn) -->
+
+<!--     ## version 'PK'   -->
+<!--     df_sif_pk <- get_data_mct_global( -->
+<!--       df_grid, -->
+<!--       dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_PK_dcSIF_005deg_8day_", -->
+<!--       get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE -->
+<!--     ) -->
+<!--     df_sif_pk <- df_sif_pk %>%  -->
+<!--       rename(idx_uniquelonlat = idx) %>%  -->
+<!--       right_join(df_grid_allsiteid, -->
+<!--                  by = c("lon", "lat")) -->
+<!--     save(df_sif_pk, file = filn)     -->
+
+<!--     df_sif %>% -->
+<!--       tidyr::unnest(df) %>% -->
+<!--       write_csv(path = filn_csv) -->
+
+<!--   } else { -->
+
+<!--     df_sif <- read_csv(file = filn_csv) %>% -->
+<!--       group_by(idx, lon, lat) %>% -->
+<!--       tidyr::nest() %>% -->
+<!--       dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>% -->
+<!--       dplyr::rename(df = data) -->
+<!--   } -->
+<!-- } else { -->
+<!--   load(filn) -->
+<!--   df_sif %>% -->
+<!--     tidyr::unnest(df) %>% -->
+<!--     write_csv(path = filn) -->
+<!-- } -->
+<!-- ``` -->
 
 ### GLASS net radiation
 
@@ -837,9 +841,9 @@ if (!file.exists(filn)){
 ```
 
     
-## CWD events and extremes
+### CWD events and extremes
 
-Do both in one step. function `get_plantwhc_mct_bysite()` retruns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution 
+Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution 
 
 `mct2.R`  Creates list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
 
@@ -848,8 +852,7 @@ Do both in one step. function `get_plantwhc_mct_bysite()` retruns the CWD time s
 
 #### Global
 
-1. Run script `rscript_get_cwd.R` on Euler (submission file: `submit_get_cwd.R`) 
-2. Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
+Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
 
 
 #### Site-level
@@ -910,10 +913,11 @@ df %>%
 Longitude slices without CWDX data. All available.
 ```{r}
 df %>% 
+  ungroup() %>% 
   dplyr::filter(!avl_cwdx)
 ```
 
-Longitude slices without extracted CWDX data. 348 additional ones not available!
+Longitude slices without extracted CWDX data. All available.
 ```{r}
 df %>% 
   dplyr::filter(!avl_cwdx_10_20_40 & avl_cwdx & avl_bal & avl_et_mm)
@@ -922,41 +926,27 @@ df %>%
 Total not available extracted CWDX data (longitude slices): 1,476
 ```{r}
 df %>% 
+  ungroup() %>% 
   dplyr::filter(!avl_cwdx_10_20_40)
 ```
 
 
 ## Collect data
 
-For the global application, combine WHCX and soil texture information into a global common data frame.
-
+For the global application, combine WHCX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
 ```{r}
 ## CWDX data
 #source("rscript_collect_cwdx.R")
-load("data/df_cwdx_10_20_40.RData") # loads 'df'
-
-## biome info
-df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", varnam = "biome") %>% 
-  rename(biome = myvar) %>% 
-  tidyr::drop_na(biome)
-
-## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
-load("data/df_whc_hires.RData") # loads 'df_whc'
-
-## merge
-df <- df %>% 
-  left_join(df_biome, by = c("lon", "lat")) %>% 
-  left_join(df_whc, by = c("lon", "lat"))
+load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
 ```
 
 Test plots WHC
 ```{r}
 ## spain
-df_whc %>% 
+df %>% 
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
-  plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
+  plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500))
 ```
-
 Test plots CWDX
 ```{r}
 ## spain
@@ -974,11 +964,44 @@ df_test <- df %>%
   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
   dplyr::filter(is.na(cwdx20)) %>% 
   slice(1)
-lon <- df_test$lon
-lat <- df_test$lat
+
+lon <- df_test$lon  # is -6.225
+uselat <- df_test$lat  # is 37.025
+lon_hires <- seq(-179.975, 179.975, by = 0.05)
+ilon_hires <- which.min(abs(lon_hires - -6.225))
+```
+More test plots
+```{r}
+## spain
+df %>% 
+  dplyr::filter(lon > -5 & lon < 25 & lat > 35 & lat < 55) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -5, lonmax = 25, latmin = 35, latmax = 55, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500))
 ```
 
+## Re-do failed
+
+Method failed for some pixes, where CWD events spanned multiple years (terminate-threshold was never reached). Re-run them with updated function where `thresh_terminate` is successively increased by 0.2. This is done by `rscript_redo_failed.R` (submitted via `submit_redo_failed.sh`)
+
+
 ## Rooting depth z(CWDX) 
+
+This requires WHC data.
+```{r}
+## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
+load("data/df_whc_hires.RData") # loads 'df_whc'
+
+## biome info
+df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", varnam = "biome") %>% 
+  rename(biome = myvar) %>% 
+  tidyr::drop_na(biome)
+
+load("data/df_cwdx_10_20_40.RData") # loads 'df', as done already above, created by rscript_collect_cwdx.R
+
+## merge
+df <- df %>% 
+  left_join(df_biome, by = c("lon", "lat")) %>% 
+  left_join(df_whc, by = c("lon", "lat"))
+```
 
 ### Calculate
 
@@ -1032,13 +1055,16 @@ if (!file.exists(filn)){
 
 ## Implied zroot using SiF: CWD(LUE=0)
 
-`test_mct_bysite_alexi_fluxnet.R` 
+### Site-level
+
+Script used for testing at FLUXNET sites: `test_mct_bysite_alexi_fluxnet.R` 
 
 - Use CWD events from step 3 and SiF from step 2
 
 Add SiF data to 
 ```{r}
 source("R/get_flue_cwdmax.R")
+
 load("data/df_sif_jj_sj02.Rdata")
 load("data/df_sif_pk_sj02.Rdata")
 

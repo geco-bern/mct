@@ -8,23 +8,6 @@ get_plantwhc_mct_bysite <- function( df,
                                      verbose = FALSE, 
                                      fittype = NULL,
                                      max_nyear_acc_cwd = 5){
-
-  # ## Get data frame in shape (renaming columns)
-  # df <- df %>%
-  #   dplyr::rename(prec=!!coln_prec, pet=!!coln_pet, fv=!!coln_fv) %>% 
-  # 
-  #   ## clean: fill gaps by linearly interpolating
-  #   mutate(
-  #     fv = rbeni::myapprox(fv), 
-  #     pet = rbeni::myapprox(pet), 
-  #     prec=ifelse(is.na(prec),0,prec)) %>% 
-  #   
-  #   ## Get daily water balance and interpolate missing values
-  #   mutate(wbal = prec - fv*pet) %>% 
-  #   mutate(wbal = rbeni::myapprox(wbal)) %>% 
-  # 
-  #   ## drop NAs at head and tail
-  #   rbeni::cutna_headtail_df("fv")
   
   ## check if any negative water balance occurs at all
   any_negative_bal <- any(df[[ varname_wbal ]] < 0)
@@ -32,7 +15,7 @@ get_plantwhc_mct_bysite <- function( df,
   if (any_negative_bal){
 
     failed <- FALSE
-    
+  
     if ( sum( !is.na(df[[ varname_wbal ]]) ) < 30 ){
       
       failed <- TRUE
@@ -45,7 +28,6 @@ get_plantwhc_mct_bysite <- function( df,
       out_mct <- mct(df, varname_wbal = varname_wbal, varname_date = varname_date, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
       
       if (nrow(out_mct$inst)>0){
-
         ##--------------------------------
         ## get annual maximum CWD
         ##--------------------------------
@@ -57,7 +39,7 @@ get_plantwhc_mct_bysite <- function( df,
           mutate(year = lubridate::year(date_start))
         
         ## test if cwd continues accumulating with events spanning more than one year
-        while (sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd){
+        while ((sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd) &&  thresh_terminate < 0.8){
           
           ## if CWD accumulates over more than 'max_nyear_acc_cwd', run 'mct()' again with relaxed 'thresh_terminate'
           thresh_terminate <- thresh_terminate + 0.2
@@ -75,10 +57,10 @@ get_plantwhc_mct_bysite <- function( df,
           summarise(deficit = max(deficit, na.rm = TRUE), .groups = 'drop') %>%       
           pull(deficit)      
         
+
         if (length(vals)>3){
           
           if (!is.null(fittype)){
-
             ##--------------------------------
             ## Prescribed distribution: Gumbel
             ##--------------------------------
@@ -87,7 +69,6 @@ get_plantwhc_mct_bysite <- function( df,
             if (class(evd) == "try-error"){ failed <- TRUE }
               
           } else {
-            
             ##--------------------------------
             ## Free distribution: GEV or Gumbel
             ##--------------------------------
@@ -136,7 +117,6 @@ get_plantwhc_mct_bysite <- function( df,
     failed <- FALSE
   }
   
-  
   ##--------------------------------
   ## Get magnitudes of extremes with given return period
   ##--------------------------------  
@@ -144,7 +124,7 @@ get_plantwhc_mct_bysite <- function( df,
 
     df_return <- tibble(
       return_period = return_period, 
-      return_level  = rep(NA, length(return_period))
+      return_level = rep(NA, length(return_period))
       )
     evd <- NA
     out_mct <- NA
@@ -172,5 +152,3 @@ get_plantwhc_mct_bysite <- function( df,
   
   return(list(df_return = df_return, mod = evd, mct = out_mct, thresh_terminate = thresh_terminate))
 }
-
-

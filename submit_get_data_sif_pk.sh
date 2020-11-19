@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# bsub -n 2 -W 72:00 -u bestocke -J get_data_sif_pk -R "rusage[mem=5000]" "R --vanilla --slave < rscript_get_data_sif_pk.R > ~/hpc_log/rscript_get_data_sif_pk.Rout"
+module load netcdf
+module load new r/3.6.0
 
 njobs=100
 for ((n=1;n<=${njobs};n++)); do
