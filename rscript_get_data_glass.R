@@ -55,6 +55,6 @@ nclist_to_df(
 	timenam = timenam, 
 	timedimnam = timedimnam, 
 	ncores = "all", 
-	single_basedate = FALSE, 
-	fgetdate = fgetdate_glass
+	single_basedate = FALSE
+	# fgetdate = fgetdate_glass
 	)
