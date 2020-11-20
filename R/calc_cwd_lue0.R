@@ -2,8 +2,17 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
 
   library(rbeni)
   
+  if (nam_lue=="SIF"){
+    plot_title <- "ET: ALEXI, precipitation: WATCH-WFDEI, SIF: Duveiller et al."
+  } else if (nam_lue=="fet"){
+    plot_title <- "ET: ALEXI, precipitation: WATCH-WFDEI, net radiation: GLASS"
+  } else {
+    plot_title <- ""
+  }
+  
   ## rename
-  df <- df %>% rename(lue = !!nam_lue)
+  df <- df %>% 
+    rename(lue = !!nam_lue)
   
   ## SiF vs CWD: ALEXI/WATCH-WFDEI------------------------------------------
   ## retain only data from largest instances of each year
@@ -16,11 +25,10 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
   df <- df %>% 
     dplyr::filter(iinst %in% biginstances)
   
-  nlue <- df %>%
-    summarise(lue = sum(!is.na(lue))) %>%
-    pull(lue)
+  nlue <- sum(!is.na(df$lue))
 
   if (nlue > 10){
+    
     ## get linear fit with outliers
     linmod <- try(lm(lue ~ deficit, data = df))
     if (class(linmod) != "try-error"){
@@ -105,7 +113,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
         mutate(iinst = as.factor(iinst)) %>%
         ggplot() +
         geom_point(aes(x = deficit, y = lue, color = iinst), alpha = 0.5) +
-        labs( x = "Cumulative water deficit (mm)", y = nam_lue, subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, SIF: Duveiller et al.") +
+        labs( x = "Cumulative water deficit (mm)", y = nam_lue, subtitle = plot_title) +
         geom_hline(yintercept = 0.0, linetype = "dotted")
       # ylim(-0.1, 0.5)
       
@@ -134,7 +142,25 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
       
     } else {
       gg <- NULL
-    }    
+    }
+    
+    ## Get "fLUE" (reduction in lue by bin)
+    nbin <- 5
+    df <- df %>%
+      ungroup() %>% 
+      mutate(bin = ntile(deficit, nbin))
+    
+    df_agg <- df %>%
+      ungroup() %>%
+      group_by(bin) %>%
+      summarise(lue = median(lue, na.rm = TRUE))			
+    
+    ## get fractional reduction in LUE in highest CWD bin, relative to first bin
+    flue <- (df_agg %>% slice(nbin) %>% pull(lue)) / (df_agg %>% slice(1) %>%  pull(lue))
+    flue <- ifelse(length(flue)==0, NA, flue)
+    
+    cwdmax <- max(df$deficit, na.rm = TRUE)
+    
 
   } else {
 
@@ -144,9 +170,11 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
     lue0_exp <- NA
     k_lue <- NA
     gg <- NA
-
+    flue <- NA
+    cwdmax <- NA
+    
   }
 
-  return(list(lue0 = lue0, slope_lue = slope_lue, lue0_exp = lue0_exp, k_lue = k_lue, gg = gg))
+  return(list(lue0 = lue0, slope_lue = slope_lue, lue0_exp = lue0_exp, k_lue = k_lue, gg = gg, flue = flue, cwdmax = cwdmax))
 
 }

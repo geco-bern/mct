@@ -1,8 +1,7 @@
 calc_cwd_lue0_byilon <- function(ilon){
   
   source("R/calc_cwd_lue0.R")
-  source("R/get_flue_cwdmax.R")
-  
+
   find_lat_lores <- function(lat_hires, vec_lat_lores){
     vec_lat_lores[which.min(abs(lat_hires - vec_lat_lores))]
   }
@@ -86,6 +85,8 @@ calc_cwd_lue0_byilon <- function(ilon){
       mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "lue0")) %>% 
       mutate(cwd_lue0_exp_SIF = purrr::map_dbl(out_lue0_SIF, "lue0_exp")) %>% 
       # mutate(gg_SIF = purrr::map(out_lue0_SIF, "gg")) %>% 
+      mutate(flue_SIF = purrr::map_dbl(out_lue0_SIF, "flue")) %>%
+      mutate(cwdmax_SIF = purrr::map_dbl(out_lue0_SIF, "cwdmax")) %>%
       dplyr::select(-out_lue0_SIF) %>% 
       
       ## get CWD at SIF/SWdown = 0; SIF/SWdown := nSIF
@@ -94,19 +95,9 @@ calc_cwd_lue0_byilon <- function(ilon){
       mutate(cwd_lue0_nSIF = purrr::map_dbl(out_lue0_nSIF, "lue0")) %>% 
       mutate(cwd_lue0_exp_nSIF = purrr::map_dbl(out_lue0_nSIF, "lue0_exp")) %>% 
       # mutate(gg_nSIF = purrr::map(out_lue0_nSIF, "gg")) %>% 
+      mutate(flue_nSIF = purrr::map_dbl(out_lue0_nSIF, "flue")) %>%
+      mutate(cwdmax_nSIF = purrr::map_dbl(out_lue0_nSIF, "cwdmax")) %>%
       dplyr::select(-out_lue0_nSIF) %>% 
-      
-      ## get fLUE at CWDmax for SIF
-      mutate(out_flue_SIF = purrr::map(data, ~get_flue_cwdmax(., nam_lue = "SIF"))) %>% 
-      mutate(flue_SIF = purrr::map_dbl(out_flue_SIF, "flue")) %>% 
-      mutate(cwdmax_SIF = purrr::map_dbl(out_flue_SIF, "cwdmax")) %>% 
-      dplyr::select(-out_flue_SIF) %>% 
-
-      ## get fLUE at CWDmax for nSIF
-      mutate(out_flue_nSIF = purrr::map(data, ~get_flue_cwdmax(., nam_lue = "nSIF"))) %>% 
-      mutate(flue_nSIF = purrr::map_dbl(out_flue_nSIF, "flue")) %>% 
-      mutate(cwdmax_nSIF = purrr::map_dbl(out_flue_nSIF, "cwdmax")) %>% 
-      dplyr::select(-out_flue_nSIF) %>% 
       
       ## drop data again
       dplyr::select(-data, -data_inst)
