@@ -1055,6 +1055,13 @@ if (!file.exists(filn)){
 
 ## Implied zroot using SiF: CWD(LUE=0)
 
+### Global
+
+Collect data in nice data frame and apply function `calc_cwd_lue0()`. 
+
+
+
+
 ### Site-level
 
 Script used for testing at FLUXNET sites: `test_mct_bysite_alexi_fluxnet.R` 
