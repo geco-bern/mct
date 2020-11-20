@@ -1057,9 +1057,7 @@ if (!file.exists(filn)){
 
 ### Global
 
-Collect data in nice data frame and apply function `calc_cwd_lue0()`. 
-
-
+Run script that wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()`. Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
 
 
 ### Site-level
@@ -1131,9 +1129,6 @@ df_sif %>%
   analyse_modobs2("cwd_lue0", "cwdx20")
 ```
     
-    
-    
-    
 ### LUE reduction at maximum CWD
 
 Doesn't work well.
@@ -1148,7 +1143,7 @@ df_sif %>%
   ggplot(aes(x = cwdmax, y = flue)) +
   geom_point()
 ```
-    
+        
     
 ## Implied zroot using Rn: CWD(fET=0)
 

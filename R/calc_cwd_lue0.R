@@ -1,5 +1,10 @@
-calc_cwd_lue0 <- function(df, inst, do_plot = FALSE){  
+calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){  
 
+  library(rbeni)
+  
+  ## rename
+  df <- df %>% rename(lue = !!nam_lue)
+  
   ## SiF vs CWD: ALEXI/WATCH-WFDEI------------------------------------------
   ## retain only data from largest instances of each year
   biginstances <- inst %>% 
@@ -12,14 +17,15 @@ calc_cwd_lue0 <- function(df, inst, do_plot = FALSE){
     dplyr::filter(iinst %in% biginstances)
   
   nlue <- df %>%
-    summarise(nlue = sum(!is.na(lue))) %>%
-    pull(nlue)
+    summarise(lue = sum(!is.na(lue))) %>%
+    pull(lue)
 
   if (nlue > 10){
     ## get linear fit with outliers
     linmod <- try(lm(lue ~ deficit, data = df))
     if (class(linmod) != "try-error"){
 
+      ## remove outliers (residuals beyond 1.5 * IQR)
       idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
       df$lue[idx_drop] <- NA
       
@@ -75,8 +81,8 @@ calc_cwd_lue0 <- function(df, inst, do_plot = FALSE){
         
         if (is_sign_exp){
           
-          ## get CWD at wich LUE is at 1/2e
-          lue0_exp <- -1.0/coef(expmod)["k"]   ## CWD where LUE is reduced to 1/e
+          ## get CWD at wich lue is at 1/2e
+          lue0_exp <- -1.0/coef(expmod)["k"]   ## CWD where lue is reduced to 1/e
           df_fit_exp <- tibble(y = predict(expmod, newdata = df), x = df$deficit)
           
         } else {
@@ -99,7 +105,7 @@ calc_cwd_lue0 <- function(df, inst, do_plot = FALSE){
         mutate(iinst = as.factor(iinst)) %>%
         ggplot() +
         geom_point(aes(x = deficit, y = lue, color = iinst), alpha = 0.5) +
-        labs( x = "Cumulative water deficit (mm)", y = "SiF", subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, SiF: Duveiller et al.") +
+        labs( x = "Cumulative water deficit (mm)", y = nam_lue, subtitle = "ET: ALEXI, precipitation: WATCH-WFDEI, SIF: Duveiller et al.") +
         geom_hline(yintercept = 0.0, linetype = "dotted")
       # ylim(-0.1, 0.5)
       
@@ -127,12 +133,12 @@ calc_cwd_lue0 <- function(df, inst, do_plot = FALSE){
       # }
       
     } else {
-      gg <- NA
+      gg <- NULL
     }    
 
   } else {
 
-    # rlang::inform(paste0("Not enough SiF data points for site ", sitename))
+    # rlang::inform(paste0("Not enough lue data points for site ", sitename))
     lue0 <- NA
     slope_lue <- NA
     lue0_exp <- NA

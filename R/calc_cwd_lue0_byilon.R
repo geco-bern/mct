@@ -1,6 +1,11 @@
 calc_cwd_lue0_byilon <- function(ilon){
   
   source("R/calc_cwd_lue0.R")
+  source("R/get_flue_cwdmax.R")
+  
+  find_lat_lores <- function(lat_hires, vec_lat_lores){
+    vec_lat_lores[which.min(abs(lat_hires - vec_lat_lores))]
+  }
   
   ## construct output file name
   dirn <- "~/mct/data/df_cwd_lue0/"
@@ -8,92 +13,111 @@ calc_cwd_lue0_byilon <- function(ilon){
   if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_cwd_lue0")
   path <- paste0(dirn, filn)
   
-  ## Open file CWDX output
-  dirn <- "~/mct/data/df_cwdx/"
-  filn <- paste0("df_cwdx_ilon_", ilon, ".RData")
-  load(paste0(dirn, filn)) # loads 'df'
-  
-  ## extract data from CWDX output. This now contains the CWD and instances information
-  df_cwd <- df %>%
-    mutate(mct = purrr::map(out_mct, "mct")) %>% 
-    dplyr::select(-out_mct) %>% 
-    mutate(data_cwd = purrr::map(mct, "df")) %>% 
-    dplyr::select(-mct)
-  
-  ## Load SiF data
-  ## version PK
-  filn <- paste0("GOME_PK_dcSIF_005deg_8day__ilon_", ilon, ".RData")
-  dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
-  load(paste0(dirn, filn)) # loads 'df'
-  df_pk <- df %>% 
-    rename(data_pk = data)
-  
-  ## version JJ
-  filn <- paste0("GOME_JJ_dcSIF_005deg_8day__ilon_", ilon, ".RData")
-  dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
-  load(paste0(dirn, filn)) # loads 'df'
-  
-  test <- df %>% 
+  if (!file.exists(path)){
     
-    ## Take mean of two versions of SIF data
-    rename(data_jj = data) %>% 
-    full_join(df_pk, by = c("lon", "lat")) %>% 
-    mutate(data = purrr::map2(data_jj, data_pk, ~bind_rows(.x, .y))) %>% 
-    dplyr::select(-data_jj, -data_pk) %>% 
-    mutate(data = purrr::map(data, ~group_by(., time) %>% summarise(SIF = mean(SIF, na.rm = TRUE), .groups = "drop"))) %>% 
+    ## Open WATCH-WFDEI SWdown data
+    lon_lores <- seq(-179.75, 179.75, by = 0.5)
+    lon_hires <- seq(-179.975, 179.975, by = 0.05)
+    ilon_lores <- which.min(abs(lon_lores - lon_hires[ilon]))
+    load(paste0("~/data/watch_wfdei/data_tidy/SWdown_daily_WFDEI__ilon_", ilon_lores, ".RData"))
+    df_sw <- df
+    rm("df")
+    
+    ## filter watch data to years within ALEXI data availability (2003-2017)
+    df_sw <- df_sw %>% 
+      ungroup() %>% 
+      dplyr::filter(!is.null(data)) %>% 
+      mutate(data = purrr::map(data, ~dplyr::filter(., lubridate::year(time)>2002 & lubridate::year(time)<2018))) %>% 
+      mutate(data = purrr::map(data, ~rename(., sw = SWdown)))
+    
+    ## get closest matching latitude indices and merge data frames
+    vec_lat_lores <- df_sw$lat %>% unique()
+    
+    ## Open file CWDX output
+    dirn <- "~/mct/data/df_cwdx/"
+    filn <- paste0("df_cwdx_ilon_", ilon, ".RData")
+    load(paste0(dirn, filn)) # loads 'df'
+    
+    ## extract data from CWDX output. This now contains the CWD and instances information
+    df_cwd <- df %>%
+      mutate(mct = purrr::map(out_mct, "mct")) %>% 
+      dplyr::select(-out_mct) %>% 
+      mutate(data_cwd = purrr::map(mct, "df"),
+             data_inst = purrr::map(mct, "inst")) %>% 
+      dplyr::select(-mct)
+    
+    ## Load SiF data
+    ## version PK
+    filn <- paste0("GOME_PK_dcSIF_005deg_8day__ilon_", ilon, ".RData")
+    dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
+    load(paste0(dirn, filn)) # loads 'df'
+    df_pk <- df %>% 
+      rename(data_pk = data)
+    
+    ## version JJ
+    filn <- paste0("GOME_JJ_dcSIF_005deg_8day__ilon_", ilon, ".RData")
+    dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
+    load(paste0(dirn, filn)) # loads 'df'
+    
+    df <- df %>% 
+      
+      ## Take mean of two versions of SIF data
+      rename(data_jj = data) %>% 
+      full_join(df_pk, by = c("lon", "lat")) %>% 
+      mutate(data = purrr::map2(data_jj, data_pk, ~bind_rows(.x, .y))) %>% 
+      dplyr::select(-data_jj, -data_pk) %>% 
+      mutate(data = purrr::map(data, ~group_by(., time) %>% summarise(SIF = mean(SIF, na.rm = TRUE), .groups = "drop"))) %>% 
+      
+      ## Combine with CWD data
+      inner_join(df_cwd, by = c("lon", "lat")) %>% 
+      mutate(data = purrr::map2(data_cwd, data, ~left_join(.x, .y, by = "time"))) %>% 
+      dplyr::select(lon, lat, data, data_inst) %>% 
+      
+      ## Combine with SWdown data from WATCH-WFDEI (0.5 deg!)
+      mutate(lat_lores = purrr::map_dbl(lat, ~find_lat_lores(., vec_lat_lores = vec_lat_lores))) %>% 
+      left_join(df_sw %>% 
+                  rename(lon_lores = lon, lat_lores = lat, data_sw = data),
+                by = "lat_lores") %>% 
+      mutate(data = purrr::map2(data, data_sw, ~right_join(.x, .y, by = "time"))) %>% 
+      dplyr::select(-data_sw) %>% 
+      
+      ## get CWD at SIF = 0
+      mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE))) %>% 
+      mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "lue0")) %>% 
+      mutate(cwd_lue0_exp_SIF = purrr::map_dbl(out_lue0_SIF, "lue0_exp")) %>% 
+      # mutate(gg_SIF = purrr::map(out_lue0_SIF, "gg")) %>% 
+      dplyr::select(-out_lue0_SIF) %>% 
+      
+      ## get CWD at SIF/SWdown = 0; SIF/SWdown := nSIF
+      mutate(data = purrr::map(data, ~mutate(., nSIF = SIF / sw))) %>% 
+      mutate(out_lue0_nSIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "nSIF", do_plot = FALSE))) %>% 
+      mutate(cwd_lue0_nSIF = purrr::map_dbl(out_lue0_nSIF, "lue0")) %>% 
+      mutate(cwd_lue0_exp_nSIF = purrr::map_dbl(out_lue0_nSIF, "lue0_exp")) %>% 
+      # mutate(gg_nSIF = purrr::map(out_lue0_nSIF, "gg")) %>% 
+      dplyr::select(-out_lue0_nSIF) %>% 
+      
+      ## get fLUE at CWDmax for SIF
+      mutate(out_flue_SIF = purrr::map(data, ~get_flue_cwdmax(., nam_lue = "SIF"))) %>% 
+      mutate(flue_SIF = purrr::map_dbl(out_flue_SIF, "flue")) %>% 
+      mutate(cwdmax_SIF = purrr::map_dbl(out_flue_SIF, "cwdmax")) %>% 
+      dplyr::select(-out_flue_SIF) %>% 
 
-    ## Combine with CWD data
-    inner_join(df_cwd, by = c("lon", "lat")) %>% 
-    mutate(data = purrr::map2(data_cwd, data, ~left_join(.x, .y, by = "time"))) %>% 
-    dplyr::select(lon, lat, data)
-  
-  
-  
-  ## testing
-  df_cwd_lat <- df_cwd$lat %>% unique()
-  df_sif_lat <- df$lat %>% unique()
-  df_com_lat <- test$lat %>% unique()
-  
-    pull(lon)
-  
-    mutate(cwdx20 = purrr::map_dbl(out_mct, ~extract_return_level(., 20))) %>% 
-    mutate(mct = purrr::map(out_mct, "mct")) %>% 
-    ungroup() %>% 
-    dplyr::select(idx, mct, cwdx20) %>% 
-    mutate(df = purrr::map(mct, "df"),
-           inst = purrr::map(mct, "inst")) %>% 
-    dplyr::select(-mct) %>% 
+      ## get fLUE at CWDmax for nSIF
+      mutate(out_flue_nSIF = purrr::map(data, ~get_flue_cwdmax(., nam_lue = "nSIF"))) %>% 
+      mutate(flue_nSIF = purrr::map_dbl(out_flue_nSIF, "flue")) %>% 
+      mutate(cwdmax_nSIF = purrr::map_dbl(out_flue_nSIF, "cwdmax")) %>% 
+      dplyr::select(-out_flue_nSIF) %>% 
+      
+      ## drop data again
+      dplyr::select(-data, -data_inst)
     
-    ## add sif data
-    left_join(
-      df_sif_jj %>% dplyr::select(idx, df_jj = data),
-      by = "idx"
-    ) %>% 
-    left_join(
-      df_sif_pk %>% dplyr::select(idx, df_pk = data),
-      by = "idx"
-    ) %>% 
-    dplyr::filter(!is.null(df) & !is.null(df_jj) & !is.null(df_pk) & !is.na(cwdx20)) %>% 
-    mutate(df = purrr::map2(df, df_jj, ~left_join(.x, .y, by = "date"))) %>% 
-    mutate(df = purrr::map(df, ~rename(., sif_jj = sif))) %>% 
-    mutate(df = purrr::map2(df, df_pk, ~left_join(.x, .y, by = "date"))) %>% 
-    mutate(df = purrr::map(df, ~rename(., sif_pk = sif))) %>% 
-    # mutate(df = purrr::map(df, ~add_mean_sif(.))) %>% 
-    mutate(df = purrr::map(df, ~rename(., lue = sif_jj))) %>%
+    ## write to file
+    print(paste("Writing file:", path))
+    save(df, file = path)  
     
-    ## get CWD at LUE0=0
-    mutate(out_lue0 = purrr::map2(df, inst, ~calc_cwd_lue0(.x, .y, do_plot = TRUE))) %>% 
-    mutate(cwd_lue0 = purrr::map_dbl(out_lue0, "lue0")) %>% 
-    mutate(cwd_lue0_exp = purrr::map_dbl(out_lue0, "lue0_exp")) %>% 
-    mutate(gg = purrr::map(out_lue0, "gg")) %>% 
-    
-    ## get fLUE at CWDmax
-    mutate(out_flue = purrr::map(df, ~get_flue_cwdmax(.))) %>% 
-    mutate(flue = purrr::map_dbl(out_flue, "flue")) %>% 
-    mutate(cwdmax = purrr::map_dbl(out_flue, "cwdmax")) %>% 
-    
-    dplyr::select(idx, cwdx20, cwd_lue0, cwd_lue0_exp, gg, flue, cwdmax)
-  
-  
-  
+  } else {
+    print(paste("File exists already:", path))
+  } 
+  error = 0
+  return(0)
 }
