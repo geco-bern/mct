@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-#args <- c(105,3000)
+# args <- c(300,7200)
 
 library(dplyr)
 library(purrr)
@@ -50,19 +50,19 @@ df_nested <- df %>%
   mutate(ncells = purrr::map_dbl(data, ~nrow(.))) %>% 
   rename(ilon = ilon_hires)
 
+## split it up into chunks (total number of chunks provided by argument 2)
+nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
+ilon_vec <- df %>% pull(ilon_hires) %>% unique()
+nrows_chunk <- ceiling(length(ilon_vec)/nchunk)
+irow_chunk <- split(ilon_vec, ceiling(seq_along(ilon_vec)/nrows_chunk))
+
+print("getting data for longitude indices:")
+print(irow_chunk[[as.integer(args[1])]]) 
+
 ##------------------------------------------------------------------------
 ## first level: based on daily water balance, re-do get_cwdx_byilon(.) with incrementally increasing thresh_terminate
 ##------------------------------------------------------------------------
 if (ncores > 1){
-  
-  ## split it up into chunks (total number of chunks provided by argument 2)
-  nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
-  ilon_vec <- df %>% pull(ilon_hires) %>% unique()
-  nrows_chunk <- ceiling(length(ilon_vec)/nchunk)
-  irow_chunk <- split(ilon_vec, ceiling(seq_along(ilon_vec)/nrows_chunk))
-  
-  print("getting data for longitude indices:")
-  print(irow_chunk[[as.integer(args[1])]]) 
   
   cl <- multidplyr::new_cluster(ncores) %>%
     multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "extRemes", "lubridate", "rlang", "broom")) %>%
@@ -78,7 +78,9 @@ if (ncores > 1){
 } else {
   
   ## testing
-  df_out <- df_nested %>% 
+  df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
+  # df_out <- tibble(ilon = 681) %>%
+    left_join(df_nested, by = "ilon") %>% 
     dplyr::mutate(out = purrr::map2( ilon, data,
                                      ~get_cwdx_byilon(.x, df_lat = .y)))
   
