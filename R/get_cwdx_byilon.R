@@ -15,9 +15,6 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
     ##---------------------------------------------------------------------
     print(paste("Complementing file:", path))
     if (!file.exists(path)) rlang::abort(paste("Aborting. File does not exist:", path))
-    load(path)
-    out_cwdx <- df
-    rm("df")
 
     ## Open file with daily water balance
     dirn <- "~/mct/data/df_bal/"
@@ -28,7 +25,8 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
     ## do it only for latitudes (single cells) where CWDX data was actually found missing
     df_cwdx_corr <- df %>% 
       
-      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
+      ## This doesn't work
+      # mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
 
       ## filter to only the ones that are missing
       dplyr::filter(lat %in% pull(df_lat, lat)) %>% 
@@ -48,53 +46,25 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
       dplyr::select(-data)
 
     ## complement cwdx dataframe with corrected one
-    dirn <- "~/mct/data/df_cwdx/"
-    filn <- paste0("df_cwdx_ilon_", as.character(ilon_hires), ".RData")
-    path <- paste0(dirn, filn)
     load(path)  # loads 'df'
     
-    df <- df %>% 
-      
-      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
-      left_join(df_cwdx_corr, by = c("lon", "lat")) %>% 
-      rowwise() %>% 
-      mutate(out_mct = ifelse((lat %in% df_missing_lat$lat) & !is.na(out_mct_corr), out_mct_corr, out_mct)) %>% 
-      dplyr::select(-out_mct_corr)
+    ## earlier attempt - ignore it
+    if ("out_mct_save" %in% names(df)){
+      df <- df %>% 
+        dplyr::select(-out_mct) %>% 
+        rename(out_mct = out_mct_save)
+    }
+
+    ## overwrite column with corrected output
+    for (idx in seq(nrow(df_cwdx_corr))){
+      idx_full <- which(df$lat == df_cwdx_corr$lat[idx])
+      df$out_mct[idx_full] <- df_cwdx_corr$out_mct[idx]
+    }
     
     ## overwrite file
     print(paste("Overwriting file:", path))
     save(df, file = path) 
 
-    
-    # # ## test
-    # # df_cwdx_corr$out_mct[[1]]$df_return
-    # # tmp <- out_cwdx %>%
-    # #   dplyr::filter(lon == df_cwdx_corr$lon[[1]] & lat == df_cwdx_corr$lat[[1]])
-    # # tmp$out_mct[[1]]$df_return
-    
-    # ## overwrite respective column in previous one (warning: for some reason the ifelse only retains df_return)
-    # out_cwdx$out_mct_save <- out_cwdx$out_mct
-    # for (idx in seq(nrow(df_cwdx_corr))){
-    #   idx_out_cwdx <- which(out_cwdx$lon == df_cwdx_corr$lon[idx] & out_cwdx$lat == df_cwdx_corr$lat[idx])
-    #   out_cwdx$out_mct[idx_out_cwdx] <- df_cwdx_corr$out_mct[idx]
-    # }
-    
-    # ## this code doesn't work for some reason:
-    # # out_cwdx <- out_cwdx %>% 
-    # #   left_join(df_cwdx_corr %>% rename(out_mct_redo = out_mct), by = c("lon", "lat")) %>%
-    # #   rowwise() %>% 
-    # #   ungroup() %>% 
-    # #   mutate(avl_redo = purrr::map_lgl(out_mct_redo, ~!is.null(.))) %>% 
-    # #   mutate(out_mct_save = out_mct) %>% 
-    # #   rowwise() %>% 
-    # #   mutate(out_mct = ifelse(avl_redo, out_mct_redo, out_mct)) %>% 
-    # #   dplyr::select(-avl_redo, -out_mct_redo)
-    
-    # ## write to file
-    # df <- out_cwdx
-    # rm("out_cwdx")
-    # print(paste("Writing file:", path))
-    # save(df, file = path)
     
   } else {
     

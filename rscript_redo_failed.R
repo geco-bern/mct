@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(300,7200)
+# args <- c(1153,7200)
 
 library(dplyr)
 library(purrr)
@@ -16,7 +16,6 @@ source("R/get_cwdx_byilon.R")
 
 ## get all available cores
 ncores <- parallel::detectCores()
-#ncores <- 2
 
 ##------------------------------------------------------------------------
 ## Determine failed cells
@@ -79,7 +78,7 @@ if (ncores > 1){
   
   ## testing
   df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
-  # df_out <- tibble(ilon = 681) %>%
+  #df_out <- tibble(ilon = 721) %>%
     left_join(df_nested, by = "ilon") %>% 
     dplyr::mutate(out = purrr::map2( ilon, data,
                                      ~get_cwdx_byilon(.x, df_lat = .y)))

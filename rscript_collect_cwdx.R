@@ -35,7 +35,7 @@ if (ncores > 1){
   
   ## testing
   df <- purrr::map(as.list(seq(nlon)), ~try(collect_cwdx_byilon(.))) %>% 
-    bind_rows()s
+    bind_rows()
   
 }
 
