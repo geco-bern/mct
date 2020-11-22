@@ -1,8 +1,5 @@
 #!/bin/bash
 
-module load netcdf
-module load new r/3.6.0
-
 njobs=100
 for ((n=1;n<=${njobs};n++)); do
     echo "Submitting chunk number $n ..."
