@@ -877,6 +877,16 @@ if (!file.exists(filn)){
 }
 ```
 
+
+## Extract CWDXX
+
+Extract CWD-extremes from full output.
+
+### Global
+
+Run `rscript_extract_cwdx.R` (with submit file `submit_extract_cwdx.sh`).
+
+
 ## Check file availability
 
 On Euler, run `rscript_check_files.R` and download the overview dataframe it writes (`data/df_file_availability.RData`)
@@ -945,7 +955,7 @@ Test plots WHC
 ## spain
 df %>% 
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
-  plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500))
+  plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 2000))
 ```
 Test plots CWDX
 ```{r}
@@ -1074,17 +1084,18 @@ load("data/df_sif_jj_sj02.Rdata")
 load("data/df_sif_pk_sj02.Rdata")
 
 filn <- paste0("data/df_sif_lue0", siteset, ".Rdata")
-  if (!file.exists(filn)){
-    add_mean_sif <- function(df){
+if (!file.exists(filn)){
+    
+  add_mean_sif <- function(df){
     rowMeans( cbind(df$sif_jj, df$sif_pk) )
   }
     
   df_sif <- df_cwd %>% 
     dplyr::select(-data) %>% 
-    mutate(cwdx20 = purrr::map_dbl(out_mct, ~extract_return_level(., 20))) %>% 
+    mutate(cwdx40 = purrr::map_dbl(out_mct, ~extract_return_level(., 40))) %>% 
     mutate(mct = purrr::map(out_mct, "mct")) %>% 
     ungroup() %>% 
-    dplyr::select(idx, mct, cwdx20) %>% 
+    dplyr::select(idx, mct, cwdx40) %>% 
     mutate(df = purrr::map(mct, "df"),
            inst = purrr::map(mct, "inst")) %>% 
     dplyr::select(-mct) %>% 
@@ -1098,7 +1109,7 @@ filn <- paste0("data/df_sif_lue0", siteset, ".Rdata")
       df_sif_pk %>% dplyr::select(idx, df_pk = data),
       by = "idx"
     ) %>% 
-    dplyr::filter(!is.null(df) & !is.null(df_jj) & !is.null(df_pk) & !is.na(cwdx20)) %>% 
+    dplyr::filter(!is.null(df) & !is.null(df_jj) & !is.null(df_pk) & !is.na(cwdx40)) %>% 
     mutate(df = purrr::map2(df, df_jj, ~left_join(.x, .y, by = "date"))) %>% 
     mutate(df = purrr::map(df, ~rename(., sif_jj = sif))) %>% 
     mutate(df = purrr::map2(df, df_pk, ~left_join(.x, .y, by = "date"))) %>% 
@@ -1117,7 +1128,7 @@ filn <- paste0("data/df_sif_lue0", siteset, ".Rdata")
     mutate(flue = purrr::map_dbl(out_flue, "flue")) %>% 
     mutate(cwdmax = purrr::map_dbl(out_flue, "cwdmax")) %>% 
 
-    dplyr::select(idx, cwdx20, cwd_lue0, cwd_lue0_exp, gg, flue, cwdmax)
+    dplyr::select(idx, cwdx40, cwd_lue0, cwd_lue0_exp, gg, flue, cwdmax)
     
   save(df_sif, file = filn)
 } else {

@@ -1,4 +1,4 @@
-extract_cwdx_byilon <- function(ilon){
+extract_cwdx_byilon <- function(ilon, overwrite = FALSE){
   
   infil <- paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData")
   
@@ -11,7 +11,7 @@ extract_cwdx_byilon <- function(ilon){
     if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_cwdx_10_20_40")
     path <- paste0(dirn, filn)
     
-    if (!file.exists(path)){
+    if (!file.exists(path) || overwrite){
       
       df <- df %>%
         dplyr::mutate(df_return = purrr::map(out_mct, "df_return")) %>%

@@ -60,7 +60,7 @@ load("data/df_alexi.Rdata")
 
 
 ##------------------------------------------------------------------------
-## Get data from FLUXNET2015 using rsofun
+## Get data from FLUXNET2015 using ingestr
 ##------------------------------------------------------------------------
 ## meteo forcing data
 ddf_meteo <- ingest(
