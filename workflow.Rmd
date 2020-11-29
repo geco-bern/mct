@@ -950,13 +950,57 @@ For the global application, combine WHCX and soil texture information into a glo
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
 ```
 
-Test plots WHC
+### Write NetCDF
+
 ```{r}
-## spain
-df %>% 
-  dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
-  plot_map3(varnam = "whc_top", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 2000))
+nc <- df_to_grid(df, varnam = "cwdx20", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx20.nc")
 ```
+
+Regrid to 0.5 deg
+```{r}
+system("cdo remapbil,gridfile_halfdeg.txt data/cwdx20.nc data/cwdx20_halfdeg.nc")
+```
+
+Read half-degree global file and plot.
+```{r}
+nc_halfdeg <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20")
+plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500), latmin = -55, latmax = 80,
+          spacing = "constant")
+ggsave("fig/map_cwdx20.pdf", width = 10, height = 8)
+```
+
+## Test plots
+
+### Distribution of values
+```{r}
+df %>% dplyr::filter(cwdx20 < 800) %>% ggplot(aes(x = cwdx20, y = ..density..)) + geom_density()
+
+# df %>% 
+#   dplyr::filter(cwdx20 < 800) %>% 
+#   tidyr::pivot_longer(cols = c(cwdx10, cwdx20, cwdx40), names_to = "return_period", values_to = "cwdxx") %>% 
+#   ggplot(aes(x = cwdxx, y = return_period)) +
+#   geom_density_ridges(
+#     jittered_points = FALSE, scale = .95, rel_min_height = .01
+#   ) +
+#   scale_y_discrete(expand = c(0, 0)) +
+#   scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+#   scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+#   scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+#   scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+#   coord_cartesian(clip = "off") +
+#   guides(fill = guide_legend(
+#     override.aes = list(
+#       fill = c("#D55E00A0", "#0072B2A0"),
+#       color = NA, point_color = NA)
+#     )
+#   ) +
+#   ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
+#   theme_ridges(center = TRUE)
+```
+
+### Maps
+
 Test plots CWDX
 ```{r}
 ## spain
@@ -980,10 +1024,11 @@ uselat <- df_test$lat  # is 37.025
 lon_hires <- seq(-179.975, 179.975, by = 0.05)
 ilon_hires <- which.min(abs(lon_hires - -6.225))
 ```
+
 More test plots
 ```{r}
-## spain
-df %>% 
+## europe
+out <- df %>% 
   dplyr::filter(lon > -5 & lon < 25 & lat > 35 & lat < 55) %>% 
   plot_map3(varnam = "cwdx20", lonmin = -5, lonmax = 25, latmin = 35, latmax = 55, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500))
 ```
