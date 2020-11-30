@@ -19,13 +19,13 @@ library(ncdf4)
 library(lubridate)
 library(ggplot2)
 library(readr)
-library(rsofun)
-library(ingestr)
+#library(rsofun)
+#library(ingestr)
 library(stringr)
-library(ggridges)
+#library(ggridges)
 
-files.sources = list.files("./R")
-out <- sapply(paste0("R/", files.sources), source)
+#files.sources = list.files("./R")
+#out <- sapply(paste0("R/", files.sources), source)
 ```
 
 ## Overview
@@ -1009,15 +1009,40 @@ df %>%
   plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
 
 ## andalusia
-df %>% 
+gg <- df %>% 
   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5)
+  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5, combine = FALSE)
+
+## example missing point:
+df_missing <- df %>% 
+  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001))
+
+gg$ggmap +
+  geom_point(aes(x = df_missing$lon, y = df_missing$lat), color = "red", size = 2)
+
+## open df_cwdx where the missing cell is contained
+load("data/df_cwdx/df_cwdx_ilon_3476.RData")
+
+## is missing
+out_mct <- df %>% 
+  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001)) %>% 
+  pull(out_mct)
+
+## open df_bal where the missing cell is contained
+load("data/df_bal/df_bal_ilon_3476.RData")
+
+## df_bal data is not missing
+df %>% 
+  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001)) %>% 
+  #dplyr::filter( lon == -6.225 & lat == 37.025 ) %>% 
+  pull(data)
 
 ## take example of missing cells in andalusia:
 df_test <- df %>% 
   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
   dplyr::filter(is.na(cwdx20)) %>% 
   slice(1)
+
 
 lon <- df_test$lon  # is -6.225
 uselat <- df_test$lat  # is 37.025

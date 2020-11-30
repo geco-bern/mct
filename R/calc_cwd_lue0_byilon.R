@@ -80,7 +80,7 @@ calc_cwd_lue0_byilon <- function(ilon){
       mutate(data = purrr::map2(data, data_sw, ~right_join(.x, .y, by = "time"))) %>% 
       dplyr::select(-data_sw) %>% 
       
-      ## get CWD at SIF = 0
+      ## get CWD at SIF = 0, using function calc_cwd_lue0()
       mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE))) %>% 
       mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "lue0")) %>% 
       mutate(cwd_lue0_exp_SIF = purrr::map_dbl(out_lue0_SIF, "lue0_exp")) %>% 
