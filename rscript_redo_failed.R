@@ -82,8 +82,8 @@ if (ncores > 1){
 } else {
   
   ## testing
-  df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
-  # df_out <- tibble(ilon = 3476) %>%
+  # df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
+  df_out <- tibble(ilon = 4901) %>%
     left_join(df_nested, by = "ilon") %>% 
     dplyr::mutate(out = purrr::map2( ilon, data,
                                      ~get_cwdx_byilon(.x, df_lat = .y)))
