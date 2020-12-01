@@ -35,6 +35,7 @@ calc_cwd_et0_byilon <- function(ilon){
       dplyr::select(-out_mct) %>% 
       mutate(data_cwd = purrr::map(mct, "df"),
              data_inst = purrr::map(mct, "inst")) %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
       dplyr::select(-mct)
     
     ## Load net radiation data (daytime net radiation in W m-2)
@@ -42,7 +43,8 @@ calc_cwd_et0_byilon <- function(ilon){
     dirn <- "~/data/glass/data_tidy/"
     load(paste0(dirn, filn)) # loads 'df'
     df_netrad <- df %>% 
-      rename(data_netrad = data)
+      rename(data_netrad = data) %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
     rm("df")
     
     ## Load ALEXI ET data (in MJ d-1 m-2)
@@ -50,20 +52,27 @@ calc_cwd_et0_byilon <- function(ilon){
     dirn <- "~/data/alexi_tir/data_tidy/"
     load(paste0(dirn, filn)) # loads 'df'
     
-    df <- df %>% 
+    tmp <- df %>% 
       
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
       rename(data_alexi = data) %>% 
       
       ## convert ALEXI ET data to W m-2 (mean across entire day; problem for comparison to netrad if significant condensation at night)
       dplyr::mutate(data_alexi = purrr::map(data_alexi, ~mutate(., et = convert_et_MJ(et)))) %>% 
       
       ## Combine with netrad data
-      inner_join(df_netrad, by = c("lon", "lat")) %>% 
+      inner_join(mutate(df_netrad, lon = round(lon, digits = 3), lat = round(lat, digits = 3)), by = c("lon", "lat")) %>% 
       mutate(data_alexi = purrr::map2(data_alexi, data_netrad, ~left_join(.x, .y, by = "time"))) %>% 
       dplyr::select(lon, lat, data = data_alexi) %>% 
     
       ## Combine with CWD data
-      inner_join(df_cwd, by = c("lon", "lat")) %>% 
+      inner_join(mutate(df_cwd, lon = round(lon, digits = 3), lat = round(lat, digits = 3)), by = c("lon", "lat")) %>%
+      
+      ## filter out pixels where cwd data is missing
+      mutate(notavl_cwd = purrr::map_lgl(data_cwd, ~is.null(.))) %>% 
+      dplyr::filter(!notavl_cwd) %>% 
+      
+      ## merge data frames
       mutate(data = purrr::map2(data_cwd, data, ~left_join(.x, .y, by = "time"))) %>% 
       dplyr::select(lon, lat, data, data_inst) %>% 
       
