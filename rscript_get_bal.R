@@ -35,7 +35,7 @@ if (ncores > 1){
     df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
       multidplyr::partition(cl) %>%
       dplyr::mutate(out = purrr::map( ilon,
-                                      ~get_bal_byilon(.)))
+                                      ~try(get_bal_byilon(.))))
 
 } else {
 
