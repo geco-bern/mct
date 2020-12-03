@@ -39,7 +39,7 @@ get_plantwhc_mct_bysite <- function( df,
           mutate(year = lubridate::year(date_start))
         
         ## test if cwd continues accumulating with events spanning more than one year
-        while ((sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd) &&  thresh_terminate < 1.0){
+        while ((sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd) &&  thresh_terminate < 0.8){
           
           ## if CWD accumulates over more than 'max_nyear_acc_cwd', run 'mct()' again with relaxed 'thresh_terminate'
           thresh_terminate <- thresh_terminate + 0.2
