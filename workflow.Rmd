@@ -957,7 +957,7 @@ df <- df %>%
 
 ```{r}
 nc <- df_to_grid(df, varnam = "cwdx20", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx20.nc")
+write_nc2(nc, varnams = "cwdx20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx20.nc", make_zdim = FALSE)
 ```
 
 Regrid to 0.5 deg
