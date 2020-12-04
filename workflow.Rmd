@@ -967,7 +967,7 @@ Read half-degree global file and plot.
 nc_halfdeg <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20")
 plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500), latmin = -55, latmax = 80,
           spacing = "constant")
-ggsave("fig/map_cwdx20.pdf", width = 10, height = 8)
+ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
 ```
 
 ## Test plots
