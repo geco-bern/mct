@@ -53,7 +53,7 @@ get_plantwhc_mct_bysite <- function( df,
           
         }
         
-        if (!is.na(out_mct)){
+        if (!identical(NA, out_mct)){
           
           vals <- out_mct$inst %>% 
             group_by(year) %>% 
