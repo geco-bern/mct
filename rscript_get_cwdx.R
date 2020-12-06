@@ -51,7 +51,6 @@ source("R/get_cwdx_byilon.R")
 ##------------------------------------------------------------------------
 ## second round
 ##------------------------------------------------------------------------
-source("rscript_check_files.R")
 load("data/df_file_availability.RData")
 vec_ilon <- df %>%
   dplyr::filter(!avl_cwdx) %>%
