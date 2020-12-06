@@ -7,7 +7,8 @@ get_plantwhc_mct_bysite <- function( df,
                                      return_period = c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800, 1000),
                                      verbose = FALSE, 
                                      fittype = NULL,
-                                     max_nyear_acc_cwd = 5){
+                                     max_nyear_acc_cwd = 5,
+                                     thresh_terminate_max = 0.8){
   
   ## check if any negative water balance occurs at all
   any_negative_bal <- any(df[[ varname_wbal ]] < 0)
@@ -38,9 +39,9 @@ get_plantwhc_mct_bysite <- function( df,
           ungroup() %>% 
           mutate(year = lubridate::year(date_start))
         
+
         ## test if cwd continues accumulating with events spanning more than one year
-        out_mct <- NA
-        while ((sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd) &&  thresh_terminate < 0.8){
+        while ((sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd) &&  thresh_terminate < thresh_terminate_max){
           
           ## if CWD accumulates over more than 'max_nyear_acc_cwd', run 'mct()' again with relaxed 'thresh_terminate'
           thresh_terminate <- thresh_terminate + 0.2
@@ -53,7 +54,12 @@ get_plantwhc_mct_bysite <- function( df,
           
         }
         
-        if (!is.na(out_mct)){
+
+        if (thresh_terminate > thresh_terminate_max){
+          ## CWD events do not terminate reasonably. ET might be too high, given P.
+          failed <- TRUE
+          
+        } else {
           
           vals <- out_mct$inst %>% 
             group_by(year) %>% 
@@ -110,10 +116,8 @@ get_plantwhc_mct_bysite <- function( df,
             failed <- TRUE
           }
           
-        } else {
-          failed <- TRUE
         }
-        
+
       } else {
         failed <- TRUE
       }
@@ -121,7 +125,7 @@ get_plantwhc_mct_bysite <- function( df,
     }
 
   } else {
-    failed <- FALSE
+    failed <- TRUE
   }
   
   ##--------------------------------
