@@ -19,7 +19,8 @@ calc_cwd_lue0_byilon <- function(ilon){
     lon_hires <- seq(-179.975, 179.975, by = 0.05)
     ilon_lores <- which.min(abs(lon_lores - lon_hires[ilon]))
     load(paste0("~/data/watch_wfdei/data_tidy/SWdown_daily_WFDEI__ilon_", ilon_lores, ".RData"))
-    df_sw <- df
+    df_sw <- df %>% 
+      mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
     rm("df")
     
     ## filter watch data to years within ALEXI data availability (2003-2017)
@@ -38,7 +39,8 @@ calc_cwd_lue0_byilon <- function(ilon){
     load(paste0(dirn, filn)) # loads 'df'
     
     ## extract data from CWDX output. This now contains the CWD and instances information
-    df_cwd <- df %>%
+    df_cwd <- df %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       mutate(mct = purrr::map(out_mct, "mct")) %>% 
       dplyr::select(-out_mct) %>% 
       mutate(data_cwd = purrr::map(mct, "df"),
@@ -51,6 +53,7 @@ calc_cwd_lue0_byilon <- function(ilon){
     dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
     load(paste0(dirn, filn)) # loads 'df'
     df_pk <- df %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename(data_pk = data)
     
     ## version JJ
@@ -59,6 +62,9 @@ calc_cwd_lue0_byilon <- function(ilon){
     load(paste0(dirn, filn)) # loads 'df'
     
     df <- df %>% 
+
+      ## because of numerical imprecision
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       
       ## Take mean of two versions of SIF data
       rename(data_jj = data) %>% 
@@ -80,7 +86,7 @@ calc_cwd_lue0_byilon <- function(ilon){
       mutate(data = purrr::map2(data, data_sw, ~right_join(.x, .y, by = "time"))) %>% 
       dplyr::select(-data_sw) %>% 
       
-      ## get CWD at SIF = 0
+      ## get CWD at SIF = 0, using function calc_cwd_lue0()
       mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE))) %>% 
       mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "lue0")) %>% 
       mutate(cwd_lue0_exp_SIF = purrr::map_dbl(out_lue0_SIF, "lue0_exp")) %>% 

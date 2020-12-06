@@ -19,13 +19,13 @@ library(ncdf4)
 library(lubridate)
 library(ggplot2)
 library(readr)
-library(rsofun)
-library(ingestr)
+#library(rsofun)
+#library(ingestr)
 library(stringr)
-library(ggridges)
+#library(ggridges)
 
-files.sources = list.files("./R")
-out <- sapply(paste0("R/", files.sources), source)
+#files.sources = list.files("./R")
+#out <- sapply(paste0("R/", files.sources), source)
 ```
 
 ## Overview
@@ -892,7 +892,7 @@ Run `rscript_extract_cwdx.R` (with submit file `submit_extract_cwdx.sh`).
 On Euler, run `rscript_check_files.R` and download the overview dataframe it writes (`data/df_file_availability.RData`)
 
 ```{r}
-load("data/df_file_availability.RData")
+load("data/df_file_availability_bal_only.RData")
 ```
 
 Longitude slices for which now snow files are available -> Possibly no WATCH-WFDEI gridcell at respective longitude? All available!
@@ -948,13 +948,16 @@ For the global application, combine WHCX and soil texture information into a glo
 ## CWDX data
 #source("rscript_collect_cwdx.R")
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
+
+df <- df %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 ```
 
 ### Write NetCDF
 
 ```{r}
 nc <- df_to_grid(df, varnam = "cwdx20", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx20.nc")
+write_nc2(nc, varnams = "cwdx20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx20.nc", make_zdim = FALSE)
 ```
 
 Regrid to 0.5 deg
@@ -968,40 +971,19 @@ nc_halfdeg <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20")
 plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500), latmin = -55, latmax = 80,
           spacing = "constant")
 ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
+
+## over the indian ocean
+gg <- plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500), latmin = 0, latmax = 25, lonmin = 50, lonmax = 80,
+          spacing = "constant")
+
+# ggsave("fig/map_cwdx20.pdf", width = 10, height = 8)
 ```
 
 ## Test plots
 
-### Distribution of values
-```{r}
-df %>% dplyr::filter(cwdx20 < 800) %>% ggplot(aes(x = cwdx20, y = ..density..)) + geom_density()
-
-# df %>% 
-#   dplyr::filter(cwdx20 < 800) %>% 
-#   tidyr::pivot_longer(cols = c(cwdx10, cwdx20, cwdx40), names_to = "return_period", values_to = "cwdxx") %>% 
-#   ggplot(aes(x = cwdxx, y = return_period)) +
-#   geom_density_ridges(
-#     jittered_points = FALSE, scale = .95, rel_min_height = .01
-#   ) +
-#   scale_y_discrete(expand = c(0, 0)) +
-#   scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
-#   scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
-#   scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
-#   scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
-#   coord_cartesian(clip = "off") +
-#   guides(fill = guide_legend(
-#     override.aes = list(
-#       fill = c("#D55E00A0", "#0072B2A0"),
-#       color = NA, point_color = NA)
-#     )
-#   ) +
-#   ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
-#   theme_ridges(center = TRUE)
-```
-
 ### Maps
 
-Test plots CWDX
+Problem with missing data for certain gridcells. Solutions with varying `thresh_terminate` and with rounding digits of longitude and latitude values. 
 ```{r}
 ## spain
 df %>% 
@@ -1009,9 +991,33 @@ df %>%
   plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
 
 ## andalusia
-df %>% 
+gg <- df %>% 
   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5)
+  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5, combine = FALSE)
+
+## example missing point:
+df_missing <- df %>% 
+  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001))
+
+gg$ggmap +
+  geom_point(aes(x = df_missing$lon, y = df_missing$lat), color = "red", size = 2)
+
+## open df_cwdx where the missing cell is contained
+load("data/df_cwdx/df_cwdx_ilon_3476.RData")
+
+## is missing
+out_mct <- df %>% 
+  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001)) %>% 
+  pull(out_mct)
+
+## open df_bal where the missing cell is contained
+load("data/df_bal/df_bal_ilon_3476.RData")
+
+## df_bal data is not missing
+df %>% 
+  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001)) %>% 
+  #dplyr::filter( lon == -6.225 & lat == 37.025 ) %>% 
+  pull(data)
 
 ## take example of missing cells in andalusia:
 df_test <- df %>% 
@@ -1024,6 +1030,31 @@ uselat <- df_test$lat  # is 37.025
 lon_hires <- seq(-179.975, 179.975, by = 0.05)
 ilon_hires <- which.min(abs(lon_hires - -6.225))
 ```
+
+Some ocean gridcells have values for cwdx. (latmin = 0, latmax = 25, lonmin = 50, lonmax = 80)
+```{r}
+## indian ocean
+gg <- df %>% 
+  dplyr::filter(lon > 50 & lon < 80 & lat > 0 & lat < 25) %>% 
+  plot_map3(varnam = "cwdx20", latmin = 0, latmax = 25, lonmin = 50, lonmax = 80, combine = FALSE)
+
+gg$ggmap +
+  geom_point(aes(x = 65.025, y = 10.025), color = "red", size = 2)
+
+## The value is 36.85907 for a gridcell in the middle of the ocean.
+df %>% 
+  dplyr::filter(lon == 65.025, lat == 10.025)
+
+which.min(abs(lon_hires - 65.025))
+```
+
+
+
+
+
+
+
+
 
 More test plots
 ```{r}

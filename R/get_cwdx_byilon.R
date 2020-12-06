@@ -25,11 +25,12 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
     ## do it only for latitudes (single cells) where CWDX data was actually found missing
     df_cwdx_corr <- df %>% 
       
-      ## This doesn't work
-      # mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
+      ## round to avoid numerical imprecision
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
 
       ## filter to only the ones that are missing
-      dplyr::filter(lat %in% pull(df_lat, lat)) %>% 
+      dplyr::filter(reduce( purrr::map(pull(df_lat, lat), near, x = lat), `|`)) %>%   # "fuzzy filter"
+      # dplyr::filter(lat %in% pull(df_lat, lat)) %>% 
       
       ## this runs the function with newly implemented incremental threshhold_drop search 
       dplyr::mutate(
@@ -48,6 +49,10 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
     ## complement cwdx dataframe with corrected one
     load(path)  # loads 'df'
     
+    ## correct numerically imprecise digits
+    df <- df %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
+    
     ## earlier attempt - ignore it
     if ("out_mct_save" %in% names(df)){
       df <- df %>% 
@@ -57,7 +62,8 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
 
     ## overwrite column with corrected output
     for (idx in seq(nrow(df_cwdx_corr))){
-      idx_full <- which(df$lat == df_cwdx_corr$lat[idx])
+      # idx_full <- which(df$lat == df_cwdx_corr$lat[idx])  # needs a near()
+      idx_full <- which(near(df$lat, df_cwdx_corr$lat[idx]))
       df$out_mct[idx_full] <- df_cwdx_corr$out_mct[idx]
     }
     
@@ -78,9 +84,8 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
       ## determine CWD and events
       df <- df %>% 
         
-        # ## xxx test
-        # ungroup() %>% 
-        # slice(110:120) %>% 
+        ## round to avoid numerical imprecision
+        mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
         
         dplyr::mutate(
           out_mct = purrr::map(

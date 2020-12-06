@@ -14,8 +14,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
   df <- df %>% 
     rename(lue = !!nam_lue)
   
-  ## SiF vs CWD: ALEXI/WATCH-WFDEI------------------------------------------
-  ## retain only data from largest instances of each year
+  ## retain only data from largest instance of each year
   biginstances <- inst %>% 
     mutate(year = lubridate::year(date_start)) %>% 
     group_by(year) %>% 
@@ -45,6 +44,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
         ## test: is slope negative?
         slope_lue <- coef(linmod)["deficit"]
         is_neg <- slope_lue < 0.0
+        rsq <- summary(linmod)$r.squared
         
         if (is_neg){
           ## test: is slope significantly (5% level) different from zero (t-test)?
@@ -65,12 +65,14 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
         is_sign <- FALSE
         lue0_fluxnet <- NA
         slope_lue <- NA
+        rsq <- NA
       }
       
     } else {
       is_sign <- FALSE
       lue0 <- NA
       slope_lue <- NA
+      rsq <- NA
     }
     
     ## get exponential fit
@@ -127,6 +129,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
           geom_vline(xintercept = lue0_exp, linetype = "dotted", color = 'royalblue') +
           geom_line(data = df_fit_exp, aes(x, y), col = "royalblue")
       }
+      
       # if (!identical(gumbi_alexi$mod, NA)){
       #   mctXX_alexi <- gumbi_alexi$df_return %>% dplyr::filter(return_period == use_return_period) %>% pull(return_level)
       #   if (!is.na(mctXX_alexi)){
@@ -160,7 +163,6 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
     flue <- ifelse(length(flue)==0, NA, flue)
     
     cwdmax <- max(df$deficit, na.rm = TRUE)
-    
 
   } else {
 
@@ -172,9 +174,12 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
     gg <- NA
     flue <- NA
     cwdmax <- NA
+    rsq <- NA
     
   }
 
-  return(list(lue0 = lue0, slope_lue = slope_lue, lue0_exp = lue0_exp, k_lue = k_lue, gg = gg, flue = flue, cwdmax = cwdmax))
+  return(list(lue0 = lue0, slope_lue = slope_lue, rsq = rsq, 
+              lue0_exp = lue0_exp, k_lue = k_lue, gg = gg, 
+              flue = flue, cwdmax = cwdmax))
 
 }

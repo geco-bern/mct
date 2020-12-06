@@ -28,11 +28,15 @@ get_bal_byilon <- function(ilon_hires){
      
       load(path_et_mm) # loads 'df_alexi'
       load(path_snow)  # loads 'df'
-      df_watch <- df # rename
+      df_watch <- df %>% 
+        mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) # rename
       rm("df")
       
       ## get closest matching latitude indices and merge data frames
       df <- df_alexi %>% 
+        
+        ## round to correct numerical imprecision on some lon and lat values
+        mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
         
         ## select only time and et_mm from alexi dataframe
         mutate(data = purrr::map(data, ~dplyr::select(., time, et_mm))) %>% 

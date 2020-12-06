@@ -1,6 +1,9 @@
 mct <- function(df, varname_wbal, varname_date, thresh_terminate = 0.0, thresh_drop = 0.9){
   
-  if (thresh_terminate > thresh_drop) rlang::abort("Aborting. thresh_terminate must be smaller or equal thresh_drop.")
+  if (thresh_terminate > thresh_drop){
+    rlang::warn("Aborting. thresh_terminate must be smaller or equal thresh_drop. Setting it equal.")
+    thresh_terminate <- thresh_drop
+  }
   
   inst <- tibble()
   idx <- 0

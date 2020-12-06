@@ -4,7 +4,7 @@ get_plantwhc_mct_bysite <- function( df,
                                      varname_date = "date",
                                      thresh_terminate = 0.0, 
                                      thresh_drop = 0.9,
-                                     return_period = c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800),
+                                     return_period = c(2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 200, 250, 300, 500, 800, 1000),
                                      verbose = FALSE, 
                                      fittype = NULL,
                                      max_nyear_acc_cwd = 5){
@@ -39,6 +39,7 @@ get_plantwhc_mct_bysite <- function( df,
           mutate(year = lubridate::year(date_start))
         
         ## test if cwd continues accumulating with events spanning more than one year
+        out_mct <- NA
         while ((sum(!(unique(df$year) %in% unique(out_mct$inst$year))) > max_nyear_acc_cwd) &&  thresh_terminate < 0.8){
           
           ## if CWD accumulates over more than 'max_nyear_acc_cwd', run 'mct()' again with relaxed 'thresh_terminate'
@@ -52,57 +53,63 @@ get_plantwhc_mct_bysite <- function( df,
           
         }
         
-        vals <- out_mct$inst %>% 
-          group_by(year) %>% 
-          summarise(deficit = max(deficit, na.rm = TRUE), .groups = 'drop') %>%       
-          pull(deficit)      
-        
-
-        if (length(vals)>3){
+        if (!is.na(out_mct)){
           
-          if (!is.null(fittype)){
-            ##--------------------------------
-            ## Prescribed distribution: Gumbel
-            ##--------------------------------
-            ## Fit a specific extreme value distribution (Gumbel)
-            evd <- try( extRemes::fevd(x=vals, type=fittype, method="MLE", units = "years") )
-            if (class(evd) == "try-error"){ failed <- TRUE }
-              
-          } else {
-            ##--------------------------------
-            ## Free distribution: GEV or Gumbel
-            ##--------------------------------
-            ## Fit a general extreme value distribution, use Gumbel instead if it works better than GEV
-            ## if shape not significant different from 0 when using GEV, then it's gumbel? shape parameter is significantly different from zero, hence GEV is supported
-            evd_gev <- try(extRemes::fevd(x=vals, type="GEV", method="MLE", units = "years"))
+          vals <- out_mct$inst %>% 
+            group_by(year) %>% 
+            summarise(deficit = max(deficit, na.rm = TRUE), .groups = 'drop') %>%       
+            pull(deficit)      
+          
+          
+          if (length(vals)>3){
             
-            ## if shape not significant different from 0 when using GEV, then it's gumbel?
-            evd_gumbel <- try(extRemes::fevd(x=vals, type="Gumbel", method="MLE", units = "years"))
-            
-            if (class(evd_gev) != "try-error" && class(evd_gumbel) != "try-error"){
-
-              ## is GEV-fit besser als Gumbel? Gumbel ist gute Annahme da p nicht signifikant
-              df_test_fevd <- lr.test(evd_gumbel, evd_gev) %>% 
-                broom::tidy()
-              pval <- df_test_fevd %>% 
-                pull(p.value)
-              ratio <- df_test_fevd %>% 
-                pull(statistic)
-              
-              if (ratio > 1 && pval < 0.05){
-                if (verbose) rlang::inform("It's a Gumbel!!!")
-                evd <- evd_gumbel
-              } else {
-                if (verbose) rlang::inform("It's a GEV")
-                evd <- evd_gev
-              }
+            if (!is.null(fittype)){
+              ##--------------------------------
+              ## Prescribed distribution: Gumbel
+              ##--------------------------------
+              ## Fit a specific extreme value distribution (Gumbel)
+              evd <- try( extRemes::fevd(x=vals, type=fittype, method="MLE", units = "years") )
+              if (class(evd) == "try-error"){ failed <- TRUE }
               
             } else {
-              failed <- TRUE
+              ##--------------------------------
+              ## Free distribution: GEV or Gumbel
+              ##--------------------------------
+              ## Fit a general extreme value distribution, use Gumbel instead if it works better than GEV
+              ## if shape not significant different from 0 when using GEV, then it's gumbel? shape parameter is significantly different from zero, hence GEV is supported
+              evd_gev <- try(extRemes::fevd(x=vals, type="GEV", method="MLE", units = "years"))
+              
+              ## if shape not significant different from 0 when using GEV, then it's gumbel?
+              evd_gumbel <- try(extRemes::fevd(x=vals, type="Gumbel", method="MLE", units = "years"))
+              
+              if (class(evd_gev) != "try-error" && class(evd_gumbel) != "try-error"){
+                
+                ## is GEV-fit besser als Gumbel? Gumbel ist gute Annahme da p nicht signifikant
+                df_test_fevd <- lr.test(evd_gumbel, evd_gev) %>% 
+                  broom::tidy()
+                pval <- df_test_fevd %>% 
+                  pull(p.value)
+                ratio <- df_test_fevd %>% 
+                  pull(statistic)
+                
+                if (ratio > 1 && pval < 0.05){
+                  if (verbose) rlang::inform("It's a Gumbel!!!")
+                  evd <- evd_gumbel
+                } else {
+                  if (verbose) rlang::inform("It's a GEV")
+                  evd <- evd_gev
+                }
+                
+              } else {
+                failed <- TRUE
+              }
+              
             }
             
+          } else {
+            failed <- TRUE
           }
-
+          
         } else {
           failed <- TRUE
         }

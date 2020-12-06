@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(1153,7200)
+args <- c(3476,7200)
 
 library(dplyr)
 library(purrr)
@@ -33,7 +33,7 @@ df <- df %>%
   dplyr::filter(lat > -60 & lat < 75) %>% 
   
   ## some had weird longitude values
-  mutate(lon = round(lon, digits = 3)) %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
   
   dplyr::select(lon, lat) %>% 
   
@@ -43,11 +43,16 @@ df <- df %>%
   mutate(ilon_hires = (lon + 179.975)/0.05 + 1)
 
 df_nested <- df %>% 
+  
+  # ## xxx test
+  # filter(near(lat, 37.025)) %>% 
+  
   dplyr::select(lat, ilon_hires) %>% 
   group_by(ilon_hires) %>% 
   nest() %>% 
   mutate(ncells = purrr::map_dbl(data, ~nrow(.))) %>% 
   rename(ilon = ilon_hires)
+  
 
 ## split it up into chunks (total number of chunks provided by argument 2)
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
@@ -77,8 +82,8 @@ if (ncores > 1){
 } else {
   
   ## testing
-  df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
-  #df_out <- tibble(ilon = 721) %>%
+  # df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
+  df_out <- tibble(ilon = 4901) %>%
     left_join(df_nested, by = "ilon") %>% 
     dplyr::mutate(out = purrr::map2( ilon, data,
                                      ~get_cwdx_byilon(.x, df_lat = .y)))
