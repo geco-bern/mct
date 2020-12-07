@@ -73,9 +73,9 @@ if (ncores > 1){
     multidplyr::cluster_assign(get_cwdx_byilon = get_cwdx_byilon)
 
   ## distribute to cores, making sure all data from a specific site is sent to the same core
-  df_out <- tibble(ilon = ilon) %>%
+  df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
     multidplyr::partition(cl) %>%
-    dplyr::mutate(out = purrr::map( irow_chunk[[as.integer(args[1])]],
+    dplyr::mutate(out = purrr::map( ilon,
                                     ~try(get_cwdx_byilon(.))))
 
 } else {
