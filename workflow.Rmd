@@ -946,7 +946,6 @@ df %>%
 For the global application, combine WHCX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
 ```{r}
 ## CWDX data
-#source("rscript_collect_cwdx.R")
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
 
 df <- df %>% 
@@ -986,14 +985,30 @@ gg <- plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 
 Problem with missing data for certain gridcells. Solutions with varying `thresh_terminate` and with rounding digits of longitude and latitude values. 
 ```{r}
 ## spain
-df %>% 
+gg <- df %>% 
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
   plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
 
 ## andalusia
 gg <- df %>% 
   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5, combine = FALSE)
+  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5, combine = TRUE)
+
+## weird zero-meridian values
+gg <- df %>% 
+  dplyr::filter(lon > -2 & lon < 2 & lat > 42 & lat < 43) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -2, lonmax = 2, latmin = 42, latmax = 43)
+
+vec_lon_missing <- df %>% 
+  dplyr::filter(lon > -2 & lon < 2 & lat > 42 & lat < 43) %>% 
+  filter(is.na(cwdx20)) %>% 
+  pull(lon) %>% 
+  unique() %>% 
+  round(digits = 3)
+
+## Missing data for these ilon:
+lon_hires <- seq(-179.975, 179.975, by = 0.05) %>% round(digits = 3)
+which(lon_hires %in% vec_lon_missing)
 
 ## example missing point:
 df_missing <- df %>% 

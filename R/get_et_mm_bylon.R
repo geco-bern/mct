@@ -19,8 +19,8 @@ get_et_mm_byilon <- function(ilon_hires){
   if (!file.exists(path)){
    
     ## determine closest longitude in 0.5 res files (WATCH)
-    lon_lores <- seq(-179.75, 179.75, by = 0.5)
-    lon_hires <- seq(-179.975, 179.975, by = 0.05)
+    lon_lores <- seq(-179.75, 179.75, by = 0.5) %>% round(digits = 2)
+    lon_hires <- seq(-179.975, 179.975, by = 0.05) %>% round(digits = 3)
     ilon_lores <- which.min(abs(lon_lores - lon_hires[ilon_hires]))
     
     ## Open files (ET from ALEXI-TIR)
