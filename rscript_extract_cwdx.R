@@ -36,12 +36,12 @@ if (ncores > 1){
   df <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
     multidplyr::partition(cl) %>%
     dplyr::mutate(out = purrr::map( ilon,
-                                    ~try(extract_cwdx_byilon(., overwrite = TRUE))))
+                                    ~try(extract_cwdx_byilon(., overwrite = FALSE))))
 
 } else {
 
   ## testing
-  df <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~try(extract_cwdx_byilon(., overwrite = TRUE)))
+  df <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~try(extract_cwdx_byilon(., overwrite = FALSE)))
 
 }
 

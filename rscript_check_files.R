@@ -114,7 +114,7 @@ df <- tibble(ilon = 1:7200) %>%
     avl_glass = check_avail_glass(ilon)
   )
 
-save(df, file = "./data/df_file_availability_bal_only.RData")
+save(df, file = "./data/df_file_availability.RData")
 
 # ## display missing
 # df %>% 
