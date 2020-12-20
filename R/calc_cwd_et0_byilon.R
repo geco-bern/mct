@@ -52,7 +52,7 @@ calc_cwd_et0_byilon <- function(ilon){
     dirn <- "~/data/alexi_tir/data_tidy/"
     load(paste0(dirn, filn)) # loads 'df'
     
-    tmp <- df %>% 
+    df <- df %>% 
       
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
       rename(data_alexi = data) %>% 
@@ -76,17 +76,34 @@ calc_cwd_et0_byilon <- function(ilon){
       mutate(data = purrr::map2(data_cwd, data, ~left_join(.x, .y, by = "time"))) %>% 
       dplyr::select(lon, lat, data, data_inst) %>% 
       
+      ## xxx try
+      # filter(lat < 40.0 & lat > 25.00) %>%
+      # filter(lat == 37.025) %>%
+
+      ## get CWD at ET = 0
+      mutate(out_lue0_et = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "et", do_plot = TRUE))) %>% 
+      mutate(cwd_lue0_et = purrr::map_dbl(out_lue0_et, "cwd_lue0")) %>%
+      mutate(slope_lue_et = purrr::map_dbl(out_lue0_et, "slope_lue")) %>%
+      # mutate(gg_et = purrr::map(out_lue0_et, "gg")) %>%
+      mutate(flue_et = purrr::map_dbl(out_lue0_et, "flue")) %>%
+      mutate(cwdmax = purrr::map_dbl(out_lue0_et, "cwdmax")) %>%
+      mutate(lue_cwd0_et = purrr::map_dbl(out_lue0_et, "lue_cwd0")) %>%
+      mutate(k_decay_et = purrr::map_dbl(out_lue0_et, "k_decay")) %>%
+      mutate(s0_teuling_et = purrr::map_dbl(out_lue0_et, "s0_teuling")) %>%
+      mutate(df_flue_et = purrr::map(out_lue0_et, "df_flue")) %>%
+      dplyr::select(-out_lue0_et) %>%
+
       ## calculate "evaporative fraction", remove outliers and points where et is zero
       mutate(data = purrr::map(data, ~calc_fet(.))) %>% 
 
       ## get CWD at fET = 0 (fET = ET/Rn)
       mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = TRUE))) %>% 
-      mutate(cwd_lue0_fet = purrr::map_dbl(out_lue0_fet, "lue0")) %>%
-      mutate(cwd_lue0_exp_fet = purrr::map_dbl(out_lue0_fet, "lue0_exp")) %>%
-      mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
+      mutate(cwd_lue0_fet = purrr::map_dbl(out_lue0_fet, "cwd_lue0")) %>%
+      mutate(slope_lue_fet = purrr::map_dbl(out_lue0_fet, "slope_lue")) %>%
+      # mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
       mutate(flue_fet = purrr::map_dbl(out_lue0_fet, "flue")) %>%
-      mutate(cwdmax_fet = purrr::map_dbl(out_lue0_fet, "cwdmax")) %>%
-      dplyr::select(-out_lue0_fet) %>% 
+      mutate(df_flue_fet = purrr::map(out_lue0_fet, "df_flue")) %>%
+      dplyr::select(-out_lue0_fet) %>%
       
       ## drop data again
       dplyr::select(-data, -data_inst)

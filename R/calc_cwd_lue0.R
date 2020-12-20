@@ -51,64 +51,79 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
           is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
           if (is_sign){
             ## get x-axis cutoff
-            lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
+            cwd_lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
             df_fit <- tibble(y = predict(linmod, newdata = df), x = df$deficit)
           } else {
-            lue0 <- NA
+            cwd_lue0 <- NA
           }
         } else {
           is_sign <- FALSE
-          lue0 <- NA
+          cwd_lue0 <- NA
         }
 
       } else {
         is_sign <- FALSE
-        lue0_fluxnet <- NA
         slope_lue <- NA
         rsq <- NA
       }
       
     } else {
       is_sign <- FALSE
-      lue0 <- NA
+      cwd_lue0 <- NA
       slope_lue <- NA
       rsq <- NA
     }
     
-    ## get exponential fit
-    expmod <- try( nls(lue ~ a * exp(k * deficit), data = df, start = list(a = 0.1, k = 1/50)) )
-    if (class(expmod) != "try-error"){
-      
-      df_coef <- summary(expmod) %>% coef()
-      
-      ## test: is slope negative?
-      k_lue <- df_coef["k", "Estimate"]
-      is_neg_exp <- k_lue < 0
-      
-      if (is_neg_exp){
-        ## test: is slope significantly (5% level) different from zero (t-test)?
-        is_sign_exp <- df_coef["k", "Pr(>|t|)"] < 0.05
-        
-        if (is_sign_exp){
-          
-          ## get CWD at wich lue is at 1/2e
-          lue0_exp <- -1.0/coef(expmod)["k"]   ## CWD where lue is reduced to 1/e
-          df_fit_exp <- tibble(y = predict(expmod, newdata = df), x = df$deficit)
-          
-        } else {
-          lue0_exp <- NA
-        }
-      } else {
-        is_sign_exp <- FALSE
-        lue0_exp <- NA
-        k_lue <- NA
-      }
-      
-    } else {
-      is_sign_exp <- FALSE
-      lue0_exp <- NA
-      k_lue <- NA
-    }
+    ##-----------------------------------------
+    ## get exponential fit over time (Teuling et al. 2006 GRL)
+    ##-----------------------------------------
+    df_log <- df %>% 
+      dplyr::filter(!is.na(lue)) %>% 
+      mutate(log_lue = log(lue)) %>% 
+      group_by(iinst) %>% 
+      nest() %>% 
+      mutate(linmod = purrr::map(data, ~lm(log_lue ~ dday, data = .))) %>% 
+      mutate(linmod = purrr::map(linmod, ~coef(.))) %>% 
+      mutate(intercept = purrr::map_dbl(linmod, "(Intercept)")) %>% 
+      mutate(k_decay = purrr::map_dbl(linmod, "dday")) %>% 
+      mutate(intercept = exp(intercept)) %>% 
+      mutate(s0_teuling = - intercept / k_decay) %>% 
+      ungroup() %>% 
+      summarise_at(vars(intercept, k_decay, s0_teuling), median, na.rm = TRUE, .groups = "drop")
+    
+    # expmod <- try( nls(lue ~ a * exp(k * deficit), data = df, start = list(a = 0.1, k = 1/50)) )
+    # if (class(expmod) != "try-error"){
+    # 
+    #   df_coef <- summary(expmod) %>% coef()
+    # 
+    #   ## test: is slope negative?
+    #   k_lue <- df_coef["k", "Estimate"]
+    #   is_neg_exp <- k_lue < 0
+    # 
+    #   if (is_neg_exp){
+    #     ## test: is slope significantly (5% level) different from zero (t-test)?
+    #     is_sign_exp <- df_coef["k", "Pr(>|t|)"] < 0.05
+    # 
+    #     if (is_sign_exp){
+    # 
+    #       ## get CWD at wich lue is at 1/2e
+    #       cwd_lue0_exp <- -1.0/coef(expmod)["k"]   ## CWD where lue is reduced to 1/e
+    #       df_fit_exp <- tibble(y = predict(expmod, newdata = df), x = df$deficit)
+    # 
+    #     } else {
+    #       cwd_lue0_exp <- NA
+    #     }
+    #   } else {
+    #     is_sign_exp <- FALSE
+    #     cwd_lue0_exp <- NA
+    #     k_lue <- NA
+    #   }
+    # 
+    # } else {
+    #   is_sign_exp <- FALSE
+    #   cwd_lue0_exp <- NA
+    #   k_lue <- NA
+    # }
 
     if (do_plot){
       gg <- df %>%
@@ -121,14 +136,14 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
       
       if (is_sign){
         gg <- gg +
-          geom_vline(xintercept = lue0, linetype = "dotted", color = 'tomato') +
+          geom_vline(xintercept = cwd_lue0, linetype = "dotted", color = 'tomato') +
           geom_line(data = df_fit, aes(x, y), col = "tomato")
       }
-      if (is_sign_exp){
-        gg <- gg +
-          geom_vline(xintercept = lue0_exp, linetype = "dotted", color = 'royalblue') +
-          geom_line(data = df_fit_exp, aes(x, y), col = "royalblue")
-      }
+      # if (is_sign_exp){
+      #   gg <- gg +
+      #     geom_vline(xintercept = cwd_lue0_exp, linetype = "dotted", color = 'royalblue') +
+      #     geom_line(data = df_fit_exp, aes(x, y), col = "royalblue")
+      # }
       
       # if (!identical(gumbi_alexi$mod, NA)){
       #   mctXX_alexi <- gumbi_alexi$df_return %>% dplyr::filter(return_period == use_return_period) %>% pull(return_level)
@@ -147,39 +162,61 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
       gg <- NULL
     }
     
+    ## maximum cwd in observation period
+    cwdmax <- max(df$deficit, na.rm = TRUE)
+    
     ## Get "fLUE" (reduction in lue by bin)
     nbin <- 5
     df <- df %>%
       ungroup() %>% 
-      mutate(bin = ntile(deficit, nbin))
-    
+      mutate(bin = cut(deficit, breaks = nbin))
     df_agg <- df %>%
       ungroup() %>%
       group_by(bin) %>%
-      summarise(lue = median(lue, na.rm = TRUE))			
-    
+      summarise(lue = median(lue, na.rm = TRUE), .groups = "drop")
+
     ## get fractional reduction in LUE in highest CWD bin, relative to first bin
-    flue <- (df_agg %>% slice(nbin) %>% pull(lue)) / (df_agg %>% slice(1) %>%  pull(lue))
+    flue <- (df_agg %>% slice(nbin) %>% pull(lue)) / (df_agg %>% slice(1) %>% pull(lue))
     flue <- ifelse(length(flue)==0, NA, flue)
     
-    cwdmax <- max(df$deficit, na.rm = TRUE)
-
+    ## Get shape of lue reduction as a function of normalized CWD (normalized to observed maximum)
+    df_flue <- df %>% 
+      ungroup() %>% 
+      mutate(deficit_norm = deficit / cwdmax) %>% 
+      mutate(bin = cut(deficit_norm, breaks = nbin)) %>%
+      group_by(bin) %>%
+      summarise(lue = median(lue, na.rm = TRUE), .groups = "drop") %>% 
+      mutate(flue = lue / .$lue[1]) %>% 
+      dplyr::select(bin, flue)
+    
   } else {
 
     # rlang::inform(paste0("Not enough lue data points for site ", sitename))
-    lue0 <- NA
+    cwd_lue0 <- NA
     slope_lue <- NA
-    lue0_exp <- NA
-    k_lue <- NA
+    # cwd_lue0_exp <- NA
+    # k_lue <- NA
     gg <- NA
     flue <- NA
     cwdmax <- NA
     rsq <- NA
+    df_flue <- tibble(bin = NA, flue = NA)
+    flue <- NA
     
   }
 
-  return(list(lue0 = lue0, slope_lue = slope_lue, rsq = rsq, 
-              lue0_exp = lue0_exp, k_lue = k_lue, gg = gg, 
-              flue = flue, cwdmax = cwdmax))
+  return(list(cwd_lue0 = cwd_lue0, 
+              slope_lue = slope_lue, 
+              rsq = rsq, 
+              # cwd_lue0_exp = cwd_lue0_exp, 
+              # k_lue = k_lue, 
+              gg = gg, 
+              flue = flue, 
+              cwdmax = cwdmax,
+              lue_cwd0 = df_log$intercept[1],
+              k_decay = df_log$k_decay[1],
+              s0_teuling = df_log$s0_teuling[1],
+              df_flue = df_flue
+              ))
 
 }
