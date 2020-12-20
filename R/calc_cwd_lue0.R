@@ -202,6 +202,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
     rsq <- NA
     df_flue <- tibble(bin = NA, flue = NA)
     flue <- NA
+    df_log <- tibble(intercept = NA, k_decay = NA, s0_teuling = NA)
     
   }
 
@@ -214,7 +215,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
               flue = flue, 
               cwdmax = cwdmax,
               lue_cwd0 = df_log$intercept[1],
-              k_decay = df_log$k_decay[1],
+              lambda_decay = 1.0 / df_log$k_decay[1],
               s0_teuling = df_log$s0_teuling[1],
               df_flue = df_flue
               ))

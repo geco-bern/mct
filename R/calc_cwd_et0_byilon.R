@@ -88,7 +88,7 @@ calc_cwd_et0_byilon <- function(ilon){
       mutate(flue_et = purrr::map_dbl(out_lue0_et, "flue")) %>%
       mutate(cwdmax = purrr::map_dbl(out_lue0_et, "cwdmax")) %>%
       mutate(lue_cwd0_et = purrr::map_dbl(out_lue0_et, "lue_cwd0")) %>%
-      mutate(k_decay_et = purrr::map_dbl(out_lue0_et, "k_decay")) %>%
+      mutate(lambda_decay_et = purrr::map_dbl(out_lue0_et, "lambda_decay")) %>%
       mutate(s0_teuling_et = purrr::map_dbl(out_lue0_et, "s0_teuling")) %>%
       mutate(df_flue_et = purrr::map(out_lue0_et, "df_flue")) %>%
       dplyr::select(-out_lue0_et) %>%
