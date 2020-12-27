@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(4030, 7200)
+# args <- c(74, 100)
 
 library(dplyr)
 library(purrr)
@@ -28,6 +28,10 @@ print(irow_chunk[[as.integer(args[1])]])
 
 ## get all available cores
 ncores <- parallel::detectCores()
+
+## limit the number of cores to number of individual runs
+nruns <- length(irow_chunk[[as.integer(args[1])]])
+ncores <- min(ncores, nruns)
 
 if (ncores > 1){
 
