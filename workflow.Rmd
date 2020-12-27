@@ -1268,12 +1268,64 @@ df_sif %>%
   geom_point()
 ```
         
+Along one longitude band (21.475 deg E).
+```{r}
+load("~/mct/data/df_cwd_lue0/df_cwd_lue0_5000.RData")
+df_cwd_lue0 <- df
+load("data/df_cwdx/df_cwdx_ilon_5000.RData")
+
+tmp <- df %>% 
+  mutate(df_return = map(out_mct, "df_return")) %>% 
+  mutate(cwdx20 = map_dbl(df_return, ~{filter(., return_period == 20) %>% pull(return_level)}))
+
+ggplot() + 
+  geom_line(data = df_cwd_lue0, aes(lat, cwd_lue0_nSIF), color = "red") +
+  geom_line(data = tmp, aes(lat, cwdx20))
+
+tmp <- tmp %>% 
+  dplyr::select(lat, cwdx20) %>% 
+  left_join(
+    df_cwd_lue0, by = "lat"
+  ) %>% 
+  mutate(cwd_lue0_nSIF = remove_outliers(cwd_lue0_nSIF)) %>% 
+  filter(flue_nSIF < 0.8) %>% 
+  mutate(lambda_decay_nSIF = remove_outliers(lambda_decay_nSIF))
+
+tmp %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_nSIF")
+tmp %>% 
+  analyse_modobs2("cwdx20", "lambda_decay_nSIF")
+```    
+    
     
 ## Implied zroot using Rn: CWD(fET=0)
 
 `test_mct_bysite_alexi_fluxnet.R`
 
 - Use CWD events from step 3 and GLASS net radiation from step 2
+
+Along one longitude band (21.475 deg E).
+```{r}
+load("~/mct/data/df_cwd_et0/df_cwd_et0_4030.RData")
+df_cwd_et0 <- df
+load("data/df_cwdx/df_cwdx_ilon_4030.RData")
+tmp <- df %>% 
+  mutate(df_return = map(out_mct, "df_return")) %>% 
+  mutate(cwdx20 = map_dbl(df_return, ~{filter(., return_period == 20) %>% pull(return_level)}))
+
+ggplot() + 
+  geom_line(data = df_cwd_et0, aes(lat, cwd_lue0_fet), color = "red") +
+  geom_line(data = tmp, aes(lat, cwdx20))
+
+tmp %>% 
+  dplyr::select(lat, cwdx20) %>% 
+  left_join(
+    df_cwd_et0, by = "lat"
+  ) %>% 
+  filter(flue_fet < 0.8) %>% 
+  mutate(lambda_decay_et = remove_outliers(lambda_decay_et)) %>% 
+  analyse_modobs2("cwdx20", "lambda_decay_et")
+```
 
 
 ## Plot 

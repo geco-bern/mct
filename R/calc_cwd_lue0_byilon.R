@@ -103,6 +103,7 @@ calc_cwd_lue0_byilon <- function(ilon){
       # mutate(gg_SIF = purrr::map(out_lue0_SIF, "gg")) %>%
       mutate(flue_SIF = purrr::map_dbl(out_lue0_SIF, "flue")) %>%
       mutate(cwdmax = purrr::map_dbl(out_lue0_SIF, "cwdmax")) %>%
+      mutate(lambda_decay_SIF = purrr::map_dbl(out_lue0_SIF, "lambda_decay")) %>%
       mutate(df_flue_SIF = purrr::map(out_lue0_SIF, "df_flue")) %>%
       dplyr::select(-out_lue0_SIF) %>%
       
@@ -113,6 +114,7 @@ calc_cwd_lue0_byilon <- function(ilon){
       mutate(slope_lue_nSIF = purrr::map_dbl(out_lue0_nSIF, "slope_lue")) %>%
       # mutate(gg_nSIF = purrr::map(out_lue0_nSIF, "gg")) %>%
       mutate(flue_nSIF = purrr::map_dbl(out_lue0_nSIF, "flue")) %>%
+      mutate(lambda_decay_nSIF = purrr::map_dbl(out_lue0_nSIF, "lambda_decay")) %>%
       mutate(df_flue_nSIF = purrr::map(out_lue0_nSIF, "df_flue")) %>%
       dplyr::select(-out_lue0_nSIF) %>%
       

@@ -1,7 +1,5 @@
 calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){  
 
-  library(rbeni)
-  
   if (nam_lue=="SIF"){
     plot_title <- "ET: ALEXI, precipitation: WATCH-WFDEI, SIF: Duveiller et al."
   } else if (nam_lue=="fet"){

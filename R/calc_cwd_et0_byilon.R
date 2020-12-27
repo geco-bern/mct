@@ -81,7 +81,7 @@ calc_cwd_et0_byilon <- function(ilon){
       # filter(lat == 37.025) %>%
 
       ## get CWD at ET = 0
-      mutate(out_lue0_et = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "et", do_plot = TRUE))) %>% 
+      mutate(out_lue0_et = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "et", do_plot = FALSE))) %>% 
       mutate(cwd_lue0_et = purrr::map_dbl(out_lue0_et, "cwd_lue0")) %>%
       mutate(slope_lue_et = purrr::map_dbl(out_lue0_et, "slope_lue")) %>%
       # mutate(gg_et = purrr::map(out_lue0_et, "gg")) %>%
@@ -97,7 +97,7 @@ calc_cwd_et0_byilon <- function(ilon){
       mutate(data = purrr::map(data, ~calc_fet(.))) %>% 
 
       ## get CWD at fET = 0 (fET = ET/Rn)
-      mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = TRUE))) %>% 
+      mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = FALSE))) %>% 
       mutate(cwd_lue0_fet = purrr::map_dbl(out_lue0_fet, "cwd_lue0")) %>%
       mutate(slope_lue_fet = purrr::map_dbl(out_lue0_fet, "slope_lue")) %>%
       # mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
