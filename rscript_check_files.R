@@ -94,7 +94,7 @@ check_avail_cwd_et0 <- function(ilon){
   
   ## written by R/get_cwd_et0_byilon.R
   dirn <- "~/mct/data/df_cwd_et0/"
-  filn <- paste0("df_cwd_et0_ilon_", ilon, ".RData")
+  filn <- paste0("df_cwd_et0_", ilon, ".RData")
   avl <- file.exists(paste0(dirn, filn))
   
   return(avl)
@@ -104,7 +104,7 @@ check_avail_cwd_lue0 <- function(ilon){
   
   ## written by R/get_cwd_lue0_byilon.R
   dirn <- "~/mct/data/df_cwd_lue0/"
-  filn <- paste0("df_cwd_lue0_ilon_", ilon, ".RData")
+  filn <- paste0("df_cwd_lue0_", ilon, ".RData")
   avl <- file.exists(paste0(dirn, filn))
   
   return(avl)
@@ -136,7 +136,7 @@ df <- tibble(ilon = 1:7200) %>%
     avl_cwd_lue0 = check_avail_cwd_lue0(ilon)
   )
 
-save(df, file = "./data/df_file_availability.RData")
+save(df, file = "./data/df_file_availability_cwd_.RData")
 
 # ## display missing
 # df %>% 
