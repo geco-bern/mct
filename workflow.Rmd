@@ -892,7 +892,7 @@ Run `rscript_extract_cwdx.R` (with submit file `submit_extract_cwdx.sh`).
 On Euler, run `rscript_check_files.R` and download the overview dataframe it writes (`data/df_file_availability.RData`)
 
 ```{r}
-load("data/df_file_availability_bal_only.RData")
+load("data/df_file_availability.RData")
 ```
 
 Longitude slices for which now snow files are available -> Possibly no WATCH-WFDEI gridcell at respective longitude? All available!
