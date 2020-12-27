@@ -1071,16 +1071,16 @@ df %>%
   #dplyr::filter( lon == -6.225 & lat == 37.025 ) %>% 
   pull(data)
 
-## take example of missing cells in andalusia:
-df_test <- df %>% 
-  dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
-  dplyr::filter(is.na(cwdx20)) %>% 
-  slice(1)
-
-lon <- df_test$lon  # is -6.225
-uselat <- df_test$lat  # is 37.025
-lon_hires <- seq(-179.975, 179.975, by = 0.05)
-ilon_hires <- which.min(abs(lon_hires - -6.225))
+# ## take example of missing cells in andalusia:
+# df_test <- df %>% 
+#   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
+#   dplyr::filter(is.na(cwdx20)) %>% 
+#   slice(1)
+# 
+# lon <- df_test$lon  # is -6.225
+# uselat <- df_test$lat  # is 37.025
+# lon_hires <- seq(-179.975, 179.975, by = 0.05)
+# ilon_hires <- which.min(abs(lon_hires - -6.225))
 ```
 
 Some ocean gridcells have values for cwdx. (latmin = 0, latmax = 25, lonmin = 50, lonmax = 80)
@@ -1274,6 +1274,7 @@ load("~/mct/data/df_cwd_lue0/df_cwd_lue0_5000.RData")
 df_cwd_lue0 <- df
 load("data/df_cwdx/df_cwdx_ilon_5000.RData")
 
+## play around with return period
 tmp <- df %>% 
   mutate(df_return = map(out_mct, "df_return")) %>% 
   mutate(cwdx20 = map_dbl(df_return, ~{filter(., return_period == 20) %>% pull(return_level)}))
@@ -1287,12 +1288,17 @@ tmp <- tmp %>%
   left_join(
     df_cwd_lue0, by = "lat"
   ) %>% 
+  mutate(cwd_lue0_SIF = remove_outliers(cwd_lue0_SIF)) %>% 
   mutate(cwd_lue0_nSIF = remove_outliers(cwd_lue0_nSIF)) %>% 
   filter(flue_nSIF < 0.8) %>% 
   mutate(lambda_decay_nSIF = remove_outliers(lambda_decay_nSIF))
 
 tmp %>% 
   analyse_modobs2("cwdx20", "cwd_lue0_nSIF")
+
+tmp %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_SIF")
+
 tmp %>% 
   analyse_modobs2("cwdx20", "lambda_decay_nSIF")
 ```    
@@ -1311,20 +1317,26 @@ df_cwd_et0 <- df
 load("data/df_cwdx/df_cwdx_ilon_4030.RData")
 tmp <- df %>% 
   mutate(df_return = map(out_mct, "df_return")) %>% 
-  mutate(cwdx20 = map_dbl(df_return, ~{filter(., return_period == 20) %>% pull(return_level)}))
+  mutate(cwdx20 = map_dbl(df_return, ~{filter(., return_period == 200) %>% pull(return_level)}))
 
 ggplot() + 
   geom_line(data = df_cwd_et0, aes(lat, cwd_lue0_fet), color = "red") +
   geom_line(data = tmp, aes(lat, cwdx20))
 
-tmp %>% 
+tmp <- tmp %>% 
   dplyr::select(lat, cwdx20) %>% 
   left_join(
     df_cwd_et0, by = "lat"
   ) %>% 
-  filter(flue_fet < 0.8) %>% 
+  filter(flue_fet < 0.7) %>% 
   mutate(lambda_decay_et = remove_outliers(lambda_decay_et)) %>% 
-  analyse_modobs2("cwdx20", "lambda_decay_et")
+  mutate(cwd_lue0_fet = remove_outliers(cwd_lue0_fet)) %>% 
+  mutate(cwd_lue0_et = remove_outliers(cwd_lue0_et))
+
+tmp %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_fet")
+tmp %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_et")
 ```
 
 

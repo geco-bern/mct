@@ -31,7 +31,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
     if (class(linmod) != "try-error"){
 
       ## remove outliers (residuals beyond 1.5 * IQR)
-      idx_drop <- which(is.na(remove_outliers(linmod$residuals, coef = 1.5)))
+      idx_drop <- which(is.na(rbeni::remove_outliers(linmod$residuals, coef = 1.5)))
       df$lue[idx_drop] <- NA
       
       ## git linear fit without outliers

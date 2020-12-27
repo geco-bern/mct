@@ -8,7 +8,7 @@ calc_cwd_et0_byilon <- function(ilon){
   
   calc_fet <- function(df){
     df %>% 
-      mutate(fet = remove_outliers(et / NR, coef = 1.5)) %>% 
+      mutate(fet = rbeni::remove_outliers(et / NR, coef = 1.5)) %>% 
       rowwise() %>% 
       mutate(fet = ifelse(fet < 0.001, NA, fet)) %>% 
       mutate(fet = ifelse(is.na(NR), NA, fet))
