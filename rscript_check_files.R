@@ -90,6 +90,26 @@ check_avail_glass <- function(ilon){
   return(avl)
 }
 
+check_avail_cwd_et0 <- function(ilon){
+  
+  ## written by R/get_cwd_et0_byilon.R
+  dirn <- "~/mct/data/df_cwd_et0/"
+  filn <- paste0("df_cwd_et0_ilon_", ilon, ".RData")
+  avl <- file.exists(paste0(dirn, filn))
+  
+  return(avl)
+}
+
+check_avail_cwd_lue0 <- function(ilon){
+  
+  ## written by R/get_cwd_lue0_byilon.R
+  dirn <- "~/mct/data/df_cwd_lue0/"
+  filn <- paste0("df_cwd_lue0_ilon_", ilon, ".RData")
+  avl <- file.exists(paste0(dirn, filn))
+  
+  return(avl)
+}
+
 get_ilon_lores <- function(ilon_hires){
   
   lon_lores <- seq(-179.75, 179.75, by = 0.5)
@@ -103,15 +123,17 @@ df <- tibble(ilon = 1:7200) %>%
   rowwise() %>%
   mutate(ilon_lores = get_ilon_lores(ilon)) %>% 
   mutate(
-    avl_tidy = check_avail_alexi_tidy(ilon),
-    avl_et_mm = check_avail_et_mm(ilon),
-    avl_snow = check_avail_snow(ilon_lores),
-    avl_bal = check_avail_bal(ilon),
-    avl_cwdx = check_avail_cwdx(ilon),
-    avl_cwdx_10_20_40 = check_avail_10_20_40(ilon),
-    avl_sif_jj = check_avail_sif_jj(ilon),
-    avl_sif_pk = check_avail_sif_pk(ilon),
-    avl_glass = check_avail_glass(ilon)
+    # avl_tidy = check_avail_alexi_tidy(ilon),
+    # avl_et_mm = check_avail_et_mm(ilon),
+    # avl_snow = check_avail_snow(ilon_lores),
+    # avl_bal = check_avail_bal(ilon),
+    # avl_cwdx = check_avail_cwdx(ilon),
+    # avl_cwdx_10_20_40 = check_avail_10_20_40(ilon),
+    # avl_sif_jj = check_avail_sif_jj(ilon),
+    # avl_sif_pk = check_avail_sif_pk(ilon),
+    # avl_glass = check_avail_glass(ilon),
+    avl_cwd_et0 = check_avail_cwd_et0(ilon),
+    avl_cwd_lue0 = check_avail_cwd_lue0(ilon)
   )
 
 save(df, file = "./data/df_file_availability.RData")
