@@ -20,7 +20,7 @@ calc_cwd_lue0_byilon <- function(ilon){
     ilon_lores <- which.min(abs(lon_lores - lon_hires[ilon]))
     load(paste0("~/data/watch_wfdei/data_tidy/SWdown_daily_WFDEI__ilon_", ilon_lores, ".RData"))
     df_sw <- df %>% 
-      mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
+      mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2))
     rm("df")
     
     ## filter watch data to years within ALEXI data availability (2003-2017)
@@ -62,7 +62,7 @@ calc_cwd_lue0_byilon <- function(ilon){
     load(paste0(dirn, filn)) # loads 'df'
     
     df <- df %>% 
-
+      
       ## because of numerical imprecision
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       
@@ -75,6 +75,12 @@ calc_cwd_lue0_byilon <- function(ilon){
       
       ## Combine with CWD data
       inner_join(df_cwd, by = c("lon", "lat")) %>% 
+      
+      ## filter missing
+      dplyr::filter(!map_lgl(data, is.null)) %>% 
+      dplyr::filter(!map_lgl(data_cwd, is.null)) %>% 
+      dplyr::filter(!map_lgl(data_inst, is.null)) %>% 
+      
       mutate(data = purrr::map2(data_cwd, data, ~left_join(.x, .y, by = "time"))) %>% 
       dplyr::select(lon, lat, data, data_inst) %>% 
       
@@ -86,24 +92,29 @@ calc_cwd_lue0_byilon <- function(ilon){
       mutate(data = purrr::map2(data, data_sw, ~right_join(.x, .y, by = "time"))) %>% 
       dplyr::select(-data_sw) %>% 
       
+      ## xxx try
+      # filter(lat < 40.0 & lat > 25.00) %>%
+      # filter(lat == 37.025) %>%
+      
       ## get CWD at SIF = 0, using function calc_cwd_lue0()
-      mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE))) %>% 
-      mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "lue0")) %>% 
-      mutate(cwd_lue0_exp_SIF = purrr::map_dbl(out_lue0_SIF, "lue0_exp")) %>% 
-      # mutate(gg_SIF = purrr::map(out_lue0_SIF, "gg")) %>% 
+      mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE))) %>%
+      mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "cwd_lue0")) %>%
+      mutate(slope_lue_SIF = purrr::map_dbl(out_lue0_SIF, "slope_lue")) %>%
+      # mutate(gg_SIF = purrr::map(out_lue0_SIF, "gg")) %>%
       mutate(flue_SIF = purrr::map_dbl(out_lue0_SIF, "flue")) %>%
-      mutate(cwdmax_SIF = purrr::map_dbl(out_lue0_SIF, "cwdmax")) %>%
-      dplyr::select(-out_lue0_SIF) %>% 
+      mutate(cwdmax = purrr::map_dbl(out_lue0_SIF, "cwdmax")) %>%
+      mutate(df_flue_SIF = purrr::map(out_lue0_SIF, "df_flue")) %>%
+      dplyr::select(-out_lue0_SIF) %>%
       
       ## get CWD at SIF/SWdown = 0; SIF/SWdown := nSIF
       mutate(data = purrr::map(data, ~mutate(., nSIF = SIF / sw))) %>% 
       mutate(out_lue0_nSIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "nSIF", do_plot = FALSE))) %>% 
-      mutate(cwd_lue0_nSIF = purrr::map_dbl(out_lue0_nSIF, "lue0")) %>% 
-      mutate(cwd_lue0_exp_nSIF = purrr::map_dbl(out_lue0_nSIF, "lue0_exp")) %>% 
-      # mutate(gg_nSIF = purrr::map(out_lue0_nSIF, "gg")) %>% 
+      mutate(cwd_lue0_nSIF = purrr::map_dbl(out_lue0_nSIF, "cwd_lue0")) %>%
+      mutate(slope_lue_nSIF = purrr::map_dbl(out_lue0_nSIF, "slope_lue")) %>%
+      # mutate(gg_nSIF = purrr::map(out_lue0_nSIF, "gg")) %>%
       mutate(flue_nSIF = purrr::map_dbl(out_lue0_nSIF, "flue")) %>%
-      mutate(cwdmax_nSIF = purrr::map_dbl(out_lue0_nSIF, "cwdmax")) %>%
-      dplyr::select(-out_lue0_nSIF) %>% 
+      mutate(df_flue_nSIF = purrr::map(out_lue0_nSIF, "df_flue")) %>%
+      dplyr::select(-out_lue0_nSIF) %>%
       
       ## drop data again
       dplyr::select(-data, -data_inst)

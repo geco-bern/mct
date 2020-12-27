@@ -946,7 +946,6 @@ df %>%
 For the global application, combine WHCX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
 ```{r}
 ## CWDX data
-#source("rscript_collect_cwdx.R")
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
 
 df <- df %>% 
@@ -968,15 +967,9 @@ system("cdo remapbil,gridfile_halfdeg.txt data/cwdx20.nc data/cwdx20_halfdeg.nc"
 Read half-degree global file and plot.
 ```{r}
 nc_halfdeg <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20")
-plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500), latmin = -55, latmax = 80,
-          spacing = "constant")
+plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
 ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
-
-## over the indian ocean
-gg <- plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500), latmin = 0, latmax = 25, lonmin = 50, lonmax = 80,
-          spacing = "constant")
-
-# ggsave("fig/map_cwdx20.pdf", width = 10, height = 8)
 ```
 
 ## Test plots
@@ -986,14 +979,73 @@ gg <- plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 
 Problem with missing data for certain gridcells. Solutions with varying `thresh_terminate` and with rounding digits of longitude and latitude values. 
 ```{r}
 ## spain
-df %>% 
+gg <- df %>% 
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45)
+  plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant")
+
+## italy
+gg <- df %>% 
+  dplyr::filter(lon > 7.5 & lon < 20 & lat > 36 & lat < 47) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = 7.5, lonmax = 20, latmin = 36, latmax = 47, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant")
+
+## europe
+gg <- df %>% 
+  dplyr::filter(lon > -10 & lon < 25 & lat > 35 & lat < 55) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 25, latmin = 35, latmax = 55, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant", 
+            combine = FALSE)
+gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwdx20_europe.pdf", width = 10, height = 10)
+
+## western usa
+gg <- df %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -125, lonmax = -90, latmin = 32.5, latmax = 47, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant", 
+            combine = FALSE)
+gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwdx20_wusa.pdf", width = 20, height = 10)
 
 ## andalusia
 gg <- df %>% 
   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5, combine = FALSE)
+  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5, combine = TRUE)
+
+## central asia
+gg <- df %>% 
+  plot_map3(varnam = "cwdx20", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+            )
+gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwdx20_casia.pdf", width = 15, height = 10)
+
+## iran
+gg <- df %>% 
+  dplyr::filter(lon > 45 & lon < 70 & lat > 20 & lat < 40) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = 45, lonmax = 70, latmin = 20, latmax = 40, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant",
+            combine = FALSE)
+gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwdx20_iran.pdf", width = 10, height = 10)
+
+## weird zero-meridian values
+gg <- df %>% 
+  dplyr::filter(lon > -2 & lon < 2 & lat > 42 & lat < 43) %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -2, lonmax = 2, latmin = 42, latmax = 43)
+
+vec_lon_missing <- df %>% 
+  dplyr::filter(lon > -2 & lon < 2 & lat > 42 & lat < 43) %>% 
+  filter(is.na(cwdx20)) %>% 
+  pull(lon) %>% 
+  unique() %>% 
+  round(digits = 3)
+
+## Missing data for these ilon:
+lon_hires <- seq(-179.975, 179.975, by = 0.05) %>% round(digits = 3)
+which(lon_hires %in% vec_lon_missing)
 
 ## example missing point:
 df_missing <- df %>% 
@@ -1048,21 +1100,6 @@ df %>%
 which.min(abs(lon_hires - 65.025))
 ```
 
-
-
-
-
-
-
-
-
-More test plots
-```{r}
-## europe
-out <- df %>% 
-  dplyr::filter(lon > -5 & lon < 25 & lat > 35 & lat < 55) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -5, lonmax = 25, latmin = 35, latmax = 55, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, 1500))
-```
 
 ## Re-do failed
 
