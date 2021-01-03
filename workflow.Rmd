@@ -190,22 +190,26 @@ if (siteset != "global"){
 Get data from rasterized HWSD data by Wieder. Data frame has row for each gridcell and nested data frames in `data`,  containing columns `T_CLAY, T_GRAVEL, T_OC, T_SAND, S_CLAY, S_GRAVEL, S_OC, S_SAND, ROOTS, IL`
 ```{r}
 ## first get subsoil parameters
-df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SAND") %>%
+df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SAND") %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
   rename( S_SAND = myvar ) %>%
   tidyr::drop_na() %>% 
   
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_CLAY.nc4", "S_CLAY") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( S_CLAY = myvar ),
     by = c("lon", "lat")
   ) %>%
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_OC.nc4", "S_OC") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( S_OC = myvar ),
     by = c("lon", "lat")
   ) %>%
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_GRAVEL.nc4", "S_GRAVEL") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( S_GRAVEL = myvar ),
     by = c("lon", "lat")
   ) %>%
@@ -213,35 +217,66 @@ df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SA
   ## get topsoil parameters
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_SAND.nc4", "T_SAND") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( T_SAND = myvar ),
     by = c("lon", "lat")
   ) %>%
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_CLAY.nc4", "T_CLAY") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( T_CLAY = myvar ),
     by = c("lon", "lat")
   ) %>%
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_OC.nc4", "T_OC") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( T_OC = myvar ),
     by = c("lon", "lat")
   ) %>%
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/T_GRAVEL.nc4", "T_GRAVEL") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( T_GRAVEL = myvar ),
     by = c("lon", "lat")
   ) %>% 
 
   left_join(
     rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/ROOTS.nc4", "ROOTS") %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename( ROOTS = myvar ),
     by = c("lon", "lat")
-  )
+  ) %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 
 save(df_hwsd, file = "data/df_hwsd_hires.RData")
 ```
 
 For global simulations, get soil parameters using the R script `rscript_calc_soilparams.R` (with `submit_calc_soilparams.sh`) and combine files with `rscript_combine_df_whc.R`.
+
+Test plot.
+```{r}
+nc <- df_to_grid(df_hwsd, varnam = "whc_top", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "whc_top", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/whc_top.nc", make_zdim = FALSE)
+
+system("cdo remapbil,gridfile_halfdeg.txt data/whc_top.nc data/whc_top_halfdeg.nc")
+
+nc_halfdeg <- read_nc_onefile("data/whc_top_halfdeg.nc", varnam = "whc_top")
+gg <- plot_map3(
+  nc_halfdeg, 
+  varnam = "whc_top", 
+  breaks = seq(0, 0.8, by = 0.05), 
+  latmin = -55, latmax = 75,
+  spacing = "constant",
+  colorscale = viridis::magma,
+  combine = FALSE
+  )
+gg$ggmap <- gg$ggmap + labs(title = "WHC", subtitle = "Topsoil, fraction")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_whc_top.pdf", width = 10, height = 6)
+
+```
+
+#### Site-level
 
 For site-level simulations do:
 ```{r}
@@ -265,7 +300,6 @@ df_whc <- df_hwsd %>%
 }
 ```
 
-#### Site-level
 
 Extract point data from shapefile using `ingestr::ingest()`.
 ```{r}
@@ -955,21 +989,49 @@ df <- df %>%
 ### Write NetCDF
 
 ```{r}
+## 10 y return period
+nc <- df_to_grid(df, varnam = "cwdx10", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx10", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx10.nc", make_zdim = FALSE)
+
+## 20 y return period
 nc <- df_to_grid(df, varnam = "cwdx20", lonnam = "lon", latnam = "lat")
 write_nc2(nc, varnams = "cwdx20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx20.nc", make_zdim = FALSE)
+
+## 40 y return period
+nc <- df_to_grid(df, varnam = "cwdx40", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx40", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx40.nc", make_zdim = FALSE)
+
+## 100 y return period
+nc <- df_to_grid(df, varnam = "cwdx100", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx100", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx100.nc", make_zdim = FALSE)
+
+## 200 y return period
+nc <- df_to_grid(df, varnam = "cwdx200", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx200", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx200.nc", make_zdim = FALSE)
 ```
 
 Regrid to 0.5 deg
 ```{r}
+system("cdo remapbil,gridfile_halfdeg.txt data/cwdx10.nc data/cwdx10_halfdeg.nc")
 system("cdo remapbil,gridfile_halfdeg.txt data/cwdx20.nc data/cwdx20_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/cwdx40.nc data/cwdx40_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/cwdx100.nc data/cwdx100_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/cwdx200.nc data/cwdx200_halfdeg.nc")
 ```
 
 Read half-degree global file and plot.
 ```{r}
+## 20 yr
 nc_halfdeg <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20")
 plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
           spacing = "constant", maxval = 6000)
 ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
+
+## 100 yr
+nc_halfdeg <- read_nc_onefile("data/cwdx100_halfdeg.nc", varnam = "cwdx100")
+plot_map3(nc_halfdeg, varnam = "cwdx100", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_cwdx100.pdf", width = 10, height = 6)
 ```
 
 ## Test plots
@@ -1083,29 +1145,6 @@ df %>%
 # ilon_hires <- which.min(abs(lon_hires - -6.225))
 ```
 
-Some ocean gridcells have values for cwdx. (latmin = 0, latmax = 25, lonmin = 50, lonmax = 80)
-```{r}
-## indian ocean
-gg <- df %>% 
-  dplyr::filter(lon > 50 & lon < 80 & lat > 0 & lat < 25) %>% 
-  plot_map3(varnam = "cwdx20", latmin = 0, latmax = 25, lonmin = 50, lonmax = 80, combine = FALSE)
-
-gg$ggmap +
-  geom_point(aes(x = 65.025, y = 10.025), color = "red", size = 2)
-
-## The value is 36.85907 for a gridcell in the middle of the ocean.
-df %>% 
-  dplyr::filter(lon == 65.025, lat == 10.025)
-
-which.min(abs(lon_hires - 65.025))
-```
-
-
-## Re-do failed
-
-Method failed for some pixes, where CWD events spanned multiple years (terminate-threshold was never reached). Re-run them with updated function where `thresh_terminate` is successively increased by 0.2. This is done by `rscript_redo_failed.R` (submitted via `submit_redo_failed.sh`)
-
-
 ## Rooting depth z(CWDX) 
 
 This requires WHC data.
@@ -1122,11 +1161,93 @@ load("data/df_cwdx_10_20_40.RData") # loads 'df', as done already above, created
 
 ## merge
 df <- df %>% 
-  left_join(df_biome, by = c("lon", "lat")) %>% 
-  left_join(df_whc, by = c("lon", "lat"))
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+  left_join(df_biome %>% 
+              mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)), 
+            by = c("lon", "lat")) %>% 
+  left_join(df_whc %>% 
+              mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)), 
+            by = c("lon", "lat"))
 ```
 
-### Calculate
+Test plot: WHC in southern South America.
+```{r}
+gg <- df %>% 
+  plot_map3(varnam = "whc_top", lonmin = -80, lonmax = -60, latmin = -60, latmax = -35, 
+            breaks = c(seq(0, 0.4, by = 0.05), 0.8, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+            )
+gg$ggmap <- gg$ggmap + labs(title = "WHC", subtitle = "Topsoil, fraction")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwdx20_casia.pdf", width = 15, height = 10)
+```
+
+Regrid and plot WHC.
+```{r}
+nc <- df_to_grid(df, varnam = "whc_top", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "whc_top", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/whc_top.nc", make_zdim = FALSE)
+
+system("cdo remapbil,gridfile_halfdeg.txt data/whc_top.nc data/whc_top_halfdeg.nc")
+
+nc_halfdeg <- read_nc_onefile("data/whc_top_halfdeg.nc", varnam = "whc_top")
+gg <- plot_map3(
+  nc_halfdeg, 
+  varnam = "whc_top", 
+  breaks = seq(0, 0.8, by = 0.05), 
+  latmin = -55, latmax = 75,
+  spacing = "constant",
+  colorscale = viridis::magma,
+  combine = FALSE
+  )
+gg$ggmap <- gg$ggmap + labs(title = "WHC", subtitle = "Topsoil, fraction")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_whc_top.pdf", width = 10, height = 6)
+```
+
+
+### Global
+
+Calculate implied rooting depth, given CWDX and WHC. WHC (`whc_top` and `whc_sub`) is derived from gridded HWSD data using `rscript_combine_df_whc.R`, `rscript_calc_soilparams.R`
+```{r}
+source("R/calc_zroot.R")
+
+df <- df %>% 
+  rowwise() %>% 
+  dplyr::mutate(zroot_cwd10 = calc_zroot(cwdx10, whc_top, whc_sub),
+                zroot_cwd20 = calc_zroot(cwdx20, whc_top, whc_sub),
+                zroot_cwd40 = calc_zroot(cwdx40, whc_top, whc_sub)
+                )
+
+save(df, file = "data/df_zroot.RData")
+```
+
+Regrid and plot.
+```{r}
+nc <- df_to_grid(df, varnam = "zroot_cwd20", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "zroot_cwd20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/zroot_cwd20.nc", make_zdim = FALSE)
+
+system("cdo remapbil,gridfile_halfdeg.txt data/zroot_cwd20.nc data/zroot_cwd20_halfdeg.nc")
+
+nc_halfdeg <- read_nc_onefile("data/zroot_cwd20_halfdeg.nc", varnam = "zroot_cwd20")
+gg <- plot_map3(
+  nc_halfdeg, 
+  varnam = "zroot_cwd20", 
+  breaks = c(seq(0, 1000, by = 200), 1500, 2000, 3000, 5000, 7000, 10000, 15000, 20000, Inf), 
+  latmin = -55, latmax = 75,
+  spacing = "constant", 
+  maxval = 60000,
+  colorscale = viridis::magma,
+  combine = FALSE
+  )
+gg$ggmap <- gg$ggmap + labs(title = "Implied rooting depth", subtitle = "20 year return period")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_zroot_cwd20.pdf", width = 10, height = 6)
+```
+
+
+### Site-level
 
 See `mct_sj02_simsuite.Rmd`, creates data frame with z(CWDX) for different return periods
 

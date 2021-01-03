@@ -14,7 +14,7 @@ path <- paste0("~/mct/data/df_whc_hires_chunk_", as.integer(args[1]), ".RData")
 
 if (!file.exists(path)){
 
-  load("data/df_hwsd_hires.RData") # loads 'df_hwsd'
+  load("data/df_hwsd_hires.RData") # loads 'df_hwsd', prepared directly in workflow.Rmd
   
   ##------------------------------------------------------------------------
   ## split it up into chunks (total number of chunks provided by argument 2)
