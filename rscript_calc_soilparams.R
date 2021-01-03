@@ -30,6 +30,11 @@ if (!file.exists(path)){
   
   ## get all available cores
   ncores <- parallel::detectCores()
+
+  ## limit the number of cores to number of individual runs
+  nruns <- length(irow_chunk[[as.integer(args[1])]])
+  ncores <- min(ncores, nruns)  
+  
   
   if (ncores > 1){
     
@@ -56,7 +61,8 @@ if (!file.exists(path)){
     df_whc <- df_hwsd %>%
       ungroup() %>%
       mutate(idx = 1:n()) %>% 
-      dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
+      # dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
+      dplyr::filter(idx %in% 1:100) %>%
       group_by(lon, lat) %>% 
       nest() %>% 
       dplyr::mutate(out = purrr::map( data,
