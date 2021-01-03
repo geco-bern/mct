@@ -18,9 +18,12 @@ extract_cwdx_byilon <- function(ilon, overwrite = FALSE){
         dplyr::mutate(df_return = purrr::map(out_mct, "df_return")) %>%
         dplyr::mutate(cwdx10 = purrr::map_dbl(df_return, ~dplyr::filter(., return_period==10) %>% dplyr::pull(return_level)),
                       cwdx20 = purrr::map_dbl(df_return, ~dplyr::filter(., return_period==20) %>% dplyr::pull(return_level)),
-                      cwdx40 = purrr::map_dbl(df_return, ~dplyr::filter(., return_period==40) %>% dplyr::pull(return_level))
+                      cwdx40 = purrr::map_dbl(df_return, ~dplyr::filter(., return_period==40) %>% dplyr::pull(return_level)),
+                      cwdx80 = purrr::map_dbl(df_return, ~dplyr::filter(., return_period==80) %>% dplyr::pull(return_level)),
+                      cwdx100 = purrr::map_dbl(df_return, ~dplyr::filter(., return_period==100) %>% dplyr::pull(return_level)),
+                      cwdx200 = purrr::map_dbl(df_return, ~dplyr::filter(., return_period==200) %>% dplyr::pull(return_level)),
         ) %>%
-        dplyr::select(lon, lat, cwdx10, cwdx20, cwdx40)
+        dplyr::select(lon, lat, cwdx10, cwdx20, cwdx40, cwdx80, cwdx100, cwdx200)
       
       print(paste("Writing file:", path))
       save(df, file = path)
