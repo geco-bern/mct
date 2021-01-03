@@ -78,6 +78,9 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
     df_log <- df %>% 
       dplyr::filter(!is.na(lue)) %>% 
       mutate(log_lue = log(lue)) %>% 
+      mutate(log_lue = ifelse(is.nan(log_lue), NA, log_lue)) %>% 
+      mutate(log_lue = ifelse(is.infinite(log_lue), NA, log_lue)) %>% 
+      tidyr::drop_na(log_lue) %>% 
       group_by(iinst) %>% 
       nest() %>% 
       mutate(linmod = purrr::map(data, ~lm(log_lue ~ dday, data = .))) %>% 
