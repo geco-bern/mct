@@ -10,7 +10,7 @@ library(rbeni)
 
 source("R/calc_soilparams_byilon.R")
 
-path <- paste0("~/mct/data/df_whc_hires_chunk_", as.integer(args[1]), ".RData")
+path <- paste0("~/mct/data/df_whc_hires_chunks/df_whc_hires_chunk_", as.integer(args[1]), ".RData")
 
 if (!file.exists(path)){
 
