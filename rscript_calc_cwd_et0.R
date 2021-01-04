@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-#args <- c(1, 100)
 
 library(dplyr)
 library(purrr)
@@ -43,7 +42,7 @@ if (ncores > 1){
   df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
     multidplyr::partition(cl) %>%
     dplyr::mutate(out = purrr::map( ilon,
-                                    ~try(calc_cwd_et0_byilon(.))))
+                                    ~calc_cwd_et0_byilon(.)))
 
 } else {
 

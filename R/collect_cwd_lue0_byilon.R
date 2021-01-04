@@ -9,6 +9,7 @@ collect_cwd_lue0_byilon <- function(ilon){
     load(path)
   } else {
     rlang::inform(paste("File does not exist:", path))
+    df <- NULL
   }
   
   return(df)
