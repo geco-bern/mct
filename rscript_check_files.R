@@ -132,11 +132,11 @@ df <- tibble(ilon = 1:7200) %>%
     # avl_sif_jj = check_avail_sif_jj(ilon),
     # avl_sif_pk = check_avail_sif_pk(ilon),
     # avl_glass = check_avail_glass(ilon),
-    avl_cwd_et0 = check_avail_cwd_et0(ilon),
+    # avl_cwd_et0 = check_avail_cwd_et0(ilon),
     avl_cwd_lue0 = check_avail_cwd_lue0(ilon)
   )
 
-save(df, file = "./data/df_file_availability_cwd_.RData")
+save(df, file = "./data/df_file_availability_cwd_lue0.RData")
 
 # ## display missing
 # df %>% 

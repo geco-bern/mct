@@ -35,7 +35,6 @@ if (!file.exists(path)){
   nruns <- length(irow_chunk[[as.integer(args[1])]])
   ncores <- min(ncores, nruns)  
   
-  
   if (ncores > 1){
     
     cl <- multidplyr::new_cluster(ncores) %>%
@@ -62,7 +61,7 @@ if (!file.exists(path)){
       ungroup() %>%
       mutate(idx = 1:n()) %>% 
       # dplyr::filter(idx %in% irow_chunk[[as.integer(args[1])]]) %>%
-      dplyr::filter(idx %in% 1:100) %>%
+      # dplyr::filter(idx %in% 1:100) %>%
       group_by(lon, lat) %>% 
       nest() %>% 
       dplyr::mutate(out = purrr::map( data,

@@ -71,8 +71,8 @@ The same overall workflow can be used for different site sets or for global simu
 
 Define which set is used by uncommenting/commenting:
 ```{r}
-# siteset <- "sj02"
-siteset <- "global"
+siteset <- "sj02"
+# siteset <- "global"
 # siteset <- "fluxnet2015"
 # siteset <- "rsip"
 ```
@@ -151,6 +151,8 @@ df_elv <- nc_to_df(
 
 Extract points from ETOPO1 GeoTIFF file and add to siteinfo.
 ```{r}
+library(ingestr)
+
 if (siteset != "global"){
   ##----------------------------------------------
   ## Site-scale set
@@ -159,18 +161,20 @@ if (siteset != "global"){
     left_join(
       ingest(
         siteinfo %>% 
-          dplyr::select(sitename, lon, lat),
+          dplyr::select(sitename, lon, lat, elv) %>% 
+          distinct(),
         source = "etopo1",
         dir = "~/data/etopo/"
-    ) %>% 
-    unnest(data) %>% 
-    rename(elv_etopo = elv),
+        ) %>% 
+        unnest(data) %>% 
+        rename(elv_etopo = elv),
       by = "sitename"
     )
 
   ## Show a comparison
   modobs_elv <- siteinfo %>% 
     analyse_modobs2("elv", "elv_etopo")
+  modobs_elv$gg
 
   ## Replace missing
   siteinfo <- siteinfo %>% 
@@ -251,55 +255,35 @@ df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SA
 save(df_hwsd, file = "data/df_hwsd_hires.RData")
 ```
 
-For global simulations, get soil parameters using the R script `rscript_calc_soilparams.R` (with `submit_calc_soilparams.sh`) and combine files with `rscript_combine_df_whc.R`.
-
 Test plot.
 ```{r}
-nc <- df_to_grid(df_hwsd, varnam = "whc_top", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "whc_top", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/whc_top.nc", make_zdim = FALSE)
+## load if it's not in the workspace yet
+load("data/df_hwsd_hires.RData")
 
-system("cdo remapbil,gridfile_halfdeg.txt data/whc_top.nc data/whc_top_halfdeg.nc")
+nc <- df_to_grid(df_hwsd, varnam = "T_SAND", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "T_SAND", lon = df_hwsd$lon %>% unique() %>% sort(), lat = df_hwsd$lat %>% unique() %>% sort(), path = "data/T_SAND.nc", make_zdim = FALSE)
 
-nc_halfdeg <- read_nc_onefile("data/whc_top_halfdeg.nc", varnam = "whc_top")
+system("cdo remapbil,gridfile_halfdeg.txt data/T_SAND.nc data/T_SAND_halfdeg.nc")
+
+nc_halfdeg <- read_nc_onefile("data/T_SAND_halfdeg.nc", varnam = "T_SAND")
 gg <- plot_map3(
   nc_halfdeg, 
-  varnam = "whc_top", 
-  breaks = seq(0, 0.8, by = 0.05), 
+  varnam = "T_SAND", 
+  breaks = seq(0, 100, by = 10), 
   latmin = -55, latmax = 75,
   spacing = "constant",
   colorscale = viridis::magma,
   combine = FALSE
   )
-gg$ggmap <- gg$ggmap + labs(title = "WHC", subtitle = "Topsoil, fraction")
+gg$ggmap <- gg$ggmap + labs(title = "Sand fraction", subtitle = "Topsoil, percent")
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_whc_top.pdf", width = 10, height = 6)
-
+ggsave("fig/map_T_SAND.pdf", width = 10, height = 6)
 ```
+
+For global simulations, get soil parameters using the R script `rscript_calc_soilparams.R` (with `submit_calc_soilparams.sh`) and combine files with `rscript_combine_df_whc.R`.
+
 
 #### Site-level
-
-For site-level simulations do:
-```{r}
-load("data/df_hwsd_hires.RData")
-
-if (siteset!="global"){
- 
-df_whc <- df_hwsd %>% 
-  slice(100000:100020) %>% ## this takes forever. send it to cluster,
-  group_by(lon, lat) %>% 
-  nest() %>% 
-  mutate(
-    data_soiltext_top = purrr::map(data, ~dplyr::select(
-      ., fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND, roots = ROOTS)),
-    data_soiltext_sub = purrr::map(data, ~dplyr::select(
-      ., fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND, roots = ROOTS))
-    ) %>% 
-  dplyr::select(-data) %>% 
-  mutate(data_soiltext_top = purrr::map(data_soiltext_top, ~calc_soilparams(., method = "balland")),
-         data_soiltext_sub = purrr::map(data_soiltext_sub, ~calc_soilparams(., method = "balland")))
-}
-```
-
 
 Extract point data from shapefile using `ingestr::ingest()`.
 ```{r}
@@ -340,16 +324,35 @@ if (siteset != "global"){
     load(filn)
   }
 
-} else {
-  
-    
-  
 }
 
 ## add to meta data table
 siteinfo <- siteinfo %>% 
   left_join(df_whc, by = "sitename")
 ```
+
+
+For site-level simulations do:
+```{r}
+load("data/df_hwsd_hires.RData")
+
+if (siteset!="global"){
+ 
+df_whc <- df_hwsd %>% 
+  group_by(lon, lat) %>% 
+  nest() %>% 
+  mutate(
+    data_soiltext_top = purrr::map(data, ~dplyr::select(
+      ., fclay = T_CLAY, fgravel = T_GRAVEL, forg = T_OC, fsand = T_SAND, roots = ROOTS)),
+    data_soiltext_sub = purrr::map(data, ~dplyr::select(
+      ., fclay = S_CLAY, fgravel = S_GRAVEL, forg = S_OC, fsand = S_SAND, roots = ROOTS))
+    ) %>% 
+  dplyr::select(-data) %>% 
+  mutate(data_soiltext_top = purrr::map(data_soiltext_top, ~calc_soilparams(., method = "balland")),
+         data_soiltext_sub = purrr::map(data_soiltext_sub, ~calc_soilparams(., method = "balland")))
+}
+```
+
 
 ### WTD
 
@@ -912,7 +915,7 @@ if (!file.exists(filn)){
 ```
 
 
-## Extract CWDXX
+## Extract CWDX
 
 Extract CWD-extremes from full output.
 
@@ -977,7 +980,7 @@ df %>%
 
 ## Collect data
 
-For the global application, combine WHCX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
+For the global application, combine CWDX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
 ```{r}
 ## CWDX data
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
@@ -1034,12 +1037,28 @@ plot_map3(nc_halfdeg, varnam = "cwdx100", breaks = c(seq(0, 100, by = 20), 150, 
 ggsave("fig/map_cwdx100.pdf", width = 10, height = 6)
 ```
 
-## Test plots
+## CWDX
 
 ### Maps
 
 Problem with missing data for certain gridcells. Solutions with varying `thresh_terminate` and with rounding digits of longitude and latitude values. 
 ```{r}
+## add rivers shapefile following https://www.earthdatascience.org/courses/earth-analytics/spatial-data-r/make-maps-with-ggplot-in-R/
+## read rivers database
+library(rgdal)
+library(broom)
+rivers <- readOGR("~/data/world_rivers_dSe/world_rivers_dSe.shp")
+df_rivers <- tidy(rivers, region = "id")
+
+# make sure the shapefile attribute table has an id column
+rivers$id <- rownames(rivers@data)
+
+# join the attribute table from the spatial object to the new data frame
+df_rivers <- left_join(df_rivers,
+                       rivers@data,
+                       by = "id"
+                       )
+
 ## spain
 gg <- df %>% 
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
@@ -1053,17 +1072,35 @@ gg <- df %>%
 ## europe
 gg <- df %>% 
   dplyr::filter(lon > -10 & lon < 25 & lat > 35 & lat < 55) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 25, latmin = 35, latmax = 55, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant", 
-            combine = FALSE)
-gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
+  plot_map3(varnam = "cwdx20", 
+            lonmin = -10, lonmax = 25, latmin = 35, latmax = 55, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
+            spacing = "constant", 
+            colorscale = viridis::magma,
+            combine = FALSE
+            )
+
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx20_europe.pdf", width = 10, height = 10)
+
+ggsave("fig/map_cwdx20_europe.pdf", width = 10, height = 8)
 
 ## western usa
 gg <- df %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -125, lonmax = -90, latmin = 32.5, latmax = 47, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant", 
-            combine = FALSE)
-gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
+  plot_map3(varnam = "cwdx20", 
+            lonmin = -125, lonmax = -90, latmin = 32.5, latmax = 47, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
+            spacing = "constant", 
+            colorscale = viridis::magma,
+            combine = FALSE
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwdx20_wusa.pdf", width = 20, height = 10)
 
@@ -1080,7 +1117,10 @@ gg <- df %>%
             combine = FALSE, 
             colorscale = viridis::magma
             )
-gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwdx20_casia.pdf", width = 15, height = 10)
 
@@ -1092,6 +1132,21 @@ gg <- df %>%
 gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwdx20_iran.pdf", width = 10, height = 10)
+
+## Amazon
+gg <- df %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -70, lonmax = -30, latmin = -20, latmax = 5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwdx20_amazon.pdf", width = 15, height = 10)
 
 ## weird zero-meridian values
 gg <- df %>% 
@@ -1145,7 +1200,10 @@ df %>%
 # ilon_hires <- which.min(abs(lon_hires - -6.225))
 ```
 
-## Rooting depth z(CWDX) 
+## Rooting depth
+
+
+### Soil texture
 
 This requires WHC data.
 ```{r}
@@ -1195,7 +1253,7 @@ nc_halfdeg <- read_nc_onefile("data/whc_top_halfdeg.nc", varnam = "whc_top")
 gg <- plot_map3(
   nc_halfdeg, 
   varnam = "whc_top", 
-  breaks = seq(0, 0.8, by = 0.05), 
+  breaks = c(seq(0, 0.4, by = 0.05), 0.8, Inf), 
   latmin = -55, latmax = 75,
   spacing = "constant",
   colorscale = viridis::magma,
@@ -1241,7 +1299,7 @@ gg <- plot_map3(
   colorscale = viridis::magma,
   combine = FALSE
   )
-gg$ggmap <- gg$ggmap + labs(title = "Implied rooting depth", subtitle = "20 year return period")
+gg$ggmap <- gg$ggmap + labs(title = "Implied rooting depth", subtitle = "20 year return period, (mm)")
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_zroot_cwd20.pdf", width = 10, height = 6)
 ```
@@ -1255,7 +1313,8 @@ See `mct_sj02_simsuite.Rmd`, creates data frame with z(CWDX) for different retur
 - Use soil texture and WTD meta info prepared in step 1, see `mct_sj02_simsuite.Rmd`
 
 ```{r}
-filn <- paste0("data/df_zroot_", siteset, ".RData")
+filn <- "data/df_zroot_sj02.RData"
+
 if (!file.exists(filn)){
 
   ## use CWDXX for zroot, no root obstacles accounted for now
@@ -1292,17 +1351,224 @@ if (!file.exists(filn)){
   save(df_zroot, file = filn)
   
 } else {
+  
   load(filn)
+  
 }
 ```
 
 
-## Implied zroot using SiF: CWD(LUE=0)
+Use simulated zroot from earlier site-level simulation (`df_zroot`, loaded from `"data/df_zroot_sj02.RData"`), based on CWD extremes with 20-year return period.
+```{r}
+df_modobs <- df_zroot %>%  
+  dplyr::select(sitename, cwdx20, zroot_cwdx20 = zroot_cwd20) %>% 
+  
+  ## add meta info and observed zroot
+  left_join(
+    read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
+      dplyr::rename(lon = Longitude, lat = Latitude) %>% 
+      dplyr::filter(lon > -180 & lat > -90) %>% 
+      dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
+      dplyr::rename(sitename = ID) %>% 
+      dplyr::mutate(D50 = 1000 * D50, D95 = 1000 * D95, D50_extrapolated = 1000 * D50_extrapolated, D95_extrapolated = 1000 * D95_extrapolated),
+    by = "sitename"
+  ) %>% 
+  
+  ## add biome info
+  left_join(siteinfo %>% 
+              dplyr::select(sitename, biome_wwf = biome_name),
+            by = "sitename")
+
+save(df_modobs, file = paste0("data/df_modobs_", siteset, "_biome_wwf.Rdata"))
+```
+
+Extract values from global simulation. Is practically the same as in old simulations!
+From map (`"data/cwdx20.nc"`).
+```{r}
+rasta_cwdx20 <- raster::brick("data/cwdx20.nc")
+tmp <- raster::extract(rasta_cwdx20, sp::SpatialPoints(dplyr::select(df_modobs, lon, lat) %>% distinct()), sp = TRUE) %>%
+      as_tibble() %>%
+      rename(cwdx20_global = layer) %>% 
+      right_join(
+        df_modobs,
+        by = c("lon", "lat")
+      )
+
+## close agreement!
+tmp %>% 
+  analyse_modobs2("cwdx20", "cwdx20_global")
+  
+rasta_zroot <- raster::brick("data/zroot_cwd20.nc")
+df_modobs <- raster::extract(rasta_zroot, sp::SpatialPoints(dplyr::select(df_modobs, lon, lat) %>% distinct()), sp = TRUE) %>%
+  as_tibble() %>%
+  rename(zroot_cwdx20_global = layer) %>% 
+  right_join(
+    df_modobs,
+    by = c("lon", "lat")
+  )
+
+## less close agreement - not using site-specific soil texture data!
+df_modobs %>% 
+  analyse_modobs2("zroot_cwdx20", "zroot_cwdx20_global")
+```
+
+Distribution by biomes, site-level data and site-level simulations. Tested also using global simulations and shows almost indistinguishable picture! Nice.
+```{r}
+library(ggridges)
+df_modobs %>% dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot_cwdx20, lon, lat) %>%  # change to mod = zroot_cwdx20_global
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_wwf)) %>% 
+  dplyr::filter(biome_wwf!="Mangroves") %>%   
+  ggplot(aes(x = zroot, y = biome_wwf, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_wwf_2021.pdf", width = 15, height = 10)
+```
+
+Modelled vs. observed, directly.
+```{r}
+df_modobs %>% 
+  analyse_modobs2("zroot_cwdx20", "D95_extrapolated")
+```
+
+Quantile regression - doesn't work well either.
+```{r}
+df_modobs %>% 
+  group_by(biome_wwf) %>% 
+  summarise(zroot_cwdx20 = quantile(zroot_cwdx20, probs = c(0.10), na.rm = TRUE),
+            D95_extrapolated = quantile(D95_extrapolated, probs = c(0.10), na.rm = TRUE)) %>% 
+  analyse_modobs2("zroot_cwdx20", "D95_extrapolated")
+```
+
+Where are locations of points with largest mismatch?
+```{r}
+df_tmp <- df_modobs %>% 
+  mutate(error = zroot - D95_extrapolated) %>% 
+  arrange(desc(error)) %>% 
+  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf, lon, lat)
+
+plot_map_simpl() +
+  geom_point(data = df_tmp, 
+             aes(lon, lat, color = error)) +
+  scale_colour_gradient(low = "grey30", high = "red")
+```
+
+Are sites with largest mismatch characterised by a small reduction in flue (indicating groundwater access)?
+```{r}
+df_modobs %>% 
+  left_join(siteinfo %>% 
+              dplyr::select(sitename, biome_wwf = biome_name),
+            by = "sitename") %>% 
+  mutate(error = zroot - D95_extrapolated) %>% 
+  arrange(desc(error)) %>% 
+  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf) %>% 
+  left_join(df_sif %>% 
+              dplyr::select(sitename = idx, flue, cwdmax),
+            by = "sitename") %>% 
+  ggplot(aes(x = flue, y = error)) +
+  geom_point()
+```
+
+
+### CWDX distribution
+
+By biomes.
+```{r}
+df_sif %>% 
+  rename(sitename = idx) %>% 
+  left_join(siteinfo %>% 
+              dplyr::select(sitename, biome_wwf = biome_name),
+            by = "sitename") %>% 
+  tidyr::pivot_longer(cols = c(cwdx20, cwd_lue0), names_to = "source", values_to = "cwd") %>% 
+  dplyr::filter(!is.na(biome_wwf)) %>% 
+  dplyr::filter(biome_wwf!="Mangroves") %>% 
+
+  ggplot(aes(x = cwd, y = biome_wwf, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = FALSE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("CWD(LUE=0)", "CWDX")) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
+  theme_ridges(center = TRUE)
+
+ggsave(paste0("fig/modobs_ridges_cwd_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
+```
+
+Something is wrong: Sites missing when applying new workflow. This is due to missing et_mm (elv was not ingested)
+```{r}
+load("data/df_modobs_reOLD.Rdata")
+df_modobs_new <- dplyr::select(df_modobs, sitename, cwdx20, zroot)
+
+df_test <- df_modobs_reOLD %>%
+  dplyr::select(zroot_old = zroot, cwdx20_old = cwd20) %>%
+  left_join(df_modobs_new, by = "sitename")
+
+out <- df_test %>%
+  analyse_modobs2("zroot_old", "zroot")
+out$gg
+
+out <- df_test %>%
+  analyse_modobs2("cwdx20_old", "cwdx20")
+out$gg
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## Implied zroot using SiF
+
+Approach is to derive CWD(LUE=0) for estimating CWDX.
 
 ### Global
 
-Run script that wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()`. Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
+Run script that wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()` (submission file: `submit_calc_cwd_lue0.sh`). Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
 
+Then collect outputs using `rscript_collect_cwd_lue0.R`.
+
+Convert to nc object and write to file.
+```{r}
+nc <- df_to_grid(df, varnam = "cwdx10", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx10", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx10.nc", make_zdim = FALSE)
+```
 
 ### Site-level
 
@@ -1460,141 +1726,6 @@ tmp %>%
   analyse_modobs2("cwdx20", "cwd_lue0_et")
 ```
 
-
-## Plot 
-
-### Rooting depth distribution
-
-Use simulated zroot based on CWD extremes with 20-year return period.
-```{r}
-df_modobs <- read_csv("~/data/rootingdepth/root_profiles_schenkjackson02/data/root_profiles_D50D95.csv") %>% 
-  dplyr::rename(lon = Longitude, lat = Latitude) %>% 
-  dplyr::filter(lon > -180 & lat > -90) %>% 
-  dplyr::filter(Wetland == "N" & Anthropogenic == "N" & Schenk_Jackson_2002 == "YES") %>% 
-  dplyr::rename(sitename = ID) %>% 
-  dplyr::mutate(D50 = 1000 * D50, D95 = 1000 * D95, D50_extrapolated = 1000 * D50_extrapolated, D95_extrapolated = 1000 * D95_extrapolated) %>% 
-  dplyr::left_join(dplyr::select(df_zroot, cwdx20, zroot = zroot_cwd20, sitename), by = "sitename") %>% 
-  left_join(siteinfo %>% 
-              dplyr::select(sitename, biome_wwf = biome_name),
-            by = "sitename")
-
-save(df_modobs, file = paste0("data/df_modobs_", siteset, "WF.Rdata"))
-```
-
-Distribution by biomes.
-```{r}
-df_modobs %>% dplyr::select(sitename, biome_wwf, obs = D95_extrapolated, mod = zroot, lon, lat) %>% 
-  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
-  dplyr::filter(!is.na(biome_wwf)) %>% 
-  dplyr::filter(biome_wwf!="Mangroves") %>%   
-  ggplot(aes(x = zroot, y = biome_wwf, color = source, point_color = source, fill = source)) +
-  geom_density_ridges(
-    jittered_points = TRUE, scale = .95, rel_min_height = .01,
-    point_shape = "|", point_size = 1.5, size = 0.25,
-    position = position_points_jitter(height = 0)
-  ) +
-  scale_y_discrete(expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
-  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("modelled", "observed")) +
-  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
-  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
-  coord_cartesian(clip = "off") +
-  guides(fill = guide_legend(
-    override.aes = list(
-      fill = c("#D55E00A0", "#0072B2A0"),
-      color = NA, point_color = NA)
-    )
-  ) +
-  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
-  theme_ridges(center = TRUE)
-
-ggsave(paste0("fig/modobs_ridges_zroot_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
-```
-
-Where are locations of points with largest mismatch?
-```{r}
-df_tmp <- df_modobs %>% 
-  mutate(error = zroot - D95_extrapolated) %>% 
-  arrange(desc(error)) %>% 
-  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf, lon, lat)
-
-plot_map_simpl() +
-  geom_point(data = df_tmp, 
-             aes(lon, lat, color = error)) +
-  scale_colour_gradient(low = "grey30", high = "red")
-```
-
-Are sites with largest mismatch characterised by a small reduction in flue (indicating groundwater access)?
-```{r}
-df_modobs %>% 
-  left_join(siteinfo %>% 
-              dplyr::select(sitename, biome_wwf = biome_name),
-            by = "sitename") %>% 
-  mutate(error = zroot - D95_extrapolated) %>% 
-  arrange(desc(error)) %>% 
-  dplyr::select(sitename, zroot, D95_extrapolated, error, biome_wwf) %>% 
-  left_join(df_sif %>% 
-              dplyr::select(sitename = idx, flue, cwdmax),
-            by = "sitename") %>% 
-  ggplot(aes(x = flue, y = error)) +
-  geom_point()
-```
-
-
-### CWDX distribution
-
-By biomes.
-```{r}
-df_sif %>% 
-  rename(sitename = idx) %>% 
-  left_join(siteinfo %>% 
-              dplyr::select(sitename, biome_wwf = biome_name),
-            by = "sitename") %>% 
-  tidyr::pivot_longer(cols = c(cwdx20, cwd_lue0), names_to = "source", values_to = "cwd") %>% 
-  dplyr::filter(!is.na(biome_wwf)) %>% 
-  dplyr::filter(biome_wwf!="Mangroves") %>% 
-
-  ggplot(aes(x = cwd, y = biome_wwf, color = source, point_color = source, fill = source)) +
-  geom_density_ridges(
-    jittered_points = FALSE, scale = .95, rel_min_height = .01,
-    point_shape = "|", point_size = 1.5, size = 0.25,
-    position = position_points_jitter(height = 0)
-  ) +
-  scale_y_discrete(expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0), name = "rooting depth (mm)") +
-  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("CWD(LUE=0)", "CWDX")) +
-  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
-  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
-  coord_cartesian(clip = "off") +
-  guides(fill = guide_legend(
-    override.aes = list(
-      fill = c("#D55E00A0", "#0072B2A0"),
-      color = NA, point_color = NA)
-    )
-  ) +
-  ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
-  theme_ridges(center = TRUE)
-
-ggsave(paste0("fig/modobs_ridges_cwd_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
-```
-
-Something is wrong: Sites missing when applying new workflow. This is due to missing et_mm (elv was not ingested)
-```{r}
-load("data/df_modobs_reOLD.Rdata")
-df_modobs_new <- dplyr::select(df_modobs, sitename, cwdx20, zroot)
-
-df_test <- df_modobs_reOLD %>%
-  dplyr::select(zroot_old = zroot, cwdx20_old = cwd20) %>%
-  left_join(df_modobs_new, by = "sitename")
-
-out <- df_test %>%
-  analyse_modobs2("zroot_old", "zroot")
-out$gg
-
-out <- df_test %>%
-  analyse_modobs2("cwdx20_old", "cwdx20")
-out$gg
-```
 
 
 

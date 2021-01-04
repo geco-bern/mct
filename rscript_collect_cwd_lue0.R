@@ -11,7 +11,8 @@ library(lubridate)
 source("R/collect_cwd_lue0_byilon.R")
 
 ## get all available cores
-ncores <- parallel::detectCores()
+# ncores <- parallel::detectCores()
+ncores <- 1
 
 ##------------------------------------------------------------------------
 ## 2. collect data from small files into a single dataframe
@@ -34,8 +35,7 @@ if (ncores > 1){
 } else {
   
   ## testing
-  df <- purrr::map(as.list(seq(nlon)), ~try(collect_cwd_lue0_byilon(.))) %>% 
-    bind_rows()
+  df <- purrr::map_dfr(as.list(seq(nlon)), ~collect_cwd_lue0_byilon(.))
   
 }
 
