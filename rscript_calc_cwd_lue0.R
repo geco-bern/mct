@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-#args <- c(500, 1200)
+#args <- c(74, 100)
 
 library(dplyr)
 library(purrr)
