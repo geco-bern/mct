@@ -44,7 +44,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE){
         is_neg <- slope_lue < 0.0
         rsq <- summary(linmod)$r.squared
         
-        if (is_neg){
+        if (is_neg && !is.na(is_neg)){
           ## test: is slope significantly (5% level) different from zero (t-test)?
           is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
           if (is_sign){
