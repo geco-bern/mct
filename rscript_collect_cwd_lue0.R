@@ -12,7 +12,6 @@ source("R/collect_cwd_lue0_byilon.R")
 
 ## get all available cores
 ncores <- parallel::detectCores()
-# ncores <- 1
 
 ##------------------------------------------------------------------------
 ## 2. collect data from small files into a single dataframe

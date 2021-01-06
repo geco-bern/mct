@@ -5,7 +5,12 @@ collect_cwd_et0_byilon <- function(ilon){
   filn <- paste0("df_cwd_et0_", ilon, ".RData")
   path <- paste0(dirn, filn)
   
-  load(path)
+  if (file.exists(path)){
+    load(path)
+  } else {
+    rlang::inform(paste("File does not exist:", path))
+    df <- NULL
+  }
   
   return(df)
 
