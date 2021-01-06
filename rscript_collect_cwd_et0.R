@@ -28,13 +28,13 @@ if (ncores > 1){
     multidplyr::partition(cl) %>%
     dplyr::mutate(data = purrr::map( ilon,
                                     ~collect_cwd_et0_byilon(.))) %>% 
-    collect() %>% 
-    tidyr::unnest(data)
+    collect()
   
 } else {
   
   ## testing
   df <- purrr::map(as.list(seq(nlon)), ~try(collect_cwd_et0_byilon(.))) %>% 
+    discard(is.null) %>% 
     bind_rows()
   
 }
