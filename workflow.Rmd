@@ -1202,7 +1202,6 @@ df %>%
 
 ## Rooting depth
 
-
 ### Soil texture
 
 This requires WHC data.
@@ -1562,12 +1561,103 @@ Approach is to derive CWD(LUE=0) for estimating CWDX.
 
 Run script that wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()` (submission file: `submit_calc_cwd_lue0.sh`). Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
 
-Then collect outputs using `rscript_collect_cwd_lue0.R`.
+Then collect outputs using `rscript_collect_cwd_lue0.R` and read the file. It's huge.
+```{r}
+load("data/df_cwd_lue0.RData")
+```
 
 Convert to nc object and write to file.
 ```{r}
-nc <- df_to_grid(df, varnam = "cwdx10", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx10", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx10.nc", make_zdim = FALSE)
+## SIF
+nc <- df_to_grid(df, varnam = "cwd_lue0_SIF", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwd_lue0_SIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwd_lue0_SIF.nc", make_zdim = FALSE)
+
+## nSIF
+nc <- df_to_grid(df, varnam = "cwd_lue0_nSIF", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwd_lue0_nSIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwd_lue0_nSIF.nc", make_zdim = FALSE)
+
+## lambda_decay_SIF
+nc <- df_to_grid(df, varnam = "lambda_decay_SIF", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "lambda_decay_SIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/lambda_decay_SIF.nc", make_zdim = FALSE)
+
+## lambda_decay_nSIF
+nc <- df_to_grid(df, varnam = "lambda_decay_nSIF", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "lambda_decay_nSIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/lambda_decay_nSIF.nc", make_zdim = FALSE)
+```
+
+Regrid to 0.5 deg
+```{r}
+system("cdo remapbil,gridfile_halfdeg.txt data/cwd_lue0_SIF.nc data/cwd_lue0_SIF_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/cwd_lue0_nSIF.nc data/cwd_lue0_nSIF_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/lambda_decay_SIF.nc data/lambda_decay_SIF_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/lambda_decay_nSIF.nc data/lambda_decay_nSIF_halfdeg.nc")
+```
+
+Read half-degree global file and plot.
+```{r}
+## SIF
+nc_halfdeg <- read_nc_onefile("data/cwd_lue0_SIF_halfdeg.nc", varnam = "cwd_lue0_SIF")
+plot_map3(nc_halfdeg, varnam = "cwd_lue0_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_cwd_lue0_SIF.pdf", width = 10, height = 6)
+
+## nSIF
+nc_halfdeg <- read_nc_onefile("data/cwd_lue0_nSIF_halfdeg.nc", varnam = "cwd_lue0_nSIF")
+plot_map3(nc_halfdeg, varnam = "cwd_lue0_nSIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_cwd_lue0_nSIF.pdf", width = 10, height = 6)
+
+## lambda_decay_SIF
+nc_halfdeg <- read_nc_onefile("data/lambda_decay_SIF_halfdeg.nc", varnam = "lambda_decay_SIF")
+plot_map3(nc_halfdeg, varnam = "lambda_decay_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_lambda_decay_SIF.pdf", width = 10, height = 6)
+
+## lambda_decay_nSIF
+nc_halfdeg <- read_nc_onefile("data/lambda_decay_nSIF_halfdeg.nc", varnam = "lambda_decay_nSIF")
+plot_map3(nc_halfdeg, varnam = "lambda_decay_nSIF", breaks = -(c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf)), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_lambda_decay_nSIF.pdf", width = 10, height = 6)
+```
+
+Plot correlation at global scale.
+```{r}
+
+
+df_corr <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>% 
+  nc_to_df(varnam = "cwdx20") %>% 
+  rename(cwdx20 = myvar) %>% 
+  left_join(
+    read_nc_onefile("data/cwd_lue0_SIF_halfdeg.nc", varnam = "cwd_lue0_SIF") %>% 
+      nc_to_df(varnam = "cwd_lue0_SIF") %>% 
+      rename(cwd_lue0_SIF = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    read_nc_onefile("data/cwd_lue0_nSIF_halfdeg.nc", varnam = "cwd_lue0_nSIF") %>% 
+      nc_to_df(varnam = "cwd_lue0_nSIF") %>% 
+      rename(cwd_lue0_nSIF = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    read_nc_onefile("data/lambda_decay_nSIF_halfdeg.nc", varnam = "lambda_decay_nSIF") %>% 
+      nc_to_df(varnam = "lambda_decay_nSIF") %>% 
+      rename(lambda_decay_nSIF = myvar),
+    by = c("lon", "lat")
+  )
+
+out <- df_corr %>% 
+  filter(cwdx20 < 1000 & cwd_lue0_SIF < 1000) %>% # TEST XXX
+  analyse_modobs2("cwdx20", "cwd_lue0_SIF", type = "heat")
+out$gg
+
+df_corr %>% 
+  filter(cwdx20 < 1000 & cwd_lue0_nSIF < 1000) %>% # TEST XXX
+  analyse_modobs2("cwdx20", "cwd_lue0_nSIF", type = "heat")
+
+df_corr %>% 
+  filter(cwdx20 > -1000 & lambda_decay_nSIF > -1000) %>% # TEST XXX
+  analyse_modobs2("cwdx20", "lambda_decay_nSIF", type = "heat")
 ```
 
 ### Site-level
@@ -1691,41 +1781,102 @@ tmp %>%
 ```    
     
     
-## Implied zroot using Rn: CWD(fET=0)
+## Implied zroot using Rn (net radiation)
 
-`test_mct_bysite_alexi_fluxnet.R`
+Approach is to derive CWD(ET/Rn=0) for estimating CWDX.
 
-- Use CWD events from step 3 and GLASS net radiation from step 2
+### Global
 
-Along one longitude band (21.475 deg E).
+Run script that wraps `calc_cwd_et0_byilon()` and `calc_cwd_et0()` (submission file: `submit_calc_cwd_et0.sh`). Collects CWD data (including instances), net radiation, and ET data into one data frame per pixel and determines sensitivity (linear regression slope) of ET/Rn vs. CWD. Also determines fractional reduction in ET/Rn in highest CWD bin (using function `get_fet_cwdmax()`).
+
+Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's huge.
 ```{r}
-load("~/mct/data/df_cwd_et0/df_cwd_et0_4030.RData")
-df_cwd_et0 <- df
-load("data/df_cwdx/df_cwdx_ilon_4030.RData")
-tmp <- df %>% 
-  mutate(df_return = map(out_mct, "df_return")) %>% 
-  mutate(cwdx20 = map_dbl(df_return, ~{filter(., return_period == 200) %>% pull(return_level)}))
+load("data/df_cwd_et0.RData")
 
-ggplot() + 
-  geom_line(data = df_cwd_et0, aes(lat, cwd_lue0_fet), color = "red") +
-  geom_line(data = tmp, aes(lat, cwdx20))
-
-tmp <- tmp %>% 
-  dplyr::select(lat, cwdx20) %>% 
-  left_join(
-    df_cwd_et0, by = "lat"
-  ) %>% 
-  filter(flue_fet < 0.7) %>% 
-  mutate(lambda_decay_et = remove_outliers(lambda_decay_et)) %>% 
-  mutate(cwd_lue0_fet = remove_outliers(cwd_lue0_fet)) %>% 
-  mutate(cwd_lue0_et = remove_outliers(cwd_lue0_et))
-
-tmp %>% 
-  analyse_modobs2("cwdx20", "cwd_lue0_fet")
-tmp %>% 
-  analyse_modobs2("cwdx20", "cwd_lue0_et")
+df <- df %>% 
+  dplyr::select(lon, lat, cwd_lue0_et, cwd_lue0_fet, s0_teuling_et)
+save(df, file = "data/df_sub_cwd_et0.RData")
 ```
 
+Convert to nc object and write to file.
+```{r}
+## ET
+nc <- df_to_grid(df, varnam = "cwd_lue0_et", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwd_lue0_et", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwd_lue0_et.nc", make_zdim = FALSE)
 
+## fET (ET/Rn)
+nc <- df_to_grid(df, varnam = "cwd_lue0_fet", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwd_lue0_fet", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwd_lue0_fet.nc", make_zdim = FALSE)
+
+## s0_teuling_et
+nc <- df_to_grid(df %>% dplyr::select(lon, lat, s0_teuling_et), varnam = "s0_teuling_et", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "s0_teuling_et", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/s0_teuling_et.nc", make_zdim = FALSE)
+```
+
+Regrid to 0.5 deg
+```{r}
+system("cdo remapbil,gridfile_halfdeg.txt data/cwd_lue0_et.nc data/cwd_lue0_et_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/cwd_lue0_fet.nc data/cwd_lue0_fet_halfdeg.nc")
+system("cdo remapbil,gridfile_halfdeg.txt data/s0_teuling_et.nc data/s0_teuling_et_halfdeg.nc")
+```
+
+Read half-degree global file and plot.
+```{r}
+## ET
+nc_halfdeg <- read_nc_onefile("data/cwd_lue0_et_halfdeg.nc", varnam = "cwd_lue0_et")
+plot_map3(nc_halfdeg, varnam = "cwd_lue0_et", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_cwd_lue0_et.pdf", width = 10, height = 6)
+
+## ET/Rn
+nc_halfdeg <- read_nc_onefile("data/cwd_lue0_fet_halfdeg.nc", varnam = "cwd_lue0_fet")
+plot_map3(nc_halfdeg, varnam = "cwd_lue0_fet", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_cwd_lue0_fet.pdf", width = 10, height = 6)
+
+## s0_teuling_et
+nc_halfdeg <- read_nc_onefile("data/s0_teuling_et_halfdeg.nc", varnam = "s0_teuling_et")
+plot_map3(nc_halfdeg, varnam = "s0_teuling_et", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000)
+ggsave("fig/map_s0_teuling_et.pdf", width = 10, height = 6)
+```
+
+Plot correlation at global scale.
+```{r}
+df_corr <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>% 
+  nc_to_df(varnam = "cwdx20") %>% 
+  rename(cwdx20 = myvar) %>% 
+  left_join(
+    read_nc_onefile("data/cwd_lue0_et_halfdeg.nc", varnam = "cwd_lue0_et") %>% 
+      nc_to_df(varnam = "cwd_lue0_et") %>% 
+      rename(cwd_lue0_et = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    read_nc_onefile("data/cwd_lue0_et_halfdeg.nc", varnam = "cwd_et0_fet") %>% 
+      nc_to_df(varnam = "cwd_et0_fet") %>% 
+      rename(cwd_et0_fet = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    read_nc_onefile("data/s0_teuling_et_halfdeg.nc", varnam = "s0_teuling_et") %>% 
+      nc_to_df(varnam = "cwd_et0_fet") %>% 
+      rename(cwd_et0_fet = myvar),
+    by = c("lon", "lat")
+  )
+
+out <- df_corr %>% 
+  filter(cwdx20 < 1000 & cwd_lue0_et < 1000) %>% # TEST XXX
+  analyse_modobs2("cwdx20", "cwd_lue0_et", type = "heat")
+out$gg
+
+df_corr %>% 
+  filter(cwdx20 < 1000 & cwd_et0_fet < 1000) %>% # TEST XXX
+  analyse_modobs2("cwdx20", "cwd_et0_fet", type = "heat")
+
+df_corr %>% 
+  filter(cwdx20 < 1000 & s0_teuling_et < 1000) %>% # TEST XXX
+  analyse_modobs2("cwdx20", "s0_teuling_et", type = "heat")
+```
 
 

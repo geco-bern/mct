@@ -61,6 +61,11 @@ calc_cwd_lue0_byilon <- function(ilon){
     dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
     load(paste0(dirn, filn)) # loads 'df'
     
+#     ## some are a list - awkwardly
+#     if (class(df) == "list" && length(df) == 0){
+#       system(paste0("Rscript --vanilla rscript_get_data_sif_jj.R ", ilon, " 7200"))
+#     }
+    
     df <- df %>% 
       
       ## because of numerical imprecision

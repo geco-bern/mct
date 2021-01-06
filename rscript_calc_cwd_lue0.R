@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-#args <- c(74, 100)
+# args <- c(14, 100)
 
 library(dplyr)
 library(purrr)
@@ -17,10 +17,19 @@ source("R/calc_cwd_lue0_byilon.R")
 ##------------------------------------------------------------------------
 ## split it up into chunks (total number of chunks provided by argument 2)
 ##------------------------------------------------------------------------
+## first round
+# nlon <- 7200
+# ilat <- seq(1:nlon)
+##----
+
+## second round: do only missing ones
+load("./data/df_file_availability_cwd_lue0.RData")
+ilat <- df %>% dplyr::filter(!avl_cwd_lue0) %>% pull(ilon)
+nlon <- length(ilat)
+##----
+
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
-nlon <- 7200
 nrows_chunk <- ceiling(nlon/nchunk)
-ilat <- seq(1:nlon)
 irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
 
 print("getting data for longitude indices:")
@@ -32,6 +41,8 @@ ncores <- parallel::detectCores()
 ## limit the number of cores to number of individual runs
 nruns <- length(irow_chunk[[as.integer(args[1])]])
 ncores <- min(ncores, nruns)
+
+# ncores <- 1
 
 if (ncores > 1){
 
@@ -48,6 +59,6 @@ if (ncores > 1){
 } else {
 
   ## testing
-  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~try(calc_cwd_lue0_byilon(.)))
+  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(.))
 
 }
