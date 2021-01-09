@@ -128,15 +128,15 @@ df <- tibble(ilon = 1:7200) %>%
     # avl_snow = check_avail_snow(ilon_lores),
     # avl_bal = check_avail_bal(ilon),
     # avl_cwdx = check_avail_cwdx(ilon),
-    # avl_cwdx_10_20_40 = check_avail_10_20_40(ilon),
+    avl_cwdx_10_20_40 = check_avail_10_20_40(ilon)
     # avl_sif_jj = check_avail_sif_jj(ilon),
     # avl_sif_pk = check_avail_sif_pk(ilon),
     # avl_glass = check_avail_glass(ilon),
-    avl_cwd_et0 = check_avail_cwd_et0(ilon)
+    # avl_cwd_et0 = check_avail_cwd_et0(ilon)
     # avl_cwd_lue0 = check_avail_cwd_lue0(ilon)
   )
 
-save(df, file = "./data/df_file_availability_cwd_et0.RData")
+save(df, file = "./data/df_file_availability_cwdx_10_20_40.RData")
 
 #load("./data/df_file_availability_cwd_lue0.RData")
 

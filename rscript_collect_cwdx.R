@@ -11,8 +11,8 @@ library(lubridate)
 source("R/collect_cwdx_byilon.R")
 
 ## get all available cores
-#ncores <- parallel::detectCores()
-ncores <- 1
+ncores <- parallel::detectCores()
+#ncores <- 1
 
 ##------------------------------------------------------------------------
 ## 2. collect data from small files into a single dataframe
