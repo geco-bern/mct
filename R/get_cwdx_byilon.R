@@ -82,7 +82,7 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
       load(paste0(dirn, filn)) # loads 'df'
       
       ## determine CWD and events
-      df_tmp <- df %>% 
+      df <- df %>% 
         
         ## round to avoid numerical imprecision
         mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%

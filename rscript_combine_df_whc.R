@@ -9,7 +9,7 @@ library(rlang)
 
 source("R/extract_whc_byfil.R")
 
-dir <- "~/data/mct_data/df_whc_hires_chunks/"
+dir <- "data/df_whc_hires_chunks/"
 filelist <- paste0(dir, list.files(dir, pattern = "df_whc_hires_chunk_.*.RData"))
 
 ## get all available cores

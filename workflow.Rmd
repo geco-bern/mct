@@ -915,15 +915,6 @@ if (!file.exists(filn)){
 ```
 
 
-## Extract CWDX
-
-Extract CWD-extremes from full output.
-
-### Global
-
-Run `rscript_extract_cwdx.R` (with submit file `submit_extract_cwdx.sh`).
-
-
 ## Check file availability
 
 On Euler, run `rscript_check_files.R` and download the overview dataframe it writes (`data/df_file_availability.RData`)
@@ -978,6 +969,15 @@ df %>%
 ```
 
 
+
+## Extract CWDX
+
+Extract CWD-extremes from full output.
+
+### Global
+
+Run `rscript_extract_cwdx.R` (with submit file `submit_extract_cwdx.sh`).
+
 ## Collect data
 
 For the global application, combine CWDX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
@@ -985,32 +985,34 @@ For the global application, combine CWDX and soil texture information into a glo
 ## CWDX data
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
 
-df <- df %>% 
+df_cwdx <- df %>% 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
+
+rm("df")
 ```
 
 ### Write NetCDF
 
 ```{r}
 ## 10 y return period
-nc <- df_to_grid(df, varnam = "cwdx10", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx10", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx10.nc", make_zdim = FALSE)
+nc <- df_to_grid(df_cwdx, varnam = "cwdx10", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx10", lon = df_cwdx$lon %>% unique() %>% sort(), lat = df_cwdx$lat %>% unique() %>% sort(), path = "data/cwdx10.nc", make_zdim = FALSE)
 
 ## 20 y return period
-nc <- df_to_grid(df, varnam = "cwdx20", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx20", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx20.nc", make_zdim = FALSE)
+nc <- df_to_grid(df_cwdx, varnam = "cwdx20", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx20", lon = df_cwdx$lon %>% unique() %>% sort(), lat = df_cwdx$lat %>% unique() %>% sort(), path = "data/cwdx20.nc", make_zdim = FALSE)
 
 ## 40 y return period
-nc <- df_to_grid(df, varnam = "cwdx40", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx40", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx40.nc", make_zdim = FALSE)
+nc <- df_to_grid(df_cwdx, varnam = "cwdx40", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx40", lon = df_cwdx$lon %>% unique() %>% sort(), lat = df_cwdx$lat %>% unique() %>% sort(), path = "data/cwdx40.nc", make_zdim = FALSE)
 
 ## 100 y return period
-nc <- df_to_grid(df, varnam = "cwdx100", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx100", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx100.nc", make_zdim = FALSE)
+nc <- df_to_grid(df_cwdx, varnam = "cwdx100", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx100", lon = df_cwdx$lon %>% unique() %>% sort(), lat = df_cwdx$lat %>% unique() %>% sort(), path = "data/cwdx100.nc", make_zdim = FALSE)
 
 ## 200 y return period
-nc <- df_to_grid(df, varnam = "cwdx200", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx200", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwdx200.nc", make_zdim = FALSE)
+nc <- df_to_grid(df_cwdx, varnam = "cwdx200", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwdx200", lon = df_cwdx$lon %>% unique() %>% sort(), lat = df_cwdx$lat %>% unique() %>% sort(), path = "data/cwdx200.nc", make_zdim = FALSE)
 ```
 
 Regrid to 0.5 deg
@@ -1026,15 +1028,33 @@ Read half-degree global file and plot.
 ```{r}
 ## 20 yr
 nc_halfdeg <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20")
-plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000)
+gg <- plot_map3(nc_halfdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
+gg$ggmap <- gg$ggmap + 
+  labs(title = expression(italic(S)[CWDX20]))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
+ggsave("fig/map_cwdx20.png", width = 10, height = 6)
+
+## 40 yr
+nc_halfdeg <- read_nc_onefile("data/cwdx40_halfdeg.nc", varnam = "cwdx40")
+gg <- plot_map3(nc_halfdeg, varnam = "cwdx40", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
+gg$ggmap <- gg$ggmap + 
+  labs(title = expression(italic(S)[CWDX40]))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwdx40.pdf", width = 10, height = 6)
+ggsave("fig/map_cwdx40.png", width = 10, height = 6)
 
 ## 100 yr
 nc_halfdeg <- read_nc_onefile("data/cwdx100_halfdeg.nc", varnam = "cwdx100")
-plot_map3(nc_halfdeg, varnam = "cwdx100", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000)
+gg <- plot_map3(nc_halfdeg, varnam = "cwdx100", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
+gg$ggmap <- gg$ggmap + 
+  labs(title = expression(italic(S)[CWDX100]))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwdx100.pdf", width = 10, height = 6)
+ggsave("fig/map_cwdx100.png", width = 10, height = 6)
 ```
 
 ## CWDX
@@ -1058,146 +1078,80 @@ df_rivers <- left_join(df_rivers,
                        rivers@data,
                        by = "id"
                        )
+save(df_rivers, file = "data/df_rivers.RData")
 
 ## spain
-gg <- df %>% 
+gg <- df_cwdx %>% 
   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
   plot_map3(varnam = "cwdx20", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant")
 
 ## italy
-gg <- df %>% 
+gg <- df_cwdx %>% 
   dplyr::filter(lon > 7.5 & lon < 20 & lat > 36 & lat < 47) %>% 
   plot_map3(varnam = "cwdx20", lonmin = 7.5, lonmax = 20, latmin = 36, latmax = 47, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant")
 
 ## europe
-gg <- df %>% 
+gg <- df_cwdx %>% 
   dplyr::filter(lon > -10 & lon < 25 & lat > 35 & lat < 55) %>% 
   plot_map3(varnam = "cwdx20", 
             lonmin = -10, lonmax = 25, latmin = 35, latmax = 55, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
             spacing = "constant", 
-            colorscale = viridis::magma,
-            combine = FALSE
+            colorscale = viridis::cividis,
+            combine = FALSE, legend_title = "(mm)"
             )
-
 gg$ggmap <- gg$ggmap + 
-  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-
+  labs(title = expression(italic(S)[CWDX20])) +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-
-ggsave("fig/map_cwdx20_europe.pdf", width = 10, height = 8)
+ggsave("fig/map_cwdx20_europe.pdf", width = 8, height = 6)
+ggsave("fig/map_cwdx20_europe.png", width = 8, height = 6)
 
 ## western usa
-gg <- df %>% 
+gg <- df_cwdx %>% 
   plot_map3(varnam = "cwdx20", 
             lonmin = -125, lonmax = -90, latmin = 32.5, latmax = 47, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
             spacing = "constant", 
-            colorscale = viridis::magma,
-            combine = FALSE
+            colorscale = viridis::cividis,
+            combine = FALSE, legend_title = "(mm)"
             )
 gg$ggmap <- gg$ggmap + 
-  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-
+  labs(title = expression(italic(S)[CWDX20])) +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx20_wusa.pdf", width = 20, height = 10)
-
-## andalusia
-gg <- df %>% 
-  dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -7, lonmax = -4, latmin = 36, latmax = 37.5, combine = TRUE)
+ggsave("fig/map_cwdx20_wusa.pdf", width = 10, height = 6)
+ggsave("fig/map_cwdx20_wusa.png", width = 10, height = 6)
 
 ## central asia
-gg <- df %>% 
+gg <- df_cwdx %>% 
   plot_map3(varnam = "cwdx20", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
             spacing = "constant",
             combine = FALSE, 
-            colorscale = viridis::magma
+            colorscale = viridis::cividis, legend_title = "(mm)"
             )
 gg$ggmap <- gg$ggmap + 
-  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-
+  labs(title = expression(italic(S)[CWDX20])) +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx20_casia.pdf", width = 15, height = 10)
-
-## iran
-gg <- df %>% 
-  dplyr::filter(lon > 45 & lon < 70 & lat > 20 & lat < 40) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = 45, lonmax = 70, latmin = 20, latmax = 40, breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), spacing = "constant",
-            combine = FALSE)
-gg$ggmap <- gg$ggmap + labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period")
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx20_iran.pdf", width = 10, height = 10)
+ggsave("fig/map_cwdx20_casia.pdf", width = 9, height = 5)
+ggsave("fig/map_cwdx20_casia.png", width = 9, height = 5)
 
 ## Amazon
-gg <- df %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -70, lonmax = -30, latmin = -20, latmax = 5, 
+gg <- df_cwdx %>% 
+  plot_map3(varnam = "cwdx20", lonmin = -83, lonmax = -33, latmin = -25, latmax = 12, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
             spacing = "constant",
             combine = FALSE, 
-            colorscale = viridis::magma
+            colorscale = viridis::cividis, legend_title = "(mm)"
             )
 gg$ggmap <- gg$ggmap + 
-  labs(title = "Maximum cumulative water deficit", subtitle = "20 year return period") +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-
+  labs(title = expression(italic(S)[CWDX20])) +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx20_amazon.pdf", width = 15, height = 10)
-
-## weird zero-meridian values
-gg <- df %>% 
-  dplyr::filter(lon > -2 & lon < 2 & lat > 42 & lat < 43) %>% 
-  plot_map3(varnam = "cwdx20", lonmin = -2, lonmax = 2, latmin = 42, latmax = 43)
-
-vec_lon_missing <- df %>% 
-  dplyr::filter(lon > -2 & lon < 2 & lat > 42 & lat < 43) %>% 
-  filter(is.na(cwdx20)) %>% 
-  pull(lon) %>% 
-  unique() %>% 
-  round(digits = 3)
-
-## Missing data for these ilon:
-lon_hires <- seq(-179.975, 179.975, by = 0.05) %>% round(digits = 3)
-which(lon_hires %in% vec_lon_missing)
-
-## example missing point:
-df_missing <- df %>% 
-  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001))
-
-gg$ggmap +
-  geom_point(aes(x = df_missing$lon, y = df_missing$lat), color = "red", size = 2)
-
-## open df_cwdx where the missing cell is contained
-load("data/df_cwdx/df_cwdx_ilon_3476.RData")
-
-## is missing
-out_mct <- df %>% 
-  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001)) %>% 
-  pull(out_mct)
-
-## open df_bal where the missing cell is contained
-load("data/df_bal/df_bal_ilon_3476.RData")
-
-## df_bal data is not missing
-df %>% 
-  dplyr::filter(near(lon, -6.225, tol = 0.0001) & near(lat, 37.025, tol = 0.0001)) %>% 
-  #dplyr::filter( lon == -6.225 & lat == 37.025 ) %>% 
-  pull(data)
-
-# ## take example of missing cells in andalusia:
-# df_test <- df %>% 
-#   dplyr::filter(lon > -7 & lon < -4 & lat > 36 & lat < 37.5) %>% 
-#   dplyr::filter(is.na(cwdx20)) %>% 
-#   slice(1)
-# 
-# lon <- df_test$lon  # is -6.225
-# uselat <- df_test$lat  # is 37.025
-# lon_hires <- seq(-179.975, 179.975, by = 0.05)
-# ilon_hires <- which.min(abs(lon_hires - -6.225))
+ggsave("fig/map_cwdx20_amazon.pdf", width = 9, height = 6)
+ggsave("fig/map_cwdx20_amazon.png", width = 9, height = 6)
 ```
 
 ## Rooting depth
@@ -1207,7 +1161,7 @@ df %>%
 This requires WHC data.
 ```{r}
 ## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
-load("data/df_whc_hires.RData") # loads 'df_whc'
+load("data/df_whc_hires.RData") %>%  # loads 'df_whc'
 
 ## biome info
 df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", varnam = "biome") %>% 
@@ -1217,7 +1171,7 @@ df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster
 load("data/df_cwdx_10_20_40.RData") # loads 'df', as done already above, created by rscript_collect_cwdx.R
 
 ## merge
-df <- df %>% 
+df_cwdx <- df_cwdx %>% 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
   left_join(df_biome %>% 
               mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)), 
@@ -1229,7 +1183,8 @@ df <- df %>%
 
 Test plot: WHC in southern South America.
 ```{r}
-gg <- df %>% 
+gg <- df_whc %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
   plot_map3(varnam = "whc_top", lonmin = -80, lonmax = -60, latmin = -60, latmax = -35, 
             breaks = c(seq(0, 0.4, by = 0.05), 0.8, Inf), 
             spacing = "constant",
@@ -1238,7 +1193,6 @@ gg <- df %>%
             )
 gg$ggmap <- gg$ggmap + labs(title = "WHC", subtitle = "Topsoil, fraction")
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx20_casia.pdf", width = 15, height = 10)
 ```
 
 Regrid and plot WHC.
@@ -1544,89 +1498,167 @@ out$gg
 
 
 
-
-
-
-
-
-
-
-
-
 ## Implied zroot using SiF
 
 Approach is to derive CWD(LUE=0) for estimating CWDX.
-
-### Global
 
 Run script that wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()` (submission file: `submit_calc_cwd_lue0.sh`). Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
 
 Then collect outputs using `rscript_collect_cwd_lue0.R` and read the file. It's huge.
 ```{r}
 load("data/df_cwd_lue0.RData")
+
+df_cwd_lue0_SIF <- df %>% 
+  dplyr::select(lon, lat, cwd_lue0_SIF)
+save(df_cwd_lue0_SIF, file = "data/df_cwd_lue0_SIF.RData")
+
+df_cwd_lue0_nSIF <- df %>% 
+  dplyr::select(lon, lat, cwd_lue0_nSIF) 
+save(df_cwd_lue0_nSIF, file = "data/df_cwd_lue0_nSIF.RData")
+
+df_df_flue_SIF <- df %>% 
+  dplyr::select(lon, lat, df_flue_SIF)
+save(df_df_flue_SIF, file = "data/df_df_flue_SIF.RData")
+
+df_df_flue_nSIF <- df %>% 
+  dplyr::select(lon, lat, df_flue_nSIF)
+save(df_df_flue_nSIF, file = "data/df_df_flue_nSIF.RData")
+
+rm("df")
 ```
+
+Load files after they're written.
+```{r}
+load("data/df_cwd_lue0_SIF.RData")
+load("data/df_cwd_lue0_nSIF.RData")
+load("data/df_df_flue_SIF.RData")
+load("data/df_df_flue_nSIF.RData")
+```
+
+Regional hi-res plots.
+```{r}
+## central asia SIF
+gg <- df_cwd_lue0_SIF %>% 
+  plot_map3(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Maximum cumulative water deficit", subtitle = "Estimated by dSIF") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwd_lue0_SIF_casia.pdf", width = 10, height = 6)
+
+## central asia nSIF
+gg <- df_cwd_lue0_nSIF %>% 
+  plot_map3(varnam = "cwd_lue0_nSIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Maximum cumulative water deficit", subtitle = "Estimated by dnSIF") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwd_lue0_nSIF_casia.pdf", width = 10, height = 6)
+```
+
+
+### Regrid and map
 
 Convert to nc object and write to file.
 ```{r}
 ## SIF
-nc <- df_to_grid(df, varnam = "cwd_lue0_SIF", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwd_lue0_SIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwd_lue0_SIF.nc", make_zdim = FALSE)
+nc <- df_to_grid(df_cwd_lue0_SIF, varnam = "cwd_lue0_SIF", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwd_lue0_SIF", lon = df_cwd_lue0_SIF$lon %>% unique() %>% sort(), lat = df_cwd_lue0_SIF$lat %>% unique() %>% sort(), path = "data/cwd_lue0_SIF.nc", make_zdim = FALSE)
 
 ## nSIF
-nc <- df_to_grid(df, varnam = "cwd_lue0_nSIF", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwd_lue0_nSIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwd_lue0_nSIF.nc", make_zdim = FALSE)
+nc <- df_to_grid(df_cwd_lue0_nSIF, varnam = "cwd_lue0_nSIF", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "cwd_lue0_nSIF", lon = df_cwd_lue0_nSIF$lon %>% unique() %>% sort(), lat = df_cwd_lue0_nSIF$lat %>% unique() %>% sort(), path = "data/cwd_lue0_nSIF.nc", make_zdim = FALSE)
 
-## lambda_decay_SIF
-nc <- df_to_grid(df, varnam = "lambda_decay_SIF", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "lambda_decay_SIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/lambda_decay_SIF.nc", make_zdim = FALSE)
-
-## lambda_decay_nSIF
-nc <- df_to_grid(df, varnam = "lambda_decay_nSIF", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "lambda_decay_nSIF", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/lambda_decay_nSIF.nc", make_zdim = FALSE)
+# ## lambda_decay_SIF
+# nc <- df_to_grid(df_cwd_lue0_SIF, varnam = "lambda_decay_SIF", lonnam = "lon", latnam = "lat")
+# write_nc2(nc, varnams = "lambda_decay_SIF", lon = df_cwd_lue0_SIF$lon %>% unique() %>% sort(), lat = df_cwd_lue0_SIF$lat %>% unique() %>% sort(), path = "data/lambda_decay_SIF.nc", make_zdim = FALSE)
+# 
+# ## lambda_decay_nSIF
+# nc <- df_to_grid(df_cwd_lue0_nSIF, varnam = "lambda_decay_nSIF", lonnam = "lon", latnam = "lat")
+# write_nc2(nc, varnams = "lambda_decay_nSIF", lon = df_cwd_lue0_nSIF$lon %>% unique() %>% sort(), lat = df_cwd_lue0_nSIF$lat %>% unique() %>% sort(), path = "data/lambda_decay_nSIF.nc", make_zdim = FALSE)
 ```
 
 Regrid to 0.5 deg
 ```{r}
 system("cdo remapbil,gridfile_halfdeg.txt data/cwd_lue0_SIF.nc data/cwd_lue0_SIF_halfdeg.nc")
 system("cdo remapbil,gridfile_halfdeg.txt data/cwd_lue0_nSIF.nc data/cwd_lue0_nSIF_halfdeg.nc")
-system("cdo remapbil,gridfile_halfdeg.txt data/lambda_decay_SIF.nc data/lambda_decay_SIF_halfdeg.nc")
-system("cdo remapbil,gridfile_halfdeg.txt data/lambda_decay_nSIF.nc data/lambda_decay_nSIF_halfdeg.nc")
+# system("cdo remapbil,gridfile_halfdeg.txt data/lambda_decay_SIF.nc data/lambda_decay_SIF_halfdeg.nc")
+# system("cdo remapbil,gridfile_halfdeg.txt data/lambda_decay_nSIF.nc data/lambda_decay_nSIF_halfdeg.nc")
 ```
 
 Read half-degree global file and plot.
 ```{r}
 ## SIF
 nc_halfdeg <- read_nc_onefile("data/cwd_lue0_SIF_halfdeg.nc", varnam = "cwd_lue0_SIF")
-plot_map3(nc_halfdeg, varnam = "cwd_lue0_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000)
+gg <- plot_map3(nc_halfdeg, varnam = "cwd_lue0_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::viridis, legend_title = "(mm)")
+gg$ggmap <- gg$ggmap + 
+  labs(title = expression(paste(italic("S")[dSIF])))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwd_lue0_SIF.pdf", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_SIF.png", width = 10, height = 6)
 
 ## nSIF
 nc_halfdeg <- read_nc_onefile("data/cwd_lue0_nSIF_halfdeg.nc", varnam = "cwd_lue0_nSIF")
-plot_map3(nc_halfdeg, varnam = "cwd_lue0_nSIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000)
+gg <- plot_map3(nc_halfdeg, varnam = "cwd_lue0_nSIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::viridis, legend_title = "(mm)")
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Maximum cumulative water deficit", subtitle = "Estimated by dSIF")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwd_lue0_nSIF.pdf", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_nSIF.png", width = 10, height = 6)
 
-## lambda_decay_SIF
-nc_halfdeg <- read_nc_onefile("data/lambda_decay_SIF_halfdeg.nc", varnam = "lambda_decay_SIF")
-plot_map3(nc_halfdeg, varnam = "lambda_decay_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000)
-ggsave("fig/map_lambda_decay_SIF.pdf", width = 10, height = 6)
-
-## lambda_decay_nSIF
-nc_halfdeg <- read_nc_onefile("data/lambda_decay_nSIF_halfdeg.nc", varnam = "lambda_decay_nSIF")
-plot_map3(nc_halfdeg, varnam = "lambda_decay_nSIF", breaks = -(c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf)), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000)
-ggsave("fig/map_lambda_decay_nSIF.pdf", width = 10, height = 6)
+# ## lambda_decay_SIF
+# nc_halfdeg <- read_nc_onefile("data/lambda_decay_SIF_halfdeg.nc", varnam = "lambda_decay_SIF")
+# plot_map3(nc_halfdeg, varnam = "lambda_decay_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
+#           spacing = "constant", maxval = 6000)
+# ggsave("fig/map_lambda_decay_SIF.pdf", width = 10, height = 6)
+# 
+# ## lambda_decay_nSIF
+# nc_halfdeg <- read_nc_onefile("data/lambda_decay_nSIF_halfdeg.nc", varnam = "lambda_decay_nSIF")
+# plot_map3(nc_halfdeg, varnam = "lambda_decay_nSIF", breaks = -(c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf)), latmin = -55, latmax = 80,
+#           spacing = "constant", maxval = 6000)
+# ggsave("fig/map_lambda_decay_nSIF.pdf", width = 10, height = 6)
 ```
 
+
+### Correlation with CWDX
+
 Plot correlation at global scale.
+
+#### Low resolution.
 ```{r}
-
-
-df_corr <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>% 
+df_corr_sif_lores <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>% 
   nc_to_df(varnam = "cwdx20") %>% 
   rename(cwdx20 = myvar) %>% 
+  left_join(
+    read_nc_onefile("data/cwdx40_halfdeg.nc", varnam = "cwdx40") %>% 
+      nc_to_df(varnam = "cwdx40") %>% 
+      rename(cwdx40 = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    read_nc_onefile("data/cwdx200_halfdeg.nc", varnam = "cwdx200") %>% 
+      nc_to_df(varnam = "cwdx200") %>% 
+      rename(cwdx200 = myvar),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    read_nc_onefile("data/cwdx100_halfdeg.nc", varnam = "cwdx100") %>% 
+      nc_to_df(varnam = "cwdx100") %>% 
+      rename(cwdx100 = myvar),
+    by = c("lon", "lat")
+  ) %>% 
   left_join(
     read_nc_onefile("data/cwd_lue0_SIF_halfdeg.nc", varnam = "cwd_lue0_SIF") %>% 
       nc_to_df(varnam = "cwd_lue0_SIF") %>% 
@@ -1646,19 +1678,129 @@ df_corr <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>%
     by = c("lon", "lat")
   )
 
-out <- df_corr %>% 
-  filter(cwdx20 < 1000 & cwd_lue0_SIF < 1000) %>% # TEST XXX
-  analyse_modobs2("cwdx20", "cwd_lue0_SIF", type = "heat")
+out <- df_corr_sif_lores %>% 
+  mutate(cwd_lue0_SIF = remove_outliers(cwd_lue0_SIF, coef = 1.5)) %>% 
+  filter(cwdx100 < 1000 & cwd_lue0_SIF < 1000) %>% # TEST XXX
+  analyse_modobs2("cwdx40", "cwd_lue0_SIF", type = "density")
 out$gg
 
-df_corr %>% 
+df_corr_sif_lores %>% 
   filter(cwdx20 < 1000 & cwd_lue0_nSIF < 1000) %>% # TEST XXX
-  analyse_modobs2("cwdx20", "cwd_lue0_nSIF", type = "heat")
+  mutate(cwd_lue0_nSIF = remove_outliers(cwd_lue0_nSIF, coef = 1.5)) %>% 
+  analyse_modobs2("cwdx40", "cwd_lue0_nSIF", type = "density")
 
-df_corr %>% 
-  filter(cwdx20 > -1000 & lambda_decay_nSIF > -1000) %>% # TEST XXX
-  analyse_modobs2("cwdx20", "lambda_decay_nSIF", type = "heat")
+df_corr_sif_lores %>% 
+  mutate(lambda_decay_nSIF = -remove_outliers(lambda_decay_nSIF, coef = 1.5)) %>% 
+  filter(cwdx20 < 1000 & cwd_lue0_nSIF < 1000) %>% # TEST XXX
+  analyse_modobs2("cwdx40", "lambda_decay_nSIF", type = "density")
 ```
+
+#### High resolution.
+
+```{r}
+df_corr_sif_hires <- df_cwdx %>% 
+  left_join(
+    df_cwd_lue0 %>% 
+      dplyr::select(lon, lat, cwd_lue0_SIF, cwd_lue0_nSIF),
+    by = c("lon", "lat")
+  )
+
+out <- df_corr_sif_hires %>% 
+  mutate(cwd_lue0_SIF = remove_outliers(cwd_lue0_SIF, coef = 10)) %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_SIF", type = "hex", plot_linmod = FALSE)
+out$gg +
+  scale_x_continuous(expand = c(0,0), limits = c(0,500)) + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,500))
+
+out <- df_corr_sif_hires %>% 
+  mutate(cwd_lue0_nSIF = remove_outliers(cwd_lue0_nSIF, coef = 10)) %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_nSIF", type = "hex", plot_linmod = FALSE)
+out$gg +
+  scale_x_continuous(expand = c(0,0), limits = c(0,500)) + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,500))
+```
+
+### Clusters
+
+```{r}
+load("data/df_df_flue_SIF.RData")
+load("data/df_cwd_lue0_SIF.RData")
+
+df_cluster_SIF <- df_df_flue_SIF %>% 
+  left_join(df_cwd_lue0_SIF, by = c("lon", "lat")) %>% 
+  drop_na(cwd_lue0_SIF) %>% 
+  # slice_sample(prop = 0.01) %>% 
+  dplyr::select(-cwd_lue0_SIF) %>% 
+  mutate(n_row = map_int(df_flue_SIF, ~nrow(.))) %>% 
+  dplyr::filter(n_row == 5) %>% 
+  mutate(df_flue_SIF = purrr::map(df_flue_SIF, ~mutate(., bin = paste0("b", seq(5))))) %>% 
+  dplyr::select(lon, lat, df_flue_SIF) %>% 
+  unnest(df_flue_SIF) %>% 
+  pivot_wider(names_from = bin, values_from = flue) %>% 
+  drop_na()
+
+
+## not clear how many is optimal
+out_kmeans <- map(as.list(2:10), ~kmeans(dplyr::select(df_cluster_SIF, starts_with("b")), centers = .))
+out_kmeans %>% 
+  map("withinss") %>% 
+  map_dbl(~sum(.)) %>% 
+  tibble(n_clusters = 2:10, sum_within_ss = .) %>% 
+  ggplot(aes(x = n_clusters, y = sum_within_ss)) +
+  geom_point()
+
+ggsave("fig/clusters_SIF_sumwithinss.pdf", width = 6, height = 4)
+
+out <- kmeans(dplyr::select(df_cluster_SIF, starts_with("b")), centers = 3)
+
+df_cluster_SIF$cluster <- out$cluster
+save(df_cluster_SIF, file = "data/df_cluster_SIF.RData")
+
+out$centers %>% 
+  as_tibble() %>%
+  mutate(cluster = paste0("c", 1:n())) %>% 
+  pivot_longer(cols = starts_with("b"), names_to = "bin", values_to = "flue", names_prefix = "b") %>% 
+  ggplot(aes(x = bin, y = flue, color = cluster)) +
+  geom_point(size = 2) +
+  ylim(0.4,1)
+
+ggsave("fig/clusters_SIF.pdf", width = 6, height = 4)
+```
+
+Plot cluster.
+```{r}
+## central asia
+gg <- df_cluster_SIF %>% 
+  plot_map3(varnam = "cluster", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = 0:3,
+            spacing = "constant",
+            combine = FALSE,
+            colorscale = wesanderson::wes_palette(n=3, name="Darjeeling1")
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Cluster") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_clusters_casia.pdf", width = 15, height = 10)
+
+## western usa
+gg <- df_cluster_SIF %>% 
+  plot_map3(varnam = "cluster", 
+            lonmin = -125, lonmax = -90, latmin = 32.5, latmax = 47, 
+            breaks = 0:3,
+            spacing = "constant", 
+            colorscale = wesanderson::wes_palette(n=3, name="Darjeeling1"),
+            combine = FALSE
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "Cluster") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_clusters_wusa.pdf", width = 20, height = 10)
+```
+
 
 ### Site-level
 
@@ -1789,13 +1931,31 @@ Approach is to derive CWD(ET/Rn=0) for estimating CWDX.
 
 Run script that wraps `calc_cwd_et0_byilon()` and `calc_cwd_et0()` (submission file: `submit_calc_cwd_et0.sh`). Collects CWD data (including instances), net radiation, and ET data into one data frame per pixel and determines sensitivity (linear regression slope) of ET/Rn vs. CWD. Also determines fractional reduction in ET/Rn in highest CWD bin (using function `get_fet_cwdmax()`).
 
-Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's huge.
+Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's huge, therefore split them up and re-write smaller files.
 ```{r}
 load("data/df_cwd_et0.RData")
 
-df <- df %>% 
-  dplyr::select(lon, lat, cwd_lue0_et, cwd_lue0_fet, s0_teuling_et)
-save(df, file = "data/df_sub_cwd_et0.RData")
+df_cwd_lue0_et <- df %>% 
+  dplyr::select(lon, lat, cwd_lue0_et)
+save(df_cwd_lue0_et, file = "data/df_cwd_lue0_et.RData")
+
+df_cwd_lue0_fet <- df %>% 
+  dplyr::select(lon, lat, cwd_lue0_fet)
+save(df_cwd_lue0_fet, file = "data/df_cwd_lue0_fet.RData")
+
+df_s0_teuling_et <- df %>% 
+  dplyr::select(lon, lat, s0_teuling_et)
+save(df_s0_teuling_et, file = "data/df_s0_teuling_et.RData")
+
+df_df_flue_et <- df %>% 
+  dplyr::select(lon, lat, df_flue_et)
+save(df_df_flue_et, file = "data/df_df_flue_et.RData")
+
+df_df_flue_fet <- df %>% 
+  dplyr::select(lon, lat, df_flue_fet)
+save(df_df_flue_fet, file = "data/df_df_flue_fet.RData")
+
+rm("df")
 ```
 
 Convert to nc object and write to file.
@@ -1809,7 +1969,7 @@ nc <- df_to_grid(df, varnam = "cwd_lue0_fet", lonnam = "lon", latnam = "lat")
 write_nc2(nc, varnams = "cwd_lue0_fet", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/cwd_lue0_fet.nc", make_zdim = FALSE)
 
 ## s0_teuling_et
-nc <- df_to_grid(df %>% dplyr::select(lon, lat, s0_teuling_et), varnam = "s0_teuling_et", lonnam = "lon", latnam = "lat")
+nc <- df_to_grid(df %>% mutate(s0_teuling_et = remove_outliers(s0_teuling_et, coef = 10)), varnam = "s0_teuling_et", lonnam = "lon", latnam = "lat")
 write_nc2(nc, varnams = "s0_teuling_et", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/s0_teuling_et.nc", make_zdim = FALSE)
 ```
 
@@ -1836,12 +1996,48 @@ ggsave("fig/map_cwd_lue0_fet.pdf", width = 10, height = 6)
 
 ## s0_teuling_et
 nc_halfdeg <- read_nc_onefile("data/s0_teuling_et_halfdeg.nc", varnam = "s0_teuling_et")
-plot_map3(nc_halfdeg, varnam = "s0_teuling_et", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000)
+plot_map3(nc_halfdeg, varnam = "s0_teuling_et", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf)*10, latmin = -55, latmax = 80,
+          spacing = "constant", maxval = 20000)
 ggsave("fig/map_s0_teuling_et.pdf", width = 10, height = 6)
 ```
 
+Regional hi-res plots.
+```{r}
+## central asia
+gg <- df %>% 
+  plot_map3(varnam = "cwd_lue0_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "CWD at ET/Rn = 0") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwd_lue0_fet_casia.pdf", width = 15, height = 10)
+
+## central asia
+gg <- df %>% 
+  plot_map3(varnam = "s0_teuling_et", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 1000, Inf) * 10, 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = "S0 after Teuling et al.") +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_s0_teuling_et_casia.pdf", width = 15, height = 10)
+```
+
+
 Plot correlation at global scale.
+
+Coarse resolution.
 ```{r}
 df_corr <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>% 
   nc_to_df(varnam = "cwdx20") %>% 
@@ -1879,4 +2075,33 @@ df_corr %>%
   analyse_modobs2("cwdx20", "s0_teuling_et", type = "heat")
 ```
 
+At high resolution.
+```{r}
+df_corr <- df_cwdx %>% 
+  left_join(
+    df %>% 
+      dplyr::select(lon, lat, cwd_lue0_et, cwd_lue0_fet, s0_teuling_et),
+    by = c("lon", "lat")
+  )
 
+out <- df_corr %>% 
+  mutate(cwd_lue0_et = remove_outliers(cwd_lue0_et, coef = 5)) %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_et", type = "hex", plot_linmod = FALSE)
+out$gg +
+  scale_x_continuous(expand = c(0,0), limits = c(0,100)) + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,100))
+
+out <- df_corr %>% 
+  mutate(cwd_lue0_fet = remove_outliers(cwd_lue0_fet, coef = 5)) %>% 
+  analyse_modobs2("cwdx20", "cwd_lue0_fet", type = "hex", plot_linmod = FALSE)
+out$gg +
+  scale_x_continuous(expand = c(0,0), limits = c(0,100)) + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,100))
+
+# out <- df_corr %>% 
+#   mutate(cwd_lue0_et = remove_outliers(cwd_lue0_et, coef = 5)) %>% 
+#   analyse_modobs2("s0_teuling_et", "cwd_lue0_et", type = "hex", plot_linmod = FALSE)
+# out$gg +
+#   scale_x_continuous(expand = c(0,0), limits = c(0,1000)) + 
+#   scale_y_continuous(expand = c(0,0), limits = c(0,100))
+```
