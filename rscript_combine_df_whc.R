@@ -27,19 +27,28 @@ if (ncores > 1){
     dplyr::mutate(out = purrr::map( ifil,
                                     ~extract_whc_byfil(.))) %>% 
     collect() %>% 
-    bind_rows() %>% 
-    dplyr::select(out) %>% 
-    tidyr::unnest(out)
+    bind_rows()
   
 } else {
   
   ## testing
   df_whc <- purrr::map(as.list(filelist), 
                        ~extract_whc_byfil(.)) %>% 
-    bind_rows() %>% 
-    dplyr::select(out) %>% 
-    tidyr::unnest(out)
+    bind_rows()
   
 }
 
 save(df_whc, file = "~/data/mct_data/df_whc_hires.RData")
+
+
+## test plot
+gg <- df_whc %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+  plot_map3(varnam = "whc_top", lonmin = -80, lonmax = -60, latmin = -60, latmax = -35, 
+            breaks = c(seq(0, 0.4, by = 0.05), 0.8, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::magma
+  )
+gg$ggmap <- gg$ggmap + labs(title = "WHC", subtitle = "Topsoil, fraction")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
