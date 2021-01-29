@@ -17,7 +17,10 @@ library(tidyr)
 library(rbeni)
 library(raster)
 library(tibble)
+library(ingestr)
 library(ggplot2)
+library(ggridges)
+library(ggrepel)
 ```
 
 The data is downloaded from the google spreadsheet [RSIP Working Copy](https://docs.google.com/spreadsheets/d/1IW7CiLaw2xEr3MYuLwZ5mJWEbhAEU_hP9J6od5vb-jk/edit#gid=1200594845), tab 'Analysis sheet', into a CSV (19.9.2019) and saved as `data/RSIP_Analysis_sheet.csv`.
@@ -118,82 +121,204 @@ df_agg %>%
 
 ### Global map
 ```{r}
-gg <- plot_map2(
+gg <- plot_map3(
   df_agg %>% 
     ungroup %>% 
     dplyr::filter(n_Dr > 2) %>% 
     dplyr::rename(lon = lon_mid, lat = lat_mid) %>%
     dplyr::select(lon, lat, median_Dr),
-  breaks = seq(from = 0, to = 15, length.out = 11),
-  maxval = 125
+  breaks = c(seq(0, 1000, by = 200), 1500, 2000, 3000, 5000, 7000, 10000, 15000, 20000, Inf)/1000, 
+  latmin = -55, latmax = 75,
+  spacing = "constant", 
+  colorscale = viridis::magma,
+  combine = FALSE,
+  legend_title = "(m)"
   )
-gg
-#ggsave("fig/test.pdf", width = 10, height = 8)
+gg$ggmap <- gg$ggmap + labs(title = "Rooting depth", subtitle = "RSIP data binned to 5 degrees gridcells")
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_zroot_rsip.pdf", width = 10, height = 6)
+ggsave("fig/map_zroot_rsip.png", width = 10, height = 6)
 ```
 
 ## Analyse by biome
 
 This doesn't seem to work. For almost all the points given in `df` with their `lat` and `lon`, there is no biome information in the raster file. 
 
-First, extract biome information from NCRS biome map.
+First, extract biome information from WWF and NCRS biome map.
+```{r eval=FALSE}
+## add WWF biome info
+df_wwf <- ingest(
+  df %>% 
+    dplyr::select(sitename = id, lon, lat),
+  source = "wwf",
+  dir = "~/data/biomes/wwf_ecoregions/official/",
+  settings = list(layer = "wwf_terr_ecos")
+  )%>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  unnest(data)
+
+save(df_wwf, file = "data/df_wwf.RData")
+```
+
 ```{r}
-source("R/add_biome_ncrs.R")
-df <- add_biome_ncrs(
-  df, 
-  path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
+load("data/df_wwf.RData")
+
+df <- df %>% 
+  left_join(
+    df_wwf %>% 
+      dplyr::select(id = sitename, biome = BIOME, biome_name = BIOME_NAME),
+    by = "id"
   )
 
-df_agg <- add_biome_ncrs(
-  df_agg %>% rename(lon = lon_mid, lat = lat_mid), 
-  path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
-  )
+
+# source("R/add_biome_ncrs.R")
+# df <- add_biome_ncrs(
+#   df, 
+#   path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
+#   )
+# 
+# df_agg <- add_biome_ncrs(
+#   df_agg %>% rename(lon = lon_mid, lat = lat_mid), 
+#   path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif"
+#   )
 ```
 
 Plot data by biomes: Individual-level data
 ```{r}
 df %>% 
-  ggplot(aes(x = biome_ncrs_chr, y = -Dr)) +
-  # geom_boxplot() +
-  geom_violin() +
-  theme(axis.text.x = element_text(angle=90, hjust=1))
+  ggplot(aes(x = as.factor(biome_name), y = -Dr)) +
+  geom_boxplot() +
+  # geom_violin() +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  ylim(-10,0)
+
+ggsave("fig/zroot_biomes_rsip.pdf", height = 10, width = 10)
 ```
 
 ## Add model results
 
 ```{r}
-load("./data/df_20y_bl_v3.Rdata") # loading df_20y_bl_v3
-df_20y_bl_v3 <- df_20y_bl_v3 %>% 
-  add_biome_ncrs(path = "/alphadata01/bstocker/data/biomes/NCRS/global_biomes_geotiff/biomes.tif")
+df <- extract_nc(df %>%dplyr::select(id, lon, lat), "data/zroot_cwd40.nc") %>% 
+  unnest(data) %>% 
+  rename(zroot_cwdx40 = V1) %>% 
+  mutate(zroot_cwdx40 = zroot_cwdx40 / 1000) %>% 
+  right_join(df, by = c("lon", "lat", "id"))
+```
 
-# df_20y_bl_v3 %>% 
-#   ggplot(aes(x = biome_ncrs_chr, y = -zroot/10000)) +
-#   # geom_boxplot() +
-#   geom_violin() +
-#   theme(axis.text.x = element_text(angle=90, hjust=1))
+## Plots
 
+```{r}
+## boxplot
 df %>% 
-  dplyr::select(biome_ncrs_chr, zroot = Dr) %>% 
-  mutate(source = "obs") %>% 
-  bind_rows(
-    df_20y_bl_v3 %>% 
-      dplyr::select(biome_ncrs_chr, zroot) %>% 
-      mutate(zroot = zroot/10000, source = "mod")
-    ) %>% 
-  ggplot(aes(x = biome_ncrs_chr, y = -zroot, fill = source, color = source)) +
+  rename(obs = Dr, mod = zroot_cwdx40) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, y = -zroot, fill = source)) +
   geom_boxplot() +
   # geom_violin() +
   # geom_bar(stat = "summary", fun.ymax = "max", position=position_dodge()) +
   theme(axis.text.x = element_text(angle=90, hjust=1))
 
+## barplot
 df %>% 
-  dplyr::select(biome_ncrs_chr, zroot = Dr) %>% 
-  mutate(source = "obs") %>% 
-  bind_rows(
-    df_20y_bl_v3 %>% 
-      dplyr::select(biome_ncrs_chr, zroot) %>% 
-      mutate(zroot = zroot/10000, source = "mod")
-    ) %>% 
-  ggplot(aes(x = biome_ncrs_chr, fill = source, color = source)) +
+  rename(obs = Dr, mod = zroot_cwdx40) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, fill = source)) +
   stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.01), geom = "bar", position=position_dodge()) +
   theme(axis.text.x = element_text(angle=90, hjust=1))
+
+## ridge plot
+biome_exclude <- df %>% 
+  group_by(biome_name) %>% 
+  summarise(count = n()) %>% 
+  dplyr::filter(count < 3) %>% 
+  pull(biome_name)
+
+df %>% 
+  dplyr::filter(!(biome_name %in% biome_exclude)) %>% 
+  rename(obs = Dr, mod = zroot_cwdx40) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_name)) %>% 
+  dplyr::filter(biome_name!="Mangroves") %>%   
+  ggplot(aes(x = zroot, y = biome_name, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0), name = "") +
+  scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX40]), "Observed"), name = "") +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  labs(title = expression("Rooting depth, RSIP data")) +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip.pdf", width = 15, height = 10)
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip.png", width = 15, height = 10)
+```
+
+Quantiles
+```{r}
+df_biome <- df %>% 
+  group_by(biome_name) %>% 
+  summarise(q10_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.1, na.rm = TRUE),
+            q25_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.25, na.rm = TRUE),
+            q50_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.5, na.rm = TRUE),
+            q75_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.75, na.rm = TRUE),
+            q90_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.9, na.rm = TRUE),
+            
+            q10_zroot_obs = quantile(Dr, probs = 0.1, na.rm = TRUE),
+            q25_zroot_obs = quantile(Dr, probs = 0.25, na.rm = TRUE),
+            q50_zroot_obs = quantile(Dr, probs = 0.5, na.rm = TRUE),
+            q75_zroot_obs = quantile(Dr, probs = 0.75, na.rm = TRUE),
+            q90_zroot_obs = quantile(Dr, probs = 0.9, na.rm = TRUE)
+            )
+
+out <- df_biome %>% 
+  analyse_modobs2("q10_zroot_cwdx40", "q10_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+gg_rsip_10 <- out$gg + labs(title = "10% quantile by biome, RSIP data",
+              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
+gg_rsip_10
+save(gg_rsip_10, file = "data/gg_rsip_10.RData")
+
+out <- df_biome %>% 
+  analyse_modobs2("q25_zroot_cwdx40", "q25_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+gg_rsip_25 <- out$gg + labs(title = "25% quantile by biome, RSIP data",
+              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
+gg_rsip_25
+save(gg_rsip_25, file = "data/gg_rsip_25.RData")
+
+out <- df_biome %>% 
+  analyse_modobs2("q50_zroot_cwdx40", "q50_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+gg_rsip_50 <- out$gg + labs(title = "50% quantile by biome, RSIP data",
+              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
+gg_rsip_50
+save(gg_rsip_50, file = "data/gg_rsip_50.RData")
+ggsave("fig/modobs_zroot_q90_rsip.pdf", width = 6, height = 5)
+
+out <- df_biome %>% 
+  analyse_modobs2("q75_zroot_cwdx40", "q75_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+gg_rsip_75 <- out$gg + labs(title = "75% quantile by biome, RSIP data",
+              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
+gg_rsip_75
+save(gg_rsip_75, file = "data/gg_rsip_75.RData")
+
+out <- df_biome %>% 
+  analyse_modobs2("q90_zroot_cwdx40", "q90_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+gg_rsip_90 <- out$gg + labs(title = "90% quantile by biome, RSIP data",
+              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
+gg_rsip_90
+save(gg_rsip_90, file = "data/gg_rsip_90.RData")
 ```
