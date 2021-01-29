@@ -2340,7 +2340,7 @@ Correlation plots for different return periods with SIF.
 out <- df_corr %>% 
   dplyr::filter(forest) %>% 
   mutate(cwd_lue0_SIF = remove_outliers(cwd_lue0_SIF, coef = 10)) %>% 
-  rbeni::analyse_modobs2("cwdx10", "cwd_lue0_SIF", type = "hex", plot_linmod = FALSE)
+  analyse_modobs2("cwdx10", "cwd_lue0_SIF", type = "density", plot_linmod = FALSE)
 out$gg +
   scale_x_continuous(expand = c(0,0), limits = c(0,500)) + 
   scale_y_continuous(expand = c(0,0), limits = c(0,500)) +
