@@ -1928,8 +1928,8 @@ save(df_cluster_SIF, file = "data/df_cluster_SIF.RData")
 
 ## prescribed number of clusters
 set.seed(1982)
-out <- kmeans(dplyr::select(df_cluster_SIF, starts_with("b")), centers = 3)
-df_cluster_SIF$cluster_3 <- out$cluster
+out <- kmeans(dplyr::select(df_cluster_SIF, starts_with("b")), centers = 2)
+df_cluster_SIF$cluster_2 <- out$cluster
 save(df_cluster_SIF, file = "data/df_cluster_SIF.RData")
 
 out$centers %>% 
@@ -1948,11 +1948,11 @@ Plot cluster.
 ```{r}
 ## central asia
 gg <- df_cluster_SIF %>% 
-  plot_map3(varnam = "cluster_3", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = 0:3,
+  plot_map3(varnam = "cluster_2", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = 0:2,
             spacing = "constant",
             combine = FALSE,
-            colorscale = wesanderson::wes_palette(n=3, name="Darjeeling1")
+            colorscale = wesanderson::wes_palette(n=2, name="Darjeeling1")
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = "Cluster") +
@@ -2699,7 +2699,7 @@ summary(linmod3)
 linmod4 <- lm(cwd_lue0_SIF_log ~ cwdx40_log, data = df_sub)
 summary(linmod4)
 
-linmod2 <- lm(cwd_lue0_SIF_log ~ cwdx40 + gti + wtd + factor(forest), data = df_sub)
+linmod2 <- lm(cwd_lue0_SIF_log ~ cwdx40, data = df_sub)
 summary(linmod2)
 
 ## with caret
