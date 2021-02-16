@@ -1,4 +1,4 @@
-calc_cwd_lue0_byilon <- function(ilon){
+calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_lue0"){
   
   source("R/calc_cwd_lue0.R")
 
@@ -7,10 +7,9 @@ calc_cwd_lue0_byilon <- function(ilon){
   }
   
   ## construct output file name
-  dirn <- "~/mct/data/df_cwd_lue0/"
   filn <- paste0("df_cwd_lue0_", ilon, ".RData")
-  if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_cwd_lue0")
-  path <- paste0(dirn, filn)
+  if (!dir.exists(dirn)) system(paste0("mkdir -p ", dirn))
+  path <- paste0(dirn, "/", filn)
   
   if (!file.exists(path)){
     
@@ -60,11 +59,6 @@ calc_cwd_lue0_byilon <- function(ilon){
     filn <- paste0("GOME_JJ_dcSIF_005deg_8day__ilon_", ilon, ".RData")
     dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
     load(paste0(dirn, filn)) # loads 'df'
-    
-#     ## some are a list - awkwardly
-#     if (class(df) == "list" && length(df) == 0){
-#       system(paste0("Rscript --vanilla rscript_get_data_sif_jj.R ", ilon, " 7200"))
-#     }
     
     df <- df %>% 
       
@@ -121,11 +115,14 @@ calc_cwd_lue0_byilon <- function(ilon){
       mutate(flue_nSIF = purrr::map_dbl(out_lue0_nSIF, "flue")) %>%
       mutate(lambda_decay_nSIF = purrr::map_dbl(out_lue0_nSIF, "lambda_decay")) %>%
       mutate(df_flue_nSIF = purrr::map(out_lue0_nSIF, "df_flue")) %>%
-      dplyr::select(-out_lue0_nSIF) %>%
-      
-      ## drop data again
-      dplyr::select(-data, -data_inst)
+      dplyr::select(-out_lue0_nSIF)
     
+    if (drop_data){
+      ## drop data again
+      df <- df %>% 
+        dplyr::select(-data, -data_inst)
+    }
+
     ## write to file
     print(paste("Writing file:", path))
     save(df, file = path)  

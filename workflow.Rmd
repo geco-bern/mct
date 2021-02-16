@@ -32,44 +32,66 @@ library(ggridges)
 
 This workflow can be applied irrespective of the site set or global gridcells. Just need a "grid data frame".
 
-1. **Get site/grid meta info** → data frame with all meta info variables as separate columns
-    - elevation
-        - Site scale: data or ETOPO1
-        - Global: WFDEI
-    - soil texture, derive WHC top and bottom, and record obstacles to root used in function `calc_zroot.R`
-        - Site scale: HWSD
-        - Global: HWSD-Wieder
-    - WTD, Fan et al.
-        - Site scale: Hi-res Fan
-        - Global: Lo-res Fan
-    - Biome, WWF, NSCP?
-        - Site scale: WWF, extract from shapefile
-        - Global: rasterize WWF data?
-2. **Extract data**, `rscript_get_data.R`  → separate data frames for each data source, rows: site/gridcell, column: nested data, data: ET (W m-2), prec, snow, temp, elevation; large data! need to separate data frames by chunks for global analyses
-    - ALEXI
-    - WATCH
-    - SIF
-    - GLASS net radiation
-3. **Convert units, complement, reduce** → Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
-    - ET to mm (done in step 1)
-    - Snow water balance
-4. **CWD events**, `mct2.R`  → list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
-    - Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
-5. **Water deficit extremes CWDX** (maximum event with N year return period), `get_plantwhc_mct_bysite.R`  → data frame with return periods
-    - Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
-6. **Rooting depth z(CWDX)**, see `mct_sj02_simsuite.Rmd` → data frame with z(CWDX) for different return periods
-    - Use meta info prepared in step 1, including WTD  (Fan), see `mct_sj02_simsuite.Rmd`
-7. **Implied zroot using SiF: CWD(LUE=0)**, see `test_mct_bysite_alexi_fluxnet.R` 
-    - Use CWD events from step 3 and SiF from step 2
-8. **Implied zroot using Rn: CWD(fET=0)**, see `test_mct_bysite_alexi_fluxnet.R`
-    - Use CWD events from step 3 and GLASS net radiation from step 2
+1.  **Get site/grid meta info** → data frame with all meta info variables as separate columns
 
+    -   elevation
+
+        -   Site scale: data or ETOPO1
+        -   Global: WFDEI
+
+    -   soil texture, derive WHC top and bottom, and record obstacles to root used in function `calc_zroot.R`
+
+        -   Site scale: HWSD
+        -   Global: HWSD-Wieder
+
+    -   WTD, Fan et al.
+
+        -   Site scale: Hi-res Fan
+        -   Global: Lo-res Fan
+
+    -   Biome, WWF, NSCP?
+
+        -   Site scale: WWF, extract from shapefile
+        -   Global: rasterize WWF data?
+
+2.  **Extract data**, `rscript_get_data.R` → separate data frames for each data source, rows: site/gridcell, column: nested data, data: ET (W m-2), prec, snow, temp, elevation; large data! need to separate data frames by chunks for global analyses
+
+    -   ALEXI
+    -   WATCH
+    -   SIF
+    -   GLASS net radiation
+
+3.  **Convert units, complement, reduce** → Manipulates data frames prepared by step 2, reduced data frames with only 1 column: daily water balance (not cumulative!)
+
+    -   ET to mm (done in step 1)
+    -   Snow water balance
+
+4.  **CWD events**, `mct2.R` → list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
+
+    -   Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
+
+5.  **Water deficit extremes CWDX** (maximum event with N year return period), `get_plantwhc_mct_bysite.R` → data frame with return periods
+
+    -   Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
+
+6.  **Rooting depth z(CWDX)**, see `mct_sj02_simsuite.Rmd` → data frame with z(CWDX) for different return periods
+
+    -   Use meta info prepared in step 1, including WTD (Fan), see `mct_sj02_simsuite.Rmd`
+
+7.  **Implied zroot using SiF: CWD(LUE=0)**, see `test_mct_bysite_alexi_fluxnet.R`
+
+    -   Use CWD events from step 3 and SiF from step 2
+
+8.  **Implied zroot using Rn: CWD(fET=0)**, see `test_mct_bysite_alexi_fluxnet.R`
+
+    -   Use CWD events from step 3 and GLASS net radiation from step 2
 
 ## Settings
 
-The same overall workflow can be used for different site sets or for global simulations (treating each gridcell as a site). Depending on this scale, some data is read from different sources. 
+The same overall workflow can be used for different site sets or for global simulations (treating each gridcell as a site). Depending on this scale, some data is read from different sources.
 
 Define which set is used by uncommenting/commenting:
+
 ```{r}
 siteset <- "sj02"
 # siteset <- "global"
@@ -79,9 +101,10 @@ siteset <- "sj02"
 
 ## Meta info
 
-- Creates data frame with all meta info variables as separate columns.
+-   Creates data frame with all meta info variables as separate columns.
 
 Read site location and direct observation data.
+
 ```{r}
 if (siteset=="sj02"){
   ##----------------------------------------------
@@ -133,13 +156,15 @@ if (siteset=="sj02"){
 
 ### Elevation
 
-- Fills missing values in column `elv`.
-    - Site scale: data or ETOPO1
-    - Global: WFDEI
-    
+-   Fills missing values in column `elv`.
+
+    -   Site scale: data or ETOPO1
+    -   Global: WFDEI
+
 #### Global
 
 First, regrid ETOPO1 file and save as NetCDF (Done with `~/data/etopo/proc_etopo.R`). Then read it in.
+
 ```{r}
 df_elv <- nc_to_df(
   "~/data/etopo/ETOPO1_Bed_g_gef.tif_halfdeg.nc",
@@ -150,6 +175,7 @@ df_elv <- nc_to_df(
 #### Site-level
 
 Extract points from ETOPO1 GeoTIFF file and add to siteinfo.
+
 ```{r}
 library(ingestr)
 
@@ -182,16 +208,19 @@ if (siteset != "global"){
     mutate(elv = ifelse(is.na(elv), elv_etopo, elv)) %>% 
     dplyr::select(-elv_etopo)
 }
-```    
-    
-### Soil texture    
--  Derive WHC top and bottom, and record obstacles to root used in function `calc_zroot.R`. Adds columns `data_soiltext_top` and `data_soiltext_sub`.
-    - Site scale: HWSD
-    - Global: HWSD-Wieder
-    
+```
+
+### Soil texture
+
+-   Derive WHC top and bottom, and record obstacles to root used in function `calc_zroot.R`. Adds columns `data_soiltext_top` and `data_soiltext_sub`.
+
+    -   Site scale: HWSD
+    -   Global: HWSD-Wieder
+
 #### Global
 
-Get data from rasterized HWSD data by Wieder. Data frame has row for each gridcell and nested data frames in `data`,  containing columns `T_CLAY, T_GRAVEL, T_OC, T_SAND, S_CLAY, S_GRAVEL, S_OC, S_SAND, ROOTS, IL`
+Get data from rasterized HWSD data by Wieder. Data frame has row for each gridcell and nested data frames in `data`, containing columns `T_CLAY, T_GRAVEL, T_OC, T_SAND, S_CLAY, S_GRAVEL, S_OC, S_SAND, ROOTS, IL`
+
 ```{r}
 ## first get subsoil parameters
 df_hwsd <- rbeni::nc_to_df("~/data/soil/hwsd/hwsd_wieder/data/S_SAND.nc4", "S_SAND") %>% 
@@ -268,6 +297,7 @@ all_lon[1:3]
 ```
 
 Test plot.
+
 ```{r}
 ## load if it's not in the workspace yet
 load("data/df_hwsd_hires.RData")
@@ -294,10 +324,10 @@ ggsave("fig/map_T_SAND.pdf", width = 10, height = 6)
 
 For global simulations, get soil parameters using the R script `rscript_calc_soilparams.R` (with `submit_calc_soilparams.sh`) and combine files with `rscript_combine_df_whc.R`.
 
-
 #### Site-level
 
 Extract point data from shapefile using `ingestr::ingest()`.
+
 ```{r}
 if (siteset != "global"){
   ##----------------------------------------------
@@ -343,8 +373,8 @@ siteinfo <- siteinfo %>%
   left_join(df_whc, by = "sitename")
 ```
 
-
 For site-level simulations do:
+
 ```{r}
 load("data/df_hwsd_hires.RData")
 
@@ -365,12 +395,12 @@ df_whc <- df_hwsd %>%
 }
 ```
 
-
 ### WTD
 
-- Fan et al.
-    - Site scale: Hi-res Fan
-    - Global: Lo-res Fan
+-   Fan et al.
+
+    -   Site scale: Hi-res Fan
+    -   Global: Lo-res Fan
 
 ```{r}
 if (siteset != "global"){
@@ -400,13 +430,15 @@ siteinfo <- siteinfo %>%
 
 ### Biome
 
-- WWF, NSCP?
-    - Site scale: WWF, extract from shapefile
-    - Global: rasterize WWF data?
-    
+-   WWF, NSCP?
+
+    -   Site scale: WWF, extract from shapefile
+    -   Global: rasterize WWF data?
+
 #### Global
 
 Rasterize shapefile to high resolution global map.
+
 ```{r}
 library(rgdal)
 
@@ -437,7 +469,7 @@ writeRaster( rasta_biome, "~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_r
 ```
 
 #### Site-level
-    
+
 ```{r}
 if (siteset != "global"){
   ##----------------------------------------------
@@ -469,7 +501,7 @@ siteinfo <- siteinfo %>%
             by = "sitename"
             )
 ```
-    
+
 ### Save meta info
 
 ```{r}
@@ -483,14 +515,14 @@ load(filn)
 #   write_csv(path = filn)
 ```
 
-
 ## Extract data
 
-`rscript_get_data.R`  Creates separate data frames for each data source, rows: site/gridcell, column: nested data, data: ET (W m-2), prec, snow, temp, elevation; large data! need to separate data frames by chunks for global analyses
+`rscript_get_data.R` Creates separate data frames for each data source, rows: site/gridcell, column: nested data, data: ET (W m-2), prec, snow, temp, elevation; large data! need to separate data frames by chunks for global analyses
 
 ### ALEXI
 
 Test plot.
+
 ```{r}
 library(sf)
 library(raster)
@@ -590,57 +622,99 @@ if (!file.exists(filn)){
 `rscript_get_data_sif_jj.R` and `rscript_get_data_sif_pk.R`: Rearranging data from maps to time series data frames. Output is stored in `~/data/gome_2_sif_downscaled/data_tidy/`.
 
 <!-- ```{r} -->
+
 <!-- source("R/get_data_mct_global.R") # because this function is defined also in another source file - mess -->
+
 <!-- ##------------------------------------------------------------------------ -->
+
 <!-- ## SiF-downscaled from Duveiller -->
+
 <!-- ##------------------------------------------------------------------------ -->
+
 <!-- filn <- paste0("data/df_sif_", siteset, ".RData") -->
+
 <!-- filn_csv <- str_replace(filn, "Rdata", "csv") -->
+
 <!-- if (!file.exists(filn)){ -->
+
 <!--   if (!file.exists(filn_csv)){ -->
 
 <!--     ## version 'JJ'   -->
+
 <!--     df_sif_jj <- get_data_mct_global( -->
+
 <!--       df_grid, -->
+
 <!--       dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_JJ_dcSIF_005deg_8day_", -->
+
 <!--       get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE -->
+
 <!--     ) -->
+
 <!--     df_sif_jj <- df_sif_jj %>%  -->
+
 <!--       rename(idx_uniquelonlat = idx) %>%  -->
+
 <!--       right_join(df_grid_allsiteid, -->
+
 <!--                  by = c("lon", "lat")) -->
+
 <!--     save(df_sif_jj, file = filn) -->
 
 <!--     ## version 'PK'   -->
+
 <!--     df_sif_pk <- get_data_mct_global( -->
+
 <!--       df_grid, -->
+
 <!--       dir_sif  = "~/data/gome_2_sif_downscaled/data_orig/", fil_sif_pattern = "GOME_PK_dcSIF_005deg_8day_", -->
+
 <!--       get_watch = FALSE, get_landeval = FALSE, get_alexi = FALSE, get_sif = TRUE -->
+
 <!--     ) -->
+
 <!--     df_sif_pk <- df_sif_pk %>%  -->
+
 <!--       rename(idx_uniquelonlat = idx) %>%  -->
+
 <!--       right_join(df_grid_allsiteid, -->
+
 <!--                  by = c("lon", "lat")) -->
+
 <!--     save(df_sif_pk, file = filn)     -->
 
 <!--     df_sif %>% -->
+
 <!--       tidyr::unnest(df) %>% -->
+
 <!--       write_csv(path = filn_csv) -->
 
 <!--   } else { -->
 
 <!--     df_sif <- read_csv(file = filn_csv) %>% -->
+
 <!--       group_by(idx, lon, lat) %>% -->
+
 <!--       tidyr::nest() %>% -->
+
 <!--       dplyr::mutate(data = purrr::map(data, ~as_tibble(.))) %>% -->
+
 <!--       dplyr::rename(df = data) -->
+
 <!--   } -->
+
 <!-- } else { -->
+
 <!--   load(filn) -->
+
 <!--   df_sif %>% -->
+
 <!--     tidyr::unnest(df) %>% -->
+
 <!--     write_csv(path = filn) -->
+
 <!-- } -->
+
 <!-- ``` -->
 
 ### GLASS net radiation
@@ -648,6 +722,7 @@ if (!file.exists(filn)){
 XXX TO BE COMPLETED
 
 Test plot.
+
 ```{r}
 library(sf)
 library(raster)
@@ -665,12 +740,12 @@ raster::writeRaster(rasta2, filename = "./data/maptest.nc", format = "CDF", over
 plot_map3("./data/maptest.nc", lonmin = lonmin, lonmax = lonmax, latmin = latmin, latmax = latmax)
 ```
 
-    
-## Combine, convert units, complement, reduce 
+## Combine, convert units, complement, reduce
 
 ### Data filtering
 
 Some ET data seem to be missing. Retain only sites with more than 3000 ET dates.
+
 ```{r}
 n_avl_et <- function(df){
   sum(!is.na(df$et))
@@ -697,9 +772,10 @@ Manipulates data frames prepared by step 2, reduced data frames with only 1 colu
 
 #### Global
 
-- Convert units to get ET in mm. Run scripts `submit_get_et_mm.sh` to run `rscript_get_et_mm.R`.
+-   Convert units to get ET in mm. Run scripts `submit_get_et_mm.sh` to run `rscript_get_et_mm.R`.
 
 #### Site-level
+
 ```{r}
 filn <- paste0("data/df_clean_", siteset, ".RData")
 if (!file.exists(filn)){
@@ -853,7 +929,7 @@ if (!file.exists(filn)){
 }
 ```
 
-### Daily water balance 
+### Daily water balance
 
 #### Global
 
@@ -862,7 +938,8 @@ Run script `rscript_get_bal.R` on Euler (submission file: `submit_get_bal.R`).
 #### Site-level
 
 ... and reduce data frames.
-```{r} 
+
+```{r}
 source("R/get_bal.R")
 
 filn <- paste0("data/df_bal_", siteset, ".RData")
@@ -889,20 +966,17 @@ if (!file.exists(filn)){
 }
 ```
 
-    
 ### CWD events and extremes
 
-Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution 
+Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time series and events data frame (output from `mct()`), as well as the return periods data frame and the fitted model for the extreme value distribution
 
-`mct2.R`  Creates list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
+`mct2.R` Creates list with (i) water deficit time series, daily and cumulative, dday, iinst; and (ii) events data frame with maximum deficit, start date and length of event
 
-- Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
-
+-   Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
 
 #### Global
 
 Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
-
 
 #### Site-level
 
@@ -926,7 +1000,6 @@ if (!file.exists(filn)){
 }
 ```
 
-
 ## Check file availability
 
 On Euler, run `rscript_check_files.R` and download the overview dataframe it writes (`data/df_file_availability.RData`)
@@ -935,32 +1008,36 @@ On Euler, run `rscript_check_files.R` and download the overview dataframe it wri
 load("data/df_file_availability.RData")
 ```
 
-Longitude slices for which now snow files are available -> Possibly no WATCH-WFDEI gridcell at respective longitude? All available!
+Longitude slices for which now snow files are available -\> Possibly no WATCH-WFDEI gridcell at respective longitude? All available!
+
 ```{r}
 df %>% 
   dplyr::filter(!avl_snow)
 ```
 
 Longitude slices without tidy ALEXI data. All available!
+
 ```{r}
 df %>% 
   dplyr::filter(!avl_tidy)
 ```
 
-Longitude slices without ET-mm data (written by `R/get_et_mm_bylon.R`). 
-All available.
+Longitude slices without ET-mm data (written by `R/get_et_mm_bylon.R`). All available.
+
 ```{r}
 df %>% 
   dplyr::filter(!avl_et_mm)
 ```
 
 Longitude slices without `bal` data. All available.
+
 ```{r}
 df %>% 
   dplyr::filter(!avl_bal)
 ```
 
 Longitude slices without CWDX data. All available.
+
 ```{r}
 df %>% 
   ungroup() %>% 
@@ -968,19 +1045,19 @@ df %>%
 ```
 
 Longitude slices without extracted CWDX data. All available.
+
 ```{r}
 df %>% 
   dplyr::filter(!avl_cwdx_10_20_40 & avl_cwdx & avl_bal & avl_et_mm)
 ```
 
 Total not available extracted CWDX data (longitude slices): 1,476
+
 ```{r}
 df %>% 
   ungroup() %>% 
   dplyr::filter(!avl_cwdx_10_20_40)
 ```
-
-
 
 ## CWDX
 
@@ -991,6 +1068,7 @@ Run `rscript_extract_cwdx.R` (with submit file `submit_extract_cwdx.sh`).
 ### Collect data
 
 For the global application, combine CWDX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
+
 ```{r}
 ## CWDX data
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
@@ -1026,6 +1104,7 @@ write_nc2(nc, varnams = "cwdx200", lon = df_cwdx$lon %>% unique() %>% sort(), la
 ```
 
 Regrid to 0.25 deg
+
 ```{r}
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx10.nc data/cwdx10_tenthdeg.nc")
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx20.nc data/cwdx20_tenthdeg.nc")
@@ -1036,9 +1115,10 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx200.nc data/cwdx200_tenthdeg
 
 ### Maps
 
-#### Global 
+#### Global
 
 Read tenth-degree global files and plot.
+
 ```{r}
 ## 20 yr
 nc_tenthdeg <- read_nc_onefile("data/cwdx20_tenthdeg.nc", varnam = "cwdx20")
@@ -1073,7 +1153,8 @@ ggsave("fig/map_cwdx100.png", width = 10, height = 6)
 
 #### Regional
 
-Problem with missing data for certain gridcells. Solutions with varying `thresh_terminate` and with rounding digits of longitude and latitude values. 
+Problem with missing data for certain gridcells. Solutions with varying `thresh_terminate` and with rounding digits of longitude and latitude values.
+
 ```{r}
 ## add rivers shapefile following https://www.earthdatascience.org/courses/earth-analytics/spatial-data-r/make-maps-with-ggplot-in-R/
 ## read rivers database
@@ -1175,6 +1256,7 @@ ggsave("fig/map_cwdx40_amazon.png", width = 9, height = 6)
 ### Soil texture
 
 This requires WHC data.
+
 ```{r}
 ## WHC, prepared by rscript_combine_df_whc.R, rscript_calc_soilparams.R, and code above writing "data/df_hwsd_hires.RData"
 # load("data/df_whc_hires.RData")  # loads 'df_whc' - this has oddly missing values in south america
@@ -1205,6 +1287,7 @@ save(df, file = "data/df_mct_merged.RData")
 ```
 
 Test plot: WHC in southern South America.
+
 ```{r}
 gg <- df_whc %>% 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
@@ -1219,6 +1302,7 @@ cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ```
 
 Regrid and plot WHC.
+
 ```{r}
 ## WHC
 # nc <- df_to_grid(df, varnam = "whc_top", lonnam = "lon", latnam = "lat")
@@ -1265,10 +1349,10 @@ ggsave("fig/map_whc_top.pdf", width = 10, height = 6)
 ggsave("fig/map_whc_top.png", width = 10, height = 6)
 ```
 
-
 ### Global
 
 Calculate implied rooting depth, given CWDX and WHC. WHC (`whc_top` and `whc_sub`) is derived from gridded HWSD data using `rscript_combine_df_whc.R`, `rscript_calc_soilparams.R`
+
 ```{r}
 source("R/calc_zroot.R")
 load("data/df_mct_merged.RData")
@@ -1289,6 +1373,7 @@ save(df, file = "data/df_zroot40.RData")
 ```
 
 Regrid and plot.
+
 ```{r}
 nc <- df_to_grid(df, varnam = "zroot_cwd40", lonnam = "lon", latnam = "lat")
 write_nc2(nc, varnams = "zroot_cwd40", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/zroot_cwd40.nc", make_zdim = FALSE)
@@ -1315,13 +1400,12 @@ ggsave("fig/map_zroot_cwd40.pdf", width = 10, height = 6)
 ggsave("fig/map_zroot_cwd40.png", width = 10, height = 6)
 ```
 
-
 ### Site-level
 
 See `mct_sj02_simsuite.Rmd`, creates data frame with z(CWDX) for different return periods
 
-- Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
-- Use soil texture and WTD meta info prepared in step 1, see `mct_sj02_simsuite.Rmd`
+-   Use 20 year return period for good match of obs and mod at SJ02 sites (see ridges plot)
+-   Use soil texture and WTD meta info prepared in step 1, see `mct_sj02_simsuite.Rmd`
 
 ```{r}
 filn <- "data/df_zroot_sj02.RData"
@@ -1370,8 +1454,8 @@ if (!file.exists(filn)){
 }
 ```
 
-
 Use simulated zroot from earlier site-level simulation (`df_zroot`, loaded from `"data/df_zroot_sj02.RData"`), based on CWD extremes with 20-year return period.
+
 ```{r}
 load("data/siteinfo_sj02.RData")
 
@@ -1399,36 +1483,59 @@ save(df_sj02, file = paste0("data/df_sj02_biome_wwf_NEW.Rdata"))
 ```
 
 <!-- Extract values from global simulation. Is practically the same as in old simulations! -->
+
 <!-- From map (`"data/cwdx20.nc"`). -->
+
 <!-- ```{r} -->
+
 <!-- rasta_cwdx20 <- raster::brick("data/cwdx20.nc") -->
+
 <!-- tmp <- raster::extract(rasta_cwdx20, sp::SpatialPoints(dplyr::select(df_modobs, lon, lat) %>% distinct()), sp = TRUE) %>% -->
+
 <!--       as_tibble() %>% -->
+
 <!--       rename(cwdx20_global = layer) %>%  -->
+
 <!--       right_join( -->
+
 <!--         df_modobs, -->
+
 <!--         by = c("lon", "lat") -->
+
 <!--       ) -->
 
 <!-- ## close agreement! -->
+
 <!-- tmp %>%  -->
+
 <!--   analyse_modobs2("cwdx20", "cwdx20_global") -->
 
 <!-- rasta_zroot <- raster::brick("data/zroot_cwd20.nc") -->
+
 <!-- df_modobs <- raster::extract(rasta_zroot, sp::SpatialPoints(dplyr::select(df_modobs, lon, lat) %>% distinct()), sp = TRUE) %>% -->
+
 <!--   as_tibble() %>% -->
+
 <!--   rename(zroot_cwdx20_global = layer) %>%  -->
+
 <!--   right_join( -->
+
 <!--     df_modobs, -->
+
 <!--     by = c("lon", "lat") -->
+
 <!--   ) -->
 
 <!-- ## less close agreement - not using site-specific soil texture data! -->
+
 <!-- df_modobs %>%  -->
+
 <!--   analyse_modobs2("zroot_cwdx20", "zroot_cwdx20_global") -->
+
 <!-- ``` -->
 
 Distribution by biomes, site-level data and site-level simulations. Tested also using global simulations and shows almost indistinguishable picture! Nice.
+
 ```{r}
 library(ggridges)
 #load("data/df_sj02_biome_wwf.Rdata")
@@ -1464,6 +1571,7 @@ ggsave("fig/modobs_ridges_zroot_biome_wwf_2022.png", width = 15, height = 10)
 ```
 
 Quantile regression plot.
+
 ```{r}
 #load("data/df_sj02_biome_wwf_NEW.Rdata")
 
@@ -1525,6 +1633,7 @@ save(gg_sj02_90, file = "data/gg_sj02_90.RData")
 ```
 
 Where are locations of points with largest mismatch?
+
 ```{r}
 df_tmp <- df_modobs %>% 
   mutate(error = zroot - D95_extrapolated) %>% 
@@ -1538,6 +1647,7 @@ plot_map_simpl() +
 ```
 
 Are sites with largest mismatch characterised by a small reduction in flue (indicating groundwater access)?
+
 ```{r}
 df_modobs %>% 
   left_join(siteinfo %>% 
@@ -1553,10 +1663,10 @@ df_modobs %>%
   geom_point()
 ```
 
-
 ### CWDX distribution
 
 By biomes.
+
 ```{r}
 df_sif %>% 
   rename(sitename = idx) %>% 
@@ -1592,6 +1702,7 @@ ggsave(paste0("fig/modobs_ridges_cwd_biome_wwf_NEW", siteset, ".pdf"), width = 1
 ```
 
 Something is wrong: Sites missing when applying new workflow. This is due to missing et_mm (elv was not ingested)
+
 ```{r}
 load("data/df_modobs_reOLD.Rdata")
 df_modobs_new <- dplyr::select(df_modobs, sitename, cwdx20, zroot)
@@ -1609,8 +1720,6 @@ out <- df_test %>%
 out$gg
 ```
 
-
-
 ## SIF
 
 Approach is to derive CWD(LUE=0) for estimating CWDX.
@@ -1618,6 +1727,7 @@ Approach is to derive CWD(LUE=0) for estimating CWDX.
 Run script that wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()` (submission file: `submit_calc_cwd_lue0.sh`). Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
 
 Then collect outputs using `rscript_collect_cwd_lue0.R` and read the file. It's huge.
+
 ```{r}
 load("data/df_cwd_lue0.RData")
 
@@ -1649,6 +1759,7 @@ rm("df")
 ```
 
 Load files after they're written.
+
 ```{r}
 load("data/df_cwd_lue0_SIF.RData")
 load("data/df_cwd_lue0_nSIF.RData")
@@ -1659,6 +1770,7 @@ load("data/df_rivers.RData")
 ```
 
 Regional hi-res plots.
+
 ```{r}
 ## central asia SIF
 gg <- df_cwd_lue0_SIF %>% 
@@ -1706,10 +1818,10 @@ ggsave("fig/map_flue_SIF_casia.pdf", width = 10, height = 6)
 ggsave("fig/map_flue_SIF_casia.png", width = 10, height = 6)
 ```
 
-
 ### Regrid and map
 
 Convert to nc object and write to file.
+
 ```{r}
 ## SIF
 nc <- df_to_grid(df_cwd_lue0_SIF, varnam = "cwd_lue0_SIF", lonnam = "lon", latnam = "lat")
@@ -1729,6 +1841,7 @@ write_nc2(nc, varnams = "cwd_lue0_nSIF", lon = df_cwd_lue0_nSIF$lon %>% unique()
 ```
 
 Regrid to 0.1 deg
+
 ```{r}
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_SIF.nc data/cwd_lue0_SIF_tenthdeg.nc")
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_nSIF.nc data/cwd_lue0_nSIF_tenthdeg.nc")
@@ -1737,6 +1850,7 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_nSIF.nc data/cwd_lue0_n
 ```
 
 Read half-degree global file and plot.
+
 ```{r}
 ## SIF
 nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_SIF_tenthdeg.nc", varnam = "cwd_lue0_SIF")
@@ -1782,12 +1896,12 @@ ggsave("fig/map_cwd_lue0_nSIF.png", width = 10, height = 6)
 # ggsave("fig/map_lambda_decay_nSIF.pdf", width = 10, height = 6)
 ```
 
-
 ### Correlation with CWDX
 
 Plot correlation at global scale.
 
 #### Low resolution.
+
 ```{r}
 df_corr_sif_lores <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>% 
   nc_to_df(varnam = "cwdx20") %>% 
@@ -1873,7 +1987,8 @@ out$gg +
 
 ### fLUE reduction
 
-Relative reduction (fraction of pre-drought level) in vegetation activity (~SIF, ~EF) in the highest CWD bin.
+Relative reduction (fraction of pre-drought level) in vegetation activity (\~SIF, \~EF) in the highest CWD bin.
+
 ```{r}
 load("data/df_flue_SIF.RData")
 load("data/df_rivers.RData")
@@ -1945,6 +2060,7 @@ ggsave("fig/clusters_SIF.pdf", width = 6, height = 4)
 ```
 
 Plot cluster.
+
 ```{r}
 ## central asia
 gg <- df_cluster_SIF %>% 
@@ -1978,14 +2094,14 @@ cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_clusters_wusa.pdf", width = 20, height = 10)
 ```
 
-
 ### Site-level
 
-Script used for testing at FLUXNET sites: `test_mct_bysite_alexi_fluxnet.R` 
+Script used for testing at FLUXNET sites: `test_mct_bysite_alexi_fluxnet.R`
 
-- Use CWD events from step 3 and SiF from step 2
+-   Use CWD events from step 3 and SiF from step 2
 
-Add SiF data to 
+Add SiF data to
+
 ```{r}
 source("R/get_flue_cwdmax.R")
 
@@ -2048,10 +2164,11 @@ df_sif %>%
   mutate(cwd_lue0 = remove_outliers(cwd_lue0)) %>% 
   analyse_modobs2("cwd_lue0", "cwdx20")
 ```
-    
+
 ### LUE reduction at maximum CWD
 
 Doesn't work well.
+
 ```{r}
 df <- df_sif %>% 
   arrange(desc(flue)) %>% 
@@ -2063,8 +2180,9 @@ df_sif %>%
   ggplot(aes(x = cwdmax, y = flue)) +
   geom_point()
 ```
-        
+
 Along one longitude band (21.475 deg E).
+
 ```{r}
 load("~/mct/data/df_cwd_lue0/df_cwd_lue0_5000.RData")
 df_cwd_lue0 <- df
@@ -2097,9 +2215,8 @@ tmp %>%
 
 tmp %>% 
   analyse_modobs2("cwdx20", "lambda_decay_nSIF")
-```    
-    
-    
+```
+
 ## EF
 
 Approach is to derive CWD(ET/Rn=0) for estimating CWDX.
@@ -2109,6 +2226,7 @@ Approach is to derive CWD(ET/Rn=0) for estimating CWDX.
 Run script that wraps `calc_cwd_et0_byilon()` and `calc_cwd_et0()` (submission file: `submit_calc_cwd_et0.sh`). Collects CWD data (including instances), net radiation, and ET data into one data frame per pixel and determines sensitivity (linear regression slope) of ET/Rn vs. CWD. Also determines fractional reduction in ET/Rn in highest CWD bin (using function `get_fet_cwdmax()`).
 
 Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's huge, therefore split them up and re-write smaller files.
+
 ```{r}
 load("data/df_cwd_et0.RData")
 
@@ -2136,6 +2254,7 @@ rm("df")
 ```
 
 Load smaller datasets.
+
 ```{r}
 load("data/df_cwd_lue0_et.RData")
 load("data/df_cwd_lue0_fet.RData")
@@ -2193,8 +2312,8 @@ ggsave("fig/map_s0_teuling_et_casia.pdf", width = 10, height = 6)
 ggsave("fig/map_s0_teuling_et_casia.png", width = 10, height = 6)
 ```
 
-
 Convert to nc object and write to file.
+
 ```{r}
 ## ET
 nc <- df_to_grid(df_cwd_lue0_et, varnam = "cwd_lue0_et", lonnam = "lon", latnam = "lat")
@@ -2210,6 +2329,7 @@ write_nc2(nc, varnams = "s0_teuling_et", lon = df_s0_teuling_et$lon %>% unique()
 ```
 
 Regional hi-res plots.
+
 ```{r}
 ## central asia
 gg <- df_cwd_lue0_fet %>% 
@@ -2242,10 +2362,10 @@ cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_s0_teuling_et_casia.pdf", width = 15, height = 10)
 ```
 
-
 ### Global
 
 Regrid to 0.1 deg
+
 ```{r}
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_et.nc data/cwd_lue0_et_tenthdeg.nc")
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_fet.nc data/cwd_lue0_fet_tenthdeg.nc")
@@ -2253,6 +2373,7 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/s0_teuling_et.nc data/s0_teuling
 ```
 
 Read half-degree global file and plot.
+
 ```{r}
 ## ET
 nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_et_tenthdeg.nc", varnam = "cwd_lue0_et")
@@ -2310,11 +2431,10 @@ ggsave("fig/map_s0_teuling_et.pdf", width = 10, height = 6)
 ggsave("fig/map_s0_teuling_et.png", width = 10, height = 6)
 ```
 
-
-
 Plot correlation at global scale.
 
 Coarse resolution.
+
 ```{r}
 df_corr <- read_nc_onefile("data/cwdx20_halfdeg.nc", varnam = "cwdx20") %>% 
   nc_to_df(varnam = "cwdx20") %>% 
@@ -2353,6 +2473,7 @@ df_corr %>%
 ```
 
 At high resolution.
+
 ```{r}
 df_corr <- df_cwdx %>% 
   left_join(
@@ -2386,6 +2507,7 @@ out$gg +
 ## Bias analysis
 
 Combine data.
+
 ```{r}
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
 df_cwdx <- df %>% 
@@ -2424,6 +2546,7 @@ save(df_corr, file = "data/df_corr.RData")
 ### Bias by return period and vegetation type
 
 Distinguishing grasslands and forests.
+
 ```{r}
 load("data/df_corr.RData")
 
@@ -2527,6 +2650,7 @@ ggsave("fig/map_bias_cwdx20_casia.png", width = 9, height = 5)
 Explaining actually SdSIF using SCWDX, CTI, groundwater table depth, vegetation type, and irrigation area fraction.
 
 Read WTD data.
+
 ```{r}
 ## read groundwater table maps per continent
 ## africa
@@ -2620,13 +2744,13 @@ save(df_pred, file = "data/df_pred.RData")
 ```
 
 Distribution of values
+
 ```{r}
 df_pred %>% 
   mutate(cwd_lue0_SIF = remove_outliers(cwd_lue0_SIF, coef = 10)) %>% 
   ggplot(aes(x = cwd_lue0_SIF, y = ..count..)) +
   geom_histogram()
 ```
-
 
 #### Residuals
 
@@ -2664,9 +2788,11 @@ df_pred %>%
   geom_boxplot() +
   geom_hline(yintercept = 0, linetype = "dotted")
 ```
+
 #### Linear regression
 
 Fit a simple multivariate linear model.
+
 ```{r}
 library(recipes)
 library(caret)
@@ -2742,6 +2868,7 @@ ggsave("fig/corr_FULL.png", width = 6, height = 5)
 #### Random forest
 
 With random forest - works nicely: increasing the R2 from 0.45 to 0.75.
+
 ```{r}
 library(caret)
 library(recipes)
@@ -2803,8 +2930,8 @@ df_test %>%
   analyse_modobs2(".pred", "cwd_lue0_SIF", type = "heat")
 ```
 
-
 Interpret model.
+
 ```{r}
 library(pdp)
 df_pd_gti <- partial(modl, pred.var = "gti")
@@ -2838,7 +2965,6 @@ df_pd_forest %>%
 library(vip)
 vip(modl$finalModel)
 ```
-
 
 ```{r}
 nc_landcover <- read_nc_onefile("~/data/landcover/modis_landcover__LPDAAC__v5.1__0.05deg__2010.nc", varnam = "landcover")
@@ -2904,10 +3030,10 @@ plot( rasta_agg,
   )
 ```
 
-
 ### Bias by GTI
 
 Looking at the bias calculated in chunk above, and testing whether it correlates with topography (TOPMODEL) index GTI.
+
 ```{r}
 ## central asia cutout
 nc_gti <- read_nc_onefile("~/data/gti_marthews/ga2_casia_05deg.nc", varnam = "Band1")
@@ -2922,11 +3048,12 @@ df_gti %>%
 
 ### Correlations
 
-For different return period selections 
+For different return period selections
 
 #### SIF
 
 Correlation plots for different return periods with SIF.
+
 ```{r}
 ## 10 year return period
 out <- df_corr %>% 
@@ -3016,6 +3143,7 @@ ggsave("fig/corr_cwd_lue0_SIF.png", width = 12, height = 10)
 ```
 
 After excluding known areas where land is irrigated. Doesn't really explain much more.
+
 ```{r}
 ## 40 year return period
 df_corr <- df_corr %>% 
@@ -3046,10 +3174,10 @@ ggsave("fig/corr_cwd_lue0_SIF_cwdx40.pdf", width = 6, height = 5)
 ggsave("fig/corr_cwd_lue0_SIF_cwdx40.png", width = 6, height = 5)
 ```
 
-
 #### EF
 
 Correlation plots for different return periods with evaporative fraction.
+
 ```{r}
 ## 10 year return period
 out <- df_corr %>% 
@@ -3137,7 +3265,6 @@ library(patchwork)
 ggsave("fig/corr_cwd_lue0_fet.pdf", width = 12, height = 10)
 ggsave("fig/corr_cwd_lue0_fet.png", width = 12, height = 10)
 ```
-
 
 ```{r}
 ## 10 year return period
@@ -3306,6 +3433,7 @@ save(gg_ef_50, file = "data/gg_ef_50.RData")
 ```
 
 Combined plot. Run `rsip.Rmd` before to get plot file for comparison against RSIP.
+
 ```{r}
 library(patchwork)
 load("data/gg_rsip_10.RData")
@@ -3330,8 +3458,6 @@ load("data/gg_sj02_90.RData")
 ggsave("fig/modobs_quantiles_biome.pdf", width = 15, height = 15)
 ggsave("fig/modobs_quantiles_biome.png", width = 15, height = 15)
 ```
-
-
 
 ### S by biome ridge plot
 
@@ -3416,5 +3542,3 @@ df_corr %>% dplyr::select(biome_name, obs = cwd_lue0_fet, mod = cwdx40) %>%
 ggsave("fig/modobs_ridges_cwdx_fet.pdf", width = 15, height = 10)
 ggsave("fig/modobs_ridges_cwdx_fet.png", width = 15, height = 10)
 ```
-
-

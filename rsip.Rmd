@@ -264,6 +264,12 @@ ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip.pdf", width = 15, height = 10)
 ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip.png", width = 15, height = 10)
 ```
 
+Scatterplot of modelled vs. observed.
+```{r}
+df %>% 
+  analyse_modobs2("zroot_cwdx40", "Dr", type = "heat")
+```
+
 Quantiles
 ```{r}
 df_biome <- df %>% 

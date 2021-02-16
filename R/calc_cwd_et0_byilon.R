@@ -1,4 +1,4 @@
-calc_cwd_et0_byilon <- function(ilon){
+calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0/"){
   
   source("R/calc_cwd_lue0.R")
 
@@ -17,10 +17,9 @@ calc_cwd_et0_byilon <- function(ilon){
   convert_et_MJ <- function(x){ x * 1e6 / (24 * 60 * 60) }  # MJ m-2 d-1 -> W m-2
   
   ## construct output file name
-  dirn <- "~/mct/data/df_cwd_et0/"
   filn <- paste0("df_cwd_et0_", ilon, ".RData")
-  if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_cwd_et0")
-  path <- paste0(dirn, filn)
+  if (!dir.exists(dirn)) system(paste0("mkdir -p ", dirn))
+  path <- paste0(dirn, "/", filn)
   
   if (!file.exists(path)){
     
@@ -103,11 +102,14 @@ calc_cwd_et0_byilon <- function(ilon){
       # mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
       mutate(flue_fet = purrr::map_dbl(out_lue0_fet, "flue")) %>%
       mutate(df_flue_fet = purrr::map(out_lue0_fet, "df_flue")) %>%
-      dplyr::select(-out_lue0_fet) %>%
-      
-      ## drop data again
-      dplyr::select(-data, -data_inst)
+      dplyr::select(-out_lue0_fet)
 
+    if (drop_data){
+      ## drop data again
+      df <- df %>% 
+        dplyr::select(-data, -data_inst)
+    }
+    
     ## write to file
     print(paste("Writing file:", path))
     save(df, file = path)  
