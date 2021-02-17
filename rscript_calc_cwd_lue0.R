@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
-# args = commandArgs(trailingOnly=TRUE)
-args <- c(5000, 7200)
+args = commandArgs(trailingOnly=TRUE)
+# args <- c(5600, 7200)
 
 library(dplyr)
 library(purrr)
@@ -60,6 +60,6 @@ if (ncores > 1){
 } else {
 
   ## testing
-  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2"))
+  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2", verbose = TRUE))
 
 }

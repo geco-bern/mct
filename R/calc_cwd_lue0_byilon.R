@@ -1,4 +1,4 @@
-calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_lue0_2"){
+calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_lue0_2", verbose = FALSE){
   
   source("R/calc_cwd_lue0_v2.R")
   
@@ -96,7 +96,7 @@ calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_c
       # filter(lat == 37.025) %>%
       
       ## get CWD at SIF = 0, using function calc_cwd_lue0()
-      mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE))) %>%
+      mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE, verbose = verbose))) %>%
       mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "cwd_lue0")) %>%
       mutate(flue_SIF = purrr::map_dbl(out_lue0_SIF, "flue")) %>%
       mutate(lambda_decay_SIF = purrr::map_dbl(out_lue0_SIF, "lambda_decay")) %>%
@@ -108,7 +108,7 @@ calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_c
       
       ## get CWD at SIF/SWdown = 0; SIF/SWdown := nSIF
       mutate(data = purrr::map(data, ~mutate(., nSIF = SIF / sw))) %>% 
-      mutate(out_lue0_nSIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "nSIF", do_plot = FALSE))) %>% 
+      mutate(out_lue0_nSIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "nSIF", do_plot = FALSE, verbose = verbose))) %>% 
       mutate(cwd_lue0_nSIF = purrr::map_dbl(out_lue0_nSIF, "cwd_lue0")) %>%
       mutate(flue_nSIF = purrr::map_dbl(out_lue0_nSIF, "flue")) %>%
       mutate(lambda_decay_nSIF = purrr::map_dbl(out_lue0_nSIF, "lambda_decay")) %>%

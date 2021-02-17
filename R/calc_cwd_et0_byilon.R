@@ -1,4 +1,4 @@
-calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0_2/"){
+calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0_2/", verbose = FALSE){
   
   source("R/calc_cwd_lue0_v2.R")
 
@@ -93,7 +93,7 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
       mutate(data = purrr::map(data, ~calc_fet(.))) %>% 
 
       ## get CWD at fET = 0 (fET = ET/Rn)
-      mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = FALSE))) %>% 
+      mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = FALSE, verbose = verbose))) %>% 
       mutate(cwd_lue0_fet = purrr::map_dbl(out_lue0_fet, "cwd_lue0")) %>%
       mutate(flue_fet = purrr::map_dbl(out_lue0_fet, "flue")) %>%
       mutate(cwdmax = purrr::map_dbl(out_lue0_fet, "cwdmax")) %>%
