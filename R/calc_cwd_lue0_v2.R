@@ -60,42 +60,45 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
     ## get x-axis cutoff (plain)
     cwd_lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["cwd_mid"]
 
-    ## select the number of breakpoints
-    lm_selg <- try(selgmented(linmod, seg.Z = ~cwd_mid, return.fit = FALSE))
-    
-    ## try xxx
-    my.seg <- selgmented(linmod, seg.Z = ~ cwd_mid)
+    ## select the number of breakpoints based on BIC (own implementation here)
+    list_lm_selg <- purrr::map(as.list(c(1,2)),
+                              ~segmented(linmod, seg.Z = ~ cwd_mid, npsi=., silent=TRUE))
+    for (i in 2:1){
+      list_lm_selg[[i+1]] <- list_lm_selg[[i]]
+    }
+    list_lm_selg[[1]] <- linmod
+    vec_bic <- purrr::map_dbl(list_lm_selg, ~BIC(.))
+    idx_best <- which.min(vec_bic)
+    npsi <- idx_best - 1
+    lm_selg <- list_lm_selg[[idx_best]]
 
     has_cp <- FALSE
 
     if (!(class(lm_selg) == "try-error")){
       
-      if (lm_selg$npsi > 0){
+      if (npsi > 0){
         ##--------------------------------------------------
         ## has changepoint      
         ##--------------------------------------------------
         if (verbose) rlang::inform("Change point detected.")
         has_cp <- TRUE
         
-        ## fit again, now returning fit
-        lm_selg_fit <- selgmented(linmod, seg.Z = ~cwd_mid, return.fit = TRUE)
-        
         ## metric
-        rsq <- summary(lm_selg_fit)$adj.r.squared
+        rsq <- summary(lm_selg)$adj.r.squared
         
         ## add predictions
         df_agg <- df_agg %>% 
-          mutate(.fit = predict(lm_selg_fit, newdata = .))
+          mutate(.fit = predict(lm_selg, newdata = .))
         
         ## get first changepoint
-        cp1 <- lm_selg_fit$psi %>% as_tibble() %>% slice(1) %>% pull(Est.)
+        cp1 <- lm_selg$psi %>% as_tibble() %>% slice(1) %>% pull(Est.)
         
         ## get useful coefficients
-        b0 <- coef(lm_selg_fit)[["(Intercept)"]]
-        slope1 <- coef(lm_selg_fit)[["cwd_mid"]]
+        b0 <- coef(lm_selg)[["(Intercept)"]]
+        slope1 <- coef(lm_selg)[["cwd_mid"]]
         
         ## Important: the coefficients are the differences in slope in comparison to the previous slope
-        slope2 <- coef(lm_selg_fit)[["cwd_mid"]] + coef(lm_selg_fit)[["U1.cwd_mid"]]
+        slope2 <- coef(lm_selg)[["cwd_mid"]] + coef(lm_selg)[["U1.cwd_mid"]]
         
         ## Solve for c0 (intercept of second segment):
         c0 <- b0 + slope1 * cp1 - slope2 * cp1
@@ -107,12 +110,12 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
         # is_neg2 <- slope2 < 0
         
         # ## is slope 1 significant?
-        # is_sign <- coef(summary(lm_selg_fit))["cwd_mid", "Pr(>|t|)"] < 0.05
+        # is_sign <- coef(summary(lm_selg))["cwd_mid", "Pr(>|t|)"] < 0.05
         
         if (slope1 < slope2){
           ## flattening after first CP
           
-          if (lm_selg$npsi == 1){
+          if (npsi == 1){
             ##--------------------------------------------------
             ## (A) single changepoint 
             ##--------------------------------------------------
@@ -124,7 +127,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
               cwd_lue0 <- NA
               
               ## slope 2 less negative than slope 1 and significantly different?
-              df_coef <- coef(summary(lm_selg_fit)) %>% as_tibble(rownames = "coef")
+              df_coef <- coef(summary(lm_selg)) %>% as_tibble(rownames = "coef")
               is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)        
               
               type <- "Aa"
@@ -140,12 +143,12 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
             }
             
             
-          } else if (lm_selg$npsi == 2){
+          } else if (npsi == 2){
             ##--------------------------------------------------
             ## Two changepoints
             ##--------------------------------------------------
-            slope3 <- coef(lm_selg_fit)[["U2.cwd_mid"]] + slope2
-            cp2 <- lm_selg_fit$psi %>% as_tibble() %>% slice(2) %>% pull(Est.)
+            slope3 <- coef(lm_selg)[["U2.cwd_mid"]] + slope2
+            cp2 <- lm_selg$psi %>% as_tibble() %>% slice(2) %>% pull(Est.)
             
             ## Solve for d0 (intercept of third segment):
             d0 <- c0 + slope2 * cp2 - slope3 * cp2
@@ -158,7 +161,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
               cwd_lue0 <- NA
               
               ## slope 2 less negative than slope 1 and significantly different?
-              df_coef <- coef(summary(lm_selg_fit)) %>% as_tibble(rownames = "coef")
+              df_coef <- coef(summary(lm_selg)) %>% as_tibble(rownames = "coef")
               is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)        
               type <- "A1"
               
@@ -176,11 +179,13 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
                 if ((cwd_lue0 > 2*max(df$deficit))){
                   ## too much extrapolation - interpret as flattening at CP1
                   cwd_lue0 <- NA
+                  df_coef <- coef(summary(lm_selg)) %>% as_tibble(rownames = "coef")
                   is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)   
                   type <- "A2a"
                   
                 } else {
                   ## actually declining after CP2 - take slope 3 for x-axis cutoff
+                  df_coef <- coef(summary(lm_selg)) %>% as_tibble(rownames = "coef")
                   is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)   
                   type <- "A2b"
                 }
@@ -190,6 +195,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
                 ## (A2a) similar as above: slope3 is positive - flattening at cp1 and no x-axis intercept
                 ##--------------------------------------------------
                 cwd_lue0 <- NA
+                df_coef <- coef(summary(lm_selg)) %>% as_tibble(rownames = "coef")
                 is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)   
                 type <- "A2a"              
               }
@@ -207,7 +213,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
           
         } else {
           
-          if (lm_selg$npsi == 1){
+          if (npsi == 1){
             ##--------------------------------------------------
             ## (B) single changepoint
             ##--------------------------------------------------
@@ -231,12 +237,12 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
             }
             
             
-          } else if (lm_selg$npsi == 2){
+          } else if (npsi == 2){
             ##--------------------------------------------------
             ## Two changepoints
             ##--------------------------------------------------
-            cp2 <- lm_selg_fit$psi %>% as_tibble() %>% slice(2) %>% pull(Est.)
-            slope3 <- coef(lm_selg_fit)[["U2.cwd_mid"]] + slope2
+            cp2 <- lm_selg$psi %>% as_tibble() %>% slice(2) %>% pull(Est.)
+            slope3 <- coef(lm_selg)[["U2.cwd_mid"]] + slope2
             
             ## Solve for d0 (intercept of third segment):
             d0 <- c0 + slope2 * cp2 - slope3 * cp2

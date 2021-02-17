@@ -8,6 +8,12 @@ output: html_document
 ```{r setup}
 library(tidyverse)
 library(segmented)
+
+source("R/calc_cwd_lue0_v2.R")
+source("R/calc_cwd_lue0_byilon.R")
+source("R/calc_cwd_et0_byilon.R")
+# source("R/selgmented.R")
+# source("R/pscore.test.R")
 ```
 
 ## Change point detection
@@ -15,12 +21,6 @@ library(segmented)
 Perform change point detection in SIF ~ CWD regression.
 
 ```{r}
-source("R/calc_cwd_lue0_v2.R")
-source("R/calc_cwd_lue0_byilon.R")
-source("R/calc_cwd_et0_byilon.R")
-# source("R/selgmented.R")
-# source("R/pscore.test.R")
-
 ## get data for one longitude slice, based on SIF
 calc_cwd_lue0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_lue0_2")
 load("~/mct/data/df_cwd_lue0_SENS/df_cwd_lue0_5600.RData")
@@ -37,12 +37,12 @@ Look at one cell.
 # caused problem: 18.175
 
 df_data <- df %>% 
-  filter(lat == 21.925) %>% 
+  filter(lat == 24.525 ) %>% 
   select(data) %>% 
   unnest(data)
 
 df_inst <- df %>% 
-  filter(lat == 21.925) %>% 
+  filter(lat == 24.525 ) %>% 
   select(data_inst) %>% 
   unnest(data_inst)
 
