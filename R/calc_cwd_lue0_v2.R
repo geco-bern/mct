@@ -176,12 +176,12 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
                 if ((cwd_lue0 > 2*max(df$deficit))){
                   ## too much extrapolation - interpret as flattening at CP1
                   cwd_lue0 <- NA
-                  is_flattening <- TRUE
+                  is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)   
                   type <- "A2a"
                   
                 } else {
                   ## actually declining after CP2 - take slope 3 for x-axis cutoff
-                  is_flattening <- TRUE
+                  is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)   
                   type <- "A2b"
                 }
                 
@@ -190,7 +190,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
                 ## (A2a) similar as above: slope3 is positive - flattening at cp1 and no x-axis intercept
                 ##--------------------------------------------------
                 cwd_lue0 <- NA
-                is_flattening <- TRUE
+                is_flattening <- (slope1 < 0) && (slope1 < slope2) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)   
                 type <- "A2a"              
               }
               
