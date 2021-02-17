@@ -166,6 +166,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
                 ##--------------------------------------------------
                 ## (A2) declining after CP2
                 ##--------------------------------------------------
+                ## x-axis cutoff based on third slope
                 cwd_lue0 <- - d0 / slope3
                 
                 if ((cwd_lue0 > 2*max(df$deficit))){
@@ -354,7 +355,11 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
     cwdmax <- max(df$deficit, na.rm = TRUE)
     
     ## avoid cases where x-axis intersect determined from first or second slope is smaller than the maximum CWD during time series
-    cwd_lue0 <- max(cwd_lue0, cwdmax)
+    tmp <- df_agg %>% 
+      drop_na() %>% 
+      pull(cwd_mid) %>% 
+      max()
+    cwd_lue0 <- max(cwd_lue0, tmp)
     
     ## avoid cases where cwd_lue0 is beyond twice the range of observed CWD values
     cwd_lue0 <- ifelse(cwd_lue0 > 2*cwdmax, NA, cwd_lue0)
