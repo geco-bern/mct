@@ -47,7 +47,8 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
     df_agg <- df %>%
       ungroup() %>%
       group_by(cwd_mid) %>%
-      summarise(lue = quantile(lue, probs = 0.9, na.rm = TRUE))  
+      summarise(lue = quantile(lue, probs = 0.9, na.rm = TRUE)) %>% 
+      as.data.frame()
 
     ## Get "fLUE" (reduction in lue by bin)
     flue <- (df_agg %>% slice(nbin) %>% pull(lue)) / (df_agg %>% slice(1) %>% pull(lue))
@@ -61,6 +62,9 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
 
     ## select the number of breakpoints
     lm_selg <- try(selgmented(linmod, seg.Z = ~cwd_mid, return.fit = FALSE))
+    
+    ## try xxx
+    my.seg <- selgmented(linmod, seg.Z = ~ cwd_mid)
 
     has_cp <- FALSE
 
