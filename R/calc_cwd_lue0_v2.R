@@ -61,13 +61,21 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
     cwd_lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["cwd_mid"]
 
     ## select the number of breakpoints based on BIC (own implementation here)
+    try_bic <- function(mod){
+      if (identical(class(mod), "try-error")){
+        out <- 9999
+      } else {
+        out <- BIC(mod)
+      }
+      return(out)
+    }
     list_lm_selg <- purrr::map(as.list(c(1,2)),
-                              ~segmented(linmod, seg.Z = ~ cwd_mid, npsi=., silent=TRUE))
+                              ~try(segmented(linmod, seg.Z = ~ cwd_mid, npsi=., silent=TRUE)))
     for (i in 2:1){
       list_lm_selg[[i+1]] <- list_lm_selg[[i]]
     }
     list_lm_selg[[1]] <- linmod
-    vec_bic <- purrr::map_dbl(list_lm_selg, ~BIC(.))
+    vec_bic <- purrr::map_dbl(list_lm_selg, ~try_bic(.))
     idx_best <- which.min(vec_bic)
     npsi <- idx_best - 1
     lm_selg <- list_lm_selg[[idx_best]]
