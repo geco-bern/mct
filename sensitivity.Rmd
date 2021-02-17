@@ -22,188 +22,40 @@ source("R/calc_cwd_lue0_byilon.R")
 source("R/calc_cwd_et0_byilon.R")
 
 ## get data for one longitude slice, based on SIF
-calc_cwd_lue0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_lue0_SENS")
+calc_cwd_lue0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_lue0_2")
 load("~/mct/data/df_cwd_lue0_SENS/df_cwd_lue0_5600.RData")
 
 ## get data for one longitude slice, based on EF
-calc_cwd_et0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_lue0_SENS")
+suppressMessages(calc_cwd_et0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_et0_2/"))
 load("~/mct/data/df_cwd_lue0_SENS/df_cwd_et0_5600.RData")
 ```
 
 Look at one cell.
 ```{r}
-# df$lat %>% sort()
+# df$lat %>% sort() 
 
 df_data <- df %>% 
-  filter(lat == 24.775) %>% 
+  filter(lat == 44.675) %>% 
   select(data) %>% 
   unnest(data)
 
 df_inst <- df %>% 
-  filter(lat == 24.775) %>% 
+  filter(lat == 44.675) %>% 
   select(data_inst) %>% 
   unnest(data_inst)
 
-out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "SIF", do_plot = TRUE)
+# # out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "SIF", do_plot = TRUE)
 # out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "et", do_plot = TRUE)
-out$gg
-
-out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "nSIF", do_plot = TRUE)
-# out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "fet", do_plot = TRUE)
-out$gg
-```
-
-Instead of a single linear regression, do a segmented regression.
-```{r eval=FALSE}
-nam_lue = "SIF"
-# nam_lue = "fet"
-
-# df_data <- df_data %>%
-#   rename(lue = !!nam_lue)
-
-## retain only data from largest instance of each year
-biginstances <- df_inst %>% 
-  mutate(year = lubridate::year(date_start)) %>% 
-  group_by(year) %>% 
-  dplyr::filter(deficit == max(deficit)) %>% 
-  pull(iinst)
-
-df_data <- df_data %>% 
-  dplyr::filter(iinst %in% biginstances)
-
-## Bin data along deficit and take upper quartile
-# nbin <- ceiling(sum(!is.na(df_data$lue))/30)
-nbin <- 30
-df_data <- df_data %>%
-  ungroup() %>% 
-  mutate(bin = cut(deficit, breaks = nbin)) %>% 
-  mutate(cwd_lower = as.numeric( sub("\\((.+),.*", "\\1", bin)),
-         cwd_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", bin) )
-         ) %>% 
-  mutate(cwd_mid = (cwd_lower + cwd_upper)/2) %>% 
-  dplyr::select(-bin, -cwd_lower, -cwd_upper)
-
-df_agg <- df_data %>%
-  ungroup() %>%
-  group_by(cwd_mid) %>%
-  summarise(lue = quantile(lue, probs = 0.9, na.rm = TRUE), .groups = "drop")  
-
-## visualise quantiles
-ggplot() +
-  geom_point(aes(deficit, lue), df_data) +
-  geom_point(aes(cwd_mid, lue), df_agg, color = "red", size = 2)
-
-linmod <- try(lm(lue ~ cwd_mid, data = df_agg))
-
-## add predictions
-df_agg <- df_agg %>% 
-  mutate(.fit = predict(linmod, newdata = .))
-
-# ## remove outliers (residuals beyond 1.5 * IQR)
-# idx_drop <- which(is.na(rbeni::remove_outliers(linmod$residuals, coef = 0.2)))
-# df_data$lue[idx_drop] <- NA
+# out$gg
 # 
-# ## git linear fit without outliers
-# linmod <- try(lm(lue ~ deficit, data = df_data))
-
-summary(linmod)
-
-## get x-axis cutoff
-cwd_lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["cwd_mid"]
-
-## visualise linear model
-
-ggplot() +
-  geom_point(aes(deficit, lue), data = df_data) +
-  geom_point(aes(cwd_mid, lue), data = df_agg, color = "red", size = 3) +
-  geom_line(aes(cwd_mid, .fit), data = df_agg, color = "red") +
-  # geom_vline(aes(xintercept = cwd_lue0), linetype = "dotted") +
-  geom_hline(aes(yintercept = 0), linetype = "dotted")
-
-## fit segmented with single change point
-# have to provide estimates for breakpoints.
-# after looking a the data, 
-lm_seg <- segmented(linmod, 
-                    seg.Z = ~cwd_mid, 
-                    npsi = 1)
-
-## select the number of breakpoints
-lm_selg <- selgmented(linmod, 
-                      seg.Z = ~cwd_mid,
-                      return.fit = FALSE)
-
-if (lm_selg$npsi>0){
-  print("Change point detected.")
-  has_cp <- TRUE
-  
-  ## fit again, now returning fit
-  lm_selg <- selgmented(linmod, 
-                      seg.Z = ~cwd_mid,
-                      return.fit = TRUE)
-  
-} else {
-  print("No change point detected.")
-  has_cp <- FALSE
-}
-                               
-summary(lm_selg)
-
-## save changepoint
-cp <- lm_seg$psi %>% as_tibble() %>% pull(Est.)
-
-## add predictions
-df_agg <- df_agg %>% 
-  mutate(.fit_seg = predict(lm_seg, newdata = .))
-
-## get useful coefficients
-b0 <- coef(lm_selg)[[1]]
-b1 <- coef(lm_selg)[[2]]
-
-## Important: the coefficients are the differences in slope in comparison to the previous slope
-c1 <- coef(lm_selg)[[2]] + coef(lm_selg)[[3]]
-# break1 <- lm_selg$psi[[3]]
-
-## Solve for c0 (intercept of second segment):
-c0 <- b0 + b1 * cp - c1 * cp
-
-## cwd_lue0 based on first slope
-cwd_lue0_seg <- - b0 / b1
-
-## visualise segmented model
-ggplot() +
-  geom_point(aes(deficit, lue), data = df_data) +
-  geom_point(aes(cwd_mid, lue), data = df_agg, color = "red", size = 3) +
-  geom_line(aes(cwd_mid, .fit_seg), data = df_agg, color = "red") +
-  # geom_vline(aes(xintercept = cwd_lue0), linetype = "dotted") +
-  geom_hline(aes(yintercept = 0), linetype = "dotted") +
-  geom_vline(aes(xintercept = cp), linetype = "dotted") +
-  
-  geom_vline(aes(xintercept = cwd_lue0_seg), linetype = "dotted") +
-  
-  ## visualise coefficients
-  geom_abline(intercept = b0, slope = b1, color = "royalblue", linetype = "dashed") +
-  geom_abline(intercept = c0, slope = c1, color = "royalblue", linetype = "dashed")
-
-# ## test 
-# pscore.test(linmod, ~cwd_mid)
-# pscore.test(lm_seg, ~cwd_mid)
-
-# ## test: is slope negative?
-# slope_lue <- coef(linmod)["deficit"]
-# is_neg <- slope_lue < 0.0
-# rsq <- summary(linmod)$r.squared
-# is_sign <- coef(summary(linmod))["deficit", "Pr(>|t|)"] < 0.05
-#  
-# df_fit <- tibble(y = predict(linmod, newdata = df_data), x = df_data$deficit)
-
-## slope 2 less negative than slope 1 and significantly different?
-df_coef <- coef(summary(lm_selg)) %>% as_tibble(rownames = "coef")
-
-(b1 < 0) && (b1 < c1) && (df_coef %>% dplyr::filter(coef == "U1.cwd_mid") %>% pull("Pr(>|t|)") < 0.05)
+# # out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "nSIF", do_plot = TRUE)
+# out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "fet", do_plot = TRUE)
+# out$gg
 ```
+
 Steps above are now implemented as
 ```{r}
-out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "nSIF", do_plot = TRUE, verbose = TRUE)
+out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "fet", do_plot = TRUE, verbose = TRUE)
 out$gg
 out$cwd_lue0
 ```

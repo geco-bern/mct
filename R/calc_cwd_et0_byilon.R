@@ -1,6 +1,6 @@
-calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0/"){
+calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0_2/"){
   
-  source("R/calc_cwd_lue0.R")
+  source("R/calc_cwd_lue0_v2.R")
 
   find_lat_lores <- function(lat_hires, vec_lat_lores){
     vec_lat_lores[which.min(abs(lat_hires - vec_lat_lores))]
@@ -75,22 +75,19 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
       mutate(data = purrr::map2(data_cwd, data, ~left_join(.x, .y, by = "time"))) %>% 
       dplyr::select(lon, lat, data, data_inst) %>% 
       
-      ## xxx try
-      # filter(lat < 40.0 & lat > 25.00) %>%
-      # filter(lat == 37.025) %>%
+      # ## xxx try
+      # # filter(lat < 40.0 & lat > 25.00) %>%
+      # filter(lat == 44.675) %>%
 
-      ## get CWD at ET = 0
-      mutate(out_lue0_et = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "et", do_plot = FALSE))) %>% 
-      mutate(cwd_lue0_et = purrr::map_dbl(out_lue0_et, "cwd_lue0")) %>%
-      mutate(slope_lue_et = purrr::map_dbl(out_lue0_et, "slope_lue")) %>%
-      # mutate(gg_et = purrr::map(out_lue0_et, "gg")) %>%
-      mutate(flue_et = purrr::map_dbl(out_lue0_et, "flue")) %>%
-      mutate(cwdmax = purrr::map_dbl(out_lue0_et, "cwdmax")) %>%
-      mutate(lue_cwd0_et = purrr::map_dbl(out_lue0_et, "lue_cwd0")) %>%
-      mutate(lambda_decay_et = purrr::map_dbl(out_lue0_et, "lambda_decay")) %>%
-      mutate(s0_teuling_et = purrr::map_dbl(out_lue0_et, "s0_teuling")) %>%
-      mutate(df_flue_et = purrr::map(out_lue0_et, "df_flue")) %>%
-      dplyr::select(-out_lue0_et) %>%
+      # ## get CWD at ET = 0
+      # mutate(out_lue0_et = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "et", do_plot = FALSE))) %>% 
+      # mutate(cwd_lue0_et = purrr::map_dbl(out_lue0_et, "cwd_lue0")) %>%
+      # # mutate(gg_et = purrr::map(out_lue0_et, "gg")) %>%
+      # mutate(flue_et = purrr::map_dbl(out_lue0_et, "flue")) %>%
+      # mutate(cwdmax = purrr::map_dbl(out_lue0_et, "cwdmax")) %>%
+      # mutate(lambda_decay_et = purrr::map_dbl(out_lue0_et, "lambda_decay")) %>%
+      # mutate(s0_teuling_et = purrr::map_dbl(out_lue0_et, "s0_teuling")) %>%
+      # dplyr::select(-out_lue0_et) %>%
 
       ## calculate "evaporative fraction", remove outliers and points where et is zero
       mutate(data = purrr::map(data, ~calc_fet(.))) %>% 
@@ -98,10 +95,13 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
       ## get CWD at fET = 0 (fET = ET/Rn)
       mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = FALSE))) %>% 
       mutate(cwd_lue0_fet = purrr::map_dbl(out_lue0_fet, "cwd_lue0")) %>%
-      mutate(slope_lue_fet = purrr::map_dbl(out_lue0_fet, "slope_lue")) %>%
-      # mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
       mutate(flue_fet = purrr::map_dbl(out_lue0_fet, "flue")) %>%
-      mutate(df_flue_fet = purrr::map(out_lue0_fet, "df_flue")) %>%
+      mutate(cwdmax = purrr::map_dbl(out_lue0_fet, "cwdmax")) %>%
+      mutate(lambda_decay_fet = purrr::map_dbl(out_lue0_fet, "lambda_decay")) %>%
+      mutate(s0_teuling_fet = purrr::map_dbl(out_lue0_fet, "s0_teuling")) %>%
+      mutate(type_fet = purrr::map_chr(out_lue0_fet, "type")) %>%
+      mutate(cwd_flattening_fet = purrr::map_dbl(out_lue0_fet, "cwd_flattening")) %>%
+      # mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
       dplyr::select(-out_lue0_fet)
 
     if (drop_data){

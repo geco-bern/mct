@@ -1,7 +1,7 @@
-calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_lue0"){
+calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_lue0_2"){
   
-  source("R/calc_cwd_lue0.R")
-
+  source("R/calc_cwd_lue0_v2.R")
+  
   find_lat_lores <- function(lat_hires, vec_lat_lores){
     vec_lat_lores[which.min(abs(lat_hires - vec_lat_lores))]
   }
@@ -98,23 +98,23 @@ calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_c
       ## get CWD at SIF = 0, using function calc_cwd_lue0()
       mutate(out_lue0_SIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "SIF", do_plot = FALSE))) %>%
       mutate(cwd_lue0_SIF = purrr::map_dbl(out_lue0_SIF, "cwd_lue0")) %>%
-      mutate(slope_lue_SIF = purrr::map_dbl(out_lue0_SIF, "slope_lue")) %>%
-      # mutate(gg_SIF = purrr::map(out_lue0_SIF, "gg")) %>%
       mutate(flue_SIF = purrr::map_dbl(out_lue0_SIF, "flue")) %>%
-      mutate(cwdmax = purrr::map_dbl(out_lue0_SIF, "cwdmax")) %>%
       mutate(lambda_decay_SIF = purrr::map_dbl(out_lue0_SIF, "lambda_decay")) %>%
-      mutate(df_flue_SIF = purrr::map(out_lue0_SIF, "df_flue")) %>%
+      mutate(cwdmax = purrr::map_dbl(out_lue0_SIF, "cwdmax")) %>%
+      mutate(type_SIF = purrr::map_chr(out_lue0_SIF, "type")) %>%
+      mutate(cwd_flattening_SIF = purrr::map_dbl(out_lue0_SIF, "cwd_flattening")) %>%
+      # mutate(gg_SIF = purrr::map(out_lue0_SIF, "gg")) %>%
       dplyr::select(-out_lue0_SIF) %>%
       
       ## get CWD at SIF/SWdown = 0; SIF/SWdown := nSIF
       mutate(data = purrr::map(data, ~mutate(., nSIF = SIF / sw))) %>% 
       mutate(out_lue0_nSIF = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "nSIF", do_plot = FALSE))) %>% 
       mutate(cwd_lue0_nSIF = purrr::map_dbl(out_lue0_nSIF, "cwd_lue0")) %>%
-      mutate(slope_lue_nSIF = purrr::map_dbl(out_lue0_nSIF, "slope_lue")) %>%
-      # mutate(gg_nSIF = purrr::map(out_lue0_nSIF, "gg")) %>%
       mutate(flue_nSIF = purrr::map_dbl(out_lue0_nSIF, "flue")) %>%
       mutate(lambda_decay_nSIF = purrr::map_dbl(out_lue0_nSIF, "lambda_decay")) %>%
-      mutate(df_flue_nSIF = purrr::map(out_lue0_nSIF, "df_flue")) %>%
+      mutate(type_nSIF = purrr::map_chr(out_lue0_nSIF, "type")) %>%
+      mutate(cwd_flattening_nSIF = purrr::map_dbl(out_lue0_nSIF, "cwd_flattening")) %>%
+      # mutate(gg_nSIF = purrr::map(out_lue0_nSIF, "gg")) %>%
       dplyr::select(-out_lue0_nSIF)
     
     if (drop_data){

@@ -46,7 +46,7 @@ ncores <- min(ncores, nruns)
 if (ncores > 1){
 
   cl <- multidplyr::new_cluster(ncores) %>%
-    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "lubridate", "rlang", "broom", "rbeni")) %>%
+    multidplyr::cluster_library(c("dplyr", "purrr", "tidyr", "dplyr", "magrittr", "lubridate", "rlang", "broom", "rbeni", "segmented")) %>%
     multidplyr::cluster_assign(calc_cwd_et0_byilon = calc_cwd_et0_byilon)
 
   ## distribute to cores, making sure all data from a specific site is sent to the same core
