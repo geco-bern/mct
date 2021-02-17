@@ -177,7 +177,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
                   
                 } else {
                   ## actually declining after CP2 - take slope 3 for x-axis cutoff
-                  is_flattening <- FALSE
+                  is_flattening <- TRUE
                   type <- "A2b"
                 }
                 
