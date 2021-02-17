@@ -47,14 +47,14 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
     df_agg <- df %>%
       ungroup() %>%
       group_by(cwd_mid) %>%
-      summarise(lue = quantile(lue, probs = 0.9, na.rm = TRUE), .groups = "drop")  
+      summarise(lue = quantile(lue, probs = 0.9, na.rm = TRUE))  
 
     ## Get "fLUE" (reduction in lue by bin)
     flue <- (df_agg %>% slice(nbin) %>% pull(lue)) / (df_agg %>% slice(1) %>% pull(lue))
     flue <- ifelse(length(flue)==0, NA, flue)      
 
     ## fit simple linear regression
-    linmod <- try(lm(lue ~ cwd_mid, data = df_agg))
+    linmod <- lm(lue ~ cwd_mid, data = df_agg)
 
     ## get x-axis cutoff (plain)
     cwd_lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["cwd_mid"]

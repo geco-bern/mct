@@ -11,6 +11,7 @@ library(broom)
 library(rlang)
 library(lubridate)
 library(rbeni)
+library(segmented)
 
 source("R/calc_cwd_et0_byilon.R")
 

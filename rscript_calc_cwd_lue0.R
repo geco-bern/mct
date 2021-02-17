@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
-args = commandArgs(trailingOnly=TRUE)
-# args <- c(14, 100)
+# args = commandArgs(trailingOnly=TRUE)
+args <- c(5000, 7200)
 
 library(dplyr)
 library(purrr)
@@ -11,6 +11,7 @@ library(broom)
 library(rlang)
 library(lubridate)
 library(rbeni)
+library(segmented)
 
 source("R/calc_cwd_lue0_byilon.R")
 

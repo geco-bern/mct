@@ -5,7 +5,7 @@ date: "2/15/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup}
 library(tidyverse)
 library(segmented)
 ```
@@ -15,6 +15,7 @@ library(segmented)
 Perform change point detection in SIF ~ CWD regression.
 
 ```{r}
+source("R/calc_cwd_lue0_v2.R")
 source("R/calc_cwd_lue0_byilon.R")
 source("R/calc_cwd_et0_byilon.R")
 
@@ -32,12 +33,12 @@ Look at one cell.
 # df$lat %>% sort() 
 
 df_data <- df %>% 
-  filter(lat == 44.675) %>% 
+  filter(lat == 18.175) %>% 
   select(data) %>% 
   unnest(data)
 
 df_inst <- df %>% 
-  filter(lat == 44.675) %>% 
+  filter(lat == 18.175) %>% 
   select(data_inst) %>% 
   unnest(data_inst)
 
@@ -52,7 +53,7 @@ df_inst <- df %>%
 
 Steps above are now implemented as
 ```{r}
-out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "fet", do_plot = TRUE, verbose = TRUE)
+out <- calc_cwd_lue0(df = df_data, inst = df_inst, nam_lue = "fet", do_plot = TRUE, verbose = TRUE)
 out$gg
 out$cwd_lue0
 ```

@@ -9,7 +9,7 @@ library(rlang)
 
 source("R/extract_whc_byfil.R")
 
-dir <- "data/df_whc_hires_chunks_SAVE/"
+dir <- "data/df_whc_hires_chunks/"
 filelist <- paste0(dir, list.files(dir, pattern = "df_whc_hires_chunk_.*.RData"))
 
 ## get all available cores
@@ -38,7 +38,7 @@ if (ncores > 1){
   
 }
 
-save(df_whc, file = "~/data/mct_data/df_whc_hires.RData")
+save(df_whc, file = "~/data/mct_data/df_whc_hires_lasthope.RData")
 
 
 ## test plot
