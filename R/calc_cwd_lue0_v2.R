@@ -80,6 +80,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
     npsi <- idx_best - 1
     lm_selg <- list_lm_selg[[idx_best]]
 
+    if (verbose) rlang::inform(paste("Number of change points:", npsi))
     has_cp <- FALSE
 
     if (!(class(lm_selg) == "try-error")){
