@@ -9,8 +9,14 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
   }
   
   ## rename
-  df <- df %>% 
-    rename(lue = !!nam_lue)
+  icol <- which(nam_lue == names(df))
+  newnames <- names(df) 
+  newnames[icol] <- "lue"
+  names(df) <- newnames
+  
+  ## doesn't always work
+  # df <- df %>% 
+  #   rename(lue = !!nam_lue)
   
   ## retain only data from largest instance of each year
   biginstances <- inst %>% 

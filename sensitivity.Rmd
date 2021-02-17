@@ -14,9 +14,6 @@ library(segmented)
 
 Perform change point detection in SIF ~ CWD regression.
 
-Install JAGS, and use the mcp package (see [here](https://gist.github.com/casallas/8411082)).
-
-
 ```{r}
 source("R/calc_cwd_lue0_byilon.R")
 source("R/calc_cwd_et0_byilon.R")
@@ -26,7 +23,7 @@ calc_cwd_lue0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_lue0_2")
 load("~/mct/data/df_cwd_lue0_SENS/df_cwd_lue0_5600.RData")
 
 ## get data for one longitude slice, based on EF
-suppressMessages(calc_cwd_et0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_et0_2/"))
+calc_cwd_et0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_et0_2/")
 load("~/mct/data/df_cwd_lue0_SENS/df_cwd_et0_5600.RData")
 ```
 
