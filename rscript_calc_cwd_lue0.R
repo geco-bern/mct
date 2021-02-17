@@ -18,14 +18,14 @@ source("R/calc_cwd_lue0_byilon.R")
 ## split it up into chunks (total number of chunks provided by argument 2)
 ##------------------------------------------------------------------------
 ## first round
-# nlon <- 7200
-# ilat <- seq(1:nlon)
+nlon <- 7200
+ilat <- seq(1:nlon)
 ##----
 
-## second round: do only missing ones
-load("./data/df_file_availability_cwd_lue0.RData")
-ilat <- df %>% dplyr::filter(!avl_cwd_lue0) %>% pull(ilon)
-nlon <- length(ilat)
+# ## second round: do only missing ones
+# load("./data/df_file_availability_cwd_lue0.RData")
+# ilat <- df %>% dplyr::filter(!avl_cwd_lue0) %>% pull(ilon)
+# nlon <- length(ilat)
 ##----
 
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
@@ -54,11 +54,11 @@ if (ncores > 1){
   df_out <- tibble(ilon = irow_chunk[[as.integer(args[1])]]) %>%
     multidplyr::partition(cl) %>%
     dplyr::mutate(out = purrr::map( ilon,
-                                    ~try(calc_cwd_lue0_byilon(.))))
+                                    ~try(calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2"))))
 
 } else {
 
   ## testing
-  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(.))
+  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2"))
 
 }
