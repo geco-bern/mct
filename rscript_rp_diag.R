@@ -19,6 +19,8 @@ calc_return_period <- function(ilon, df_s0){
     dplyr::select(-results) %>% 
     mutate(loc = purrr::map_dbl(par, "location")) %>% 
     mutate(scale = purrr::map_dbl(par, "scale")) %>% 
+    mutate(loc = ifelse(is.null(loc), NA, loc),
+           scale = ifelse(is.null(scale), NA, scale)) %>% 
     dplyr::select(-par) %>% 
     rowwise() %>% 
     mutate(rp_diag = calc_return_period_byrow(cwd_lue0_nSIF, loc, scale)) %>% 
