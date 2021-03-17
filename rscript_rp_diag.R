@@ -39,7 +39,6 @@ df_rp_diag <- df_corr %>%
   nest() %>% 
   mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
   ungroup() %>% 
-  slice(140) %>% 
   mutate(data = purrr::map2(ilon, data, ~calc_return_period(.x, .y))) %>% 
   mutate(data = purrr::map(data, ~dplyr::select(lat, rp_diag))) %>% 
   unnest(data)
