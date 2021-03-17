@@ -1,7 +1,7 @@
 collect_cwd_lue0_byilon <- function(ilon){
   
   ## construct output file name
-  dirn <- "~/mct/data/df_cwd_lue0/"
+  dirn <- "~/mct/data/df_cwd_lue0_2/"
   filn <- paste0("df_cwd_lue0_", ilon, ".RData")
   path <- paste0(dirn, filn)
   
