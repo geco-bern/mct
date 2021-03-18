@@ -1,7 +1,7 @@
 library(tidyverse)
 
 extract_loc <- function(mod){
-  loc <- mod$results$par$location
+  loc <- mod$results$par[ "location" ]
   if (!is.null(loc)){
     return(loc)
   } else {
@@ -10,7 +10,7 @@ extract_loc <- function(mod){
 }
 
 extract_scale <- function(mod){
-  scale <- mod$results$par$scale
+  scale <- mod$results$par[ "scale" ]
   if (!is.null(scale)){
     return(scale)
   } else {
