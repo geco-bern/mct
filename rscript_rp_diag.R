@@ -1,6 +1,26 @@
 library(tidyverse)
 
-load("data/df_corr.RData")
+extract_loc <- function(mod){
+  loc <- mod$results$par$location
+  if (!is.null(loc)){
+    return(loc)
+  } else {
+    return(NA)
+  }
+}
+
+extract_scale <- function(mod){
+  scale <- mod$results$par$scale
+  if (!is.null(scale)){
+    return(scale)
+  } else {
+    return(NA)
+  }
+}
+
+calc_return_period_byrow <- function(x, loc, scale){
+  1 / (1 - exp( -exp(-(x - loc)/scale)))
+}
 
 calc_return_period <- function(ilon, df_s0){
   
@@ -14,25 +34,16 @@ calc_return_period <- function(ilon, df_s0){
     mutate(mod = purrr::map(out_mct, "mod")) %>% 
     mutate(notavl_mod = purrr::map_lgl(mod, ~is.na(.))) %>% 
     dplyr::filter(!notavl_mod) %>% 
-    dplyr::select(-out_mct) %>% 
-    mutate(results = purrr::map(mod, "results")) %>% 
-    dplyr::select(-mod) %>% 
-    mutate(par = purrr::map(results, "par")) %>% 
-    dplyr::select(-results) %>% 
-    mutate(loc = purrr::map_dbl(par, "location")) %>% 
-    mutate(scale = purrr::map_dbl(par, "scale")) %>% 
-    mutate(loc = ifelse(is.null(loc), NA, loc),
-           scale = ifelse(is.null(scale), NA, scale)) %>% 
-    dplyr::select(-par) %>% 
+    dplyr::select(-out_mct) %>%
+    mutate(loc = purrr::map(mod, ~extract_loc(.)),
+           scale = purrr::map(mod, ~extract_scale(.))) %>% 
     rowwise() %>% 
     mutate(rp_diag = calc_return_period_byrow(cwd_lue0_nSIF, loc, scale)) %>% 
     ungroup()
   
 }
 
-calc_return_period_byrow <- function(x, loc, scale){
-  1 / (1 - exp( -exp(-(x - loc)/scale)))
-}
+load("data/df_corr.RData")
 
 df_rp_diag <- df_corr %>% 
   dplyr::select(lon, lat, cwd_lue0_nSIF) %>% 
