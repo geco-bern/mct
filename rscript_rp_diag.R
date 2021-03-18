@@ -12,7 +12,7 @@ calc_return_period <- function(ilon, df_s0){
                 mutate(lat = round(lat, digits = 3)), 
               by = "lat") %>% 
     mutate(mod = purrr::map(out_mct, "mod")) %>% 
-    mutate(notavl_mod = purrr::map_lgl(mod, ~is.na(.))) %>% 
+    mutate(notavl_mod = purrr::map_lgl(mod, ~identical(NA, .))) %>% 
     dplyr::filter(!notavl_mod) %>% 
     dplyr::select(-out_mct) %>% 
     mutate(results = purrr::map(mod, "results")) %>% 
