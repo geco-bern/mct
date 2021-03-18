@@ -35,8 +35,8 @@ calc_return_period <- function(ilon, df_s0){
     mutate(notavl_mod = purrr::map_lgl(mod, ~identical(NA, .))) %>% 
     dplyr::filter(!notavl_mod) %>% 
     dplyr::select(-out_mct) %>%
-    mutate(loc = purrr::map(mod, ~extract_loc(.)),
-           scale = purrr::map(mod, ~extract_scale(.))) %>% 
+    mutate(loc = purrr::map_dbl(mod, ~extract_loc(.)),
+           scale = purrr::map_dbl(mod, ~extract_scale(.))) %>% 
     rowwise() %>% 
     mutate(rp_diag = calc_return_period_byrow(cwd_lue0_nSIF, loc, scale)) %>% 
     ungroup()
