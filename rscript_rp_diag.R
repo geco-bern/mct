@@ -1,15 +1,16 @@
 #!/usr/bin/env Rscript
 
-# args = commandArgs(trailingOnly=TRUE)
-args <- c(10, 30)
+args = commandArgs(trailingOnly=TRUE)
+# args <- c(10, 30)
 
 library(tidyverse)
 
-# source("R/calc_return_period.R")
+source("R/calc_return_period.R")
 
 load("data/df_corr.RData")
 
 df_corr <- df_corr %>% 
+  arrange(lon) %>% 
   mutate(idx = 1:n()) %>%
   mutate(chunk = rep(1:as.integer(args[2]), each = (nrow(.)/as.integer(args[2])), len = nrow(.)))
 
@@ -30,7 +31,7 @@ print(df_corr_sub$idx)
 filn <- paste0("data/df_rp_diag/df_rp_diag_ichunk_", args[1], "_", args[2], ".RData")
 if (!file.exists(filn)){
 	df_rp_diag <- df_corr_sub %>% 
-	  dplyr::select(lon, lat, cwd_lue0_nSIF) %>% 
+	  dplyr::select(lon, lat, s0 = cwd_lue0_fet) %>% 
 	  drop_na() %>% 
 	  group_by(lon) %>% 
 	  nest() %>% 

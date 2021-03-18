@@ -15,7 +15,7 @@ calc_return_period <- function(ilon, df_s0){
     mutate(loc = purrr::map_dbl(mod, ~extract_loc(.)),
            scale = purrr::map_dbl(mod, ~extract_scale(.))) %>% 
     rowwise() %>% 
-    mutate(rp_diag = calc_return_period_byrow(cwd_lue0_nSIF, loc, scale)) %>% 
+    mutate(rp_diag = calc_return_period_byrow(s0, loc, scale)) %>% 
     ungroup()
   
 }
