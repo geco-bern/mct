@@ -7,6 +7,7 @@ calc_return_period <- function(ilon, df_s0){
     left_join(df %>% 
                 mutate(lat = round(lat, digits = 3)), 
               by = "lat") %>% 
+    dplyr::select(-lon) %>% 
     mutate(mod = purrr::map(out_mct, "mod")) %>% 
     mutate(notavl_mod = purrr::map_lgl(mod, ~identical(NA, .))) %>% 
     dplyr::filter(!notavl_mod) %>% 

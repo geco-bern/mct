@@ -1,11 +1,11 @@
 #!/usr/bin/env Rscript
 
-args = commandArgs(trailingOnly=TRUE)
-# args <- c(30, 30)
+# args = commandArgs(trailingOnly=TRUE)
+args <- c(10, 30)
 
 library(tidyverse)
 
-source("R/calc_return_period.R")
+# source("R/calc_return_period.R")
 
 load("data/df_corr.RData")
 
@@ -37,8 +37,8 @@ if (!file.exists(filn)){
 	  mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
 	  ungroup() %>% 
 	  mutate(data = purrr::map2(ilon, data, ~calc_return_period(.x, .y))) %>% 
-	  mutate(data = purrr::map(data, ~dplyr::select(lat, rp_diag))) %>% 
-	  unnest(data)
+	  unnest(data) %>% 
+	  dplyr::select(lon, lat, loc, scale, rp_diag)
   save(df_rp_diag, file = filn)
 } else {
   print(paste("File exists already: ", filn))
