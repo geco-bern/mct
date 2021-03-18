@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
 
+## This can easily be run on the local computer after downloading data into ~/mct/data/df_cwd_et0_2/
+
 library(dplyr)
 library(purrr)
 library(tidyr)
@@ -11,7 +13,8 @@ library(lubridate)
 source("R/collect_cwd_et0_byilon.R")
 
 ## get all available cores
-ncores <- parallel::detectCores()
+#ncores <- parallel::detectCores()
+ncores <- 1
 
 ##------------------------------------------------------------------------
 ## 2. collect data from small files into a single dataframe
@@ -40,7 +43,7 @@ if (ncores > 1){
 
 ## write to file
 dirn <- "~/mct/data/"
-filn <- paste0("df_cwd_et0.RData")
+filn <- paste0("df_cwd_et0_2.RData")
 path <- paste0(dirn, filn)
 print(paste("Writing file:", path))
 save(df, file = path)

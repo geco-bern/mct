@@ -198,10 +198,10 @@ ggsave("fig/zroot_biomes_rsip.pdf", height = 10, width = 10)
 ## Add model results
 
 ```{r}
-df <- extract_nc(df %>%dplyr::select(id, lon, lat), "data/zroot_cwd40.nc") %>% 
+df <- extract_nc(df %>%dplyr::select(id, lon, lat), "data/zroot_cwd80.nc") %>% 
   unnest(data) %>% 
-  rename(zroot_cwdx40 = V1) %>% 
-  mutate(zroot_cwdx40 = zroot_cwdx40 / 1000) %>% 
+  rename(zroot_cwdx80 = V1) %>% 
+  mutate(zroot_cwdx80 = zroot_cwdx80 / 1000) %>% 
   right_join(df, by = c("lon", "lat", "id"))
 ```
 
@@ -210,7 +210,7 @@ df <- extract_nc(df %>%dplyr::select(id, lon, lat), "data/zroot_cwd40.nc") %>%
 ```{r}
 ## boxplot
 df %>% 
-  rename(obs = Dr, mod = zroot_cwdx40) %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
   pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
   ggplot(aes(x = biome_name, y = -zroot, fill = source)) +
   geom_boxplot() +
@@ -220,7 +220,7 @@ df %>%
 
 ## barplot
 df %>% 
-  rename(obs = Dr, mod = zroot_cwdx40) %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
   pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
   ggplot(aes(x = biome_name, fill = source)) +
   stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.01), geom = "bar", position=position_dodge()) +
@@ -235,7 +235,7 @@ biome_exclude <- df %>%
 
 df %>% 
   dplyr::filter(!(biome_name %in% biome_exclude)) %>% 
-  rename(obs = Dr, mod = zroot_cwdx40) %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
   tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
   dplyr::filter(!is.na(biome_name)) %>% 
   dplyr::filter(biome_name!="Mangroves") %>%   
@@ -247,7 +247,7 @@ df %>%
   ) +
   scale_y_discrete(expand = c(0, 0), name = "") +
   scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
-  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX40]), "Observed"), name = "") +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
   scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
   scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
   coord_cartesian(clip = "off") +
@@ -267,18 +267,18 @@ ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip.png", width = 15, height = 10)
 Scatterplot of modelled vs. observed.
 ```{r}
 df %>% 
-  analyse_modobs2("zroot_cwdx40", "Dr", type = "heat")
+  analyse_modobs2("zroot_cwdx80", "Dr", type = "heat")
 ```
 
 Quantiles
 ```{r}
 df_biome <- df %>% 
   group_by(biome_name) %>% 
-  summarise(q10_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.1, na.rm = TRUE),
-            q25_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.25, na.rm = TRUE),
-            q50_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.5, na.rm = TRUE),
-            q75_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.75, na.rm = TRUE),
-            q90_zroot_cwdx40 = quantile(zroot_cwdx40, probs = 0.9, na.rm = TRUE),
+  summarise(q10_zroot_cwdx80 = quantile(zroot_cwdx80, probs = 0.1, na.rm = TRUE),
+            q25_zroot_cwdx80 = quantile(zroot_cwdx80, probs = 0.25, na.rm = TRUE),
+            q50_zroot_cwdx80 = quantile(zroot_cwdx80, probs = 0.5, na.rm = TRUE),
+            q75_zroot_cwdx80 = quantile(zroot_cwdx80, probs = 0.75, na.rm = TRUE),
+            q90_zroot_cwdx80 = quantile(zroot_cwdx80, probs = 0.9, na.rm = TRUE),
             
             q10_zroot_obs = quantile(Dr, probs = 0.1, na.rm = TRUE),
             q25_zroot_obs = quantile(Dr, probs = 0.25, na.rm = TRUE),
@@ -288,42 +288,42 @@ df_biome <- df %>%
             )
 
 out <- df_biome %>% 
-  analyse_modobs2("q10_zroot_cwdx40", "q10_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+  analyse_modobs2("q10_zroot_cwdx80", "q10_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
 gg_rsip_10 <- out$gg + labs(title = "10% quantile by biome, RSIP data",
-              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_rsip_10
 save(gg_rsip_10, file = "data/gg_rsip_10.RData")
 
 out <- df_biome %>% 
-  analyse_modobs2("q25_zroot_cwdx40", "q25_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+  analyse_modobs2("q25_zroot_cwdx80", "q25_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
 gg_rsip_25 <- out$gg + labs(title = "25% quantile by biome, RSIP data",
-              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_rsip_25
 save(gg_rsip_25, file = "data/gg_rsip_25.RData")
 
 out <- df_biome %>% 
-  analyse_modobs2("q50_zroot_cwdx40", "q50_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+  analyse_modobs2("q50_zroot_cwdx80", "q50_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
 gg_rsip_50 <- out$gg + labs(title = "50% quantile by biome, RSIP data",
-              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_rsip_50
 save(gg_rsip_50, file = "data/gg_rsip_50.RData")
 ggsave("fig/modobs_zroot_q90_rsip.pdf", width = 6, height = 5)
 
 out <- df_biome %>% 
-  analyse_modobs2("q75_zroot_cwdx40", "q75_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+  analyse_modobs2("q75_zroot_cwdx80", "q75_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
 gg_rsip_75 <- out$gg + labs(title = "75% quantile by biome, RSIP data",
-              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_rsip_75
 save(gg_rsip_75, file = "data/gg_rsip_75.RData")
 
 out <- df_biome %>% 
-  analyse_modobs2("q90_zroot_cwdx40", "q90_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
+  analyse_modobs2("q90_zroot_cwdx80", "q90_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
 gg_rsip_90 <- out$gg + labs(title = "90% quantile by biome, RSIP data",
-              x = expression(italic(z)[CWDX40] ~ " (m)"),
+              x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_rsip_90
 save(gg_rsip_90, file = "data/gg_rsip_90.RData")
