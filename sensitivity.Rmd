@@ -37,13 +37,13 @@ Look at one cell.
 # caused problem: 18.175
 
 df_data <- df %>% 
-  dplyr::filter(lat == 18.875 ) %>% 
-  dplyr::select(data) %>% 
+  filter(lat == 18.175) %>% 
+  select(data) %>% 
   unnest(data)
 
 df_inst <- df %>% 
-  dplyr::filter(lat == 18.875 ) %>% 
-  dplyr::select(data_inst) %>% 
+  filter(lat == 18.175) %>% 
+  select(data_inst) %>% 
   unnest(data_inst)
 
 # # out <- calc_cwd_lue0(df_data, df_inst, nam_lue = "SIF", do_plot = TRUE)
