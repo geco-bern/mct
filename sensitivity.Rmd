@@ -37,12 +37,12 @@ Look at one cell.
 # caused problem: 18.175
 
 df_data <- df %>% 
-  filter(lat == 24.525 ) %>% 
+  filter(lat == 18.175) %>% 
   select(data) %>% 
   unnest(data)
 
 df_inst <- df %>% 
-  filter(lat == 24.525 ) %>% 
+  filter(lat == 18.175) %>% 
   select(data_inst) %>% 
   unnest(data_inst)
 
