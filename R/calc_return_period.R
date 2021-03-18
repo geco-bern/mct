@@ -21,7 +21,7 @@ calc_return_period <- function(ilon, df_s0){
 }
 
 calc_return_period_byrow <- function(x, loc, scale){
-  1 / (1 - exp( -exp(-(x - loc)/scale)))
+  1 / (1 - exp(-exp(-(x-loc)/scale)))
 }
 
 extract_loc <- function(mod){
