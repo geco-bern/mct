@@ -23,7 +23,7 @@ library(ggridges)
 library(ggrepel)
 ```
 
-The data is downloaded from the google spreadsheet [RSIP Working Copy](https://docs.google.com/spreadsheets/d/1IW7CiLaw2xEr3MYuLwZ5mJWEbhAEU_hP9J6od5vb-jk/edit#gid=1200594845), tab 'Analysis sheet', into a CSV (19.9.2019) and saved as `data/RSIP_Analysis_sheet.csv`.
+The data is downloaded from the google spreadsheet [RSIP Working Copy], tab 'Analysis sheet', into a CSV (19.9.2019) and saved as `data/RSIP_Analysis_sheet.csv`.
 
 Use `gsheet::gsheet2tbl`
 

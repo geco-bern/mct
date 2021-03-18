@@ -1,61 +1,45 @@
 #!/usr/bin/env Rscript
 
+args = commandArgs(trailingOnly=TRUE)
+# args <- c(30, 30)
+
 library(tidyverse)
 
-extract_loc <- function(mod){
-  loc <- mod$results$par[ "location" ]
-  if (!is.null(loc)){
-    return(loc)
-  } else {
-    return(NA)
-  }
-}
-
-extract_scale <- function(mod){
-  scale <- mod$results$par[ "scale" ]
-  if (!is.null(scale)){
-    return(scale)
-  } else {
-    return(NA)
-  }
-}
-
-calc_return_period_byrow <- function(x, loc, scale){
-  1 / (1 - exp( -exp(-(x - loc)/scale)))
-}
-
-calc_return_period <- function(ilon, df_s0){
-  
-  load(paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData"))
-  
-  df_s0 %>% 
-    mutate(lat = round(lat, digits = 3)) %>% 
-    left_join(df %>% 
-                mutate(lat = round(lat, digits = 3)), 
-              by = "lat") %>% 
-    mutate(mod = purrr::map(out_mct, "mod")) %>% 
-    mutate(notavl_mod = purrr::map_lgl(mod, ~identical(NA, .))) %>% 
-    dplyr::filter(!notavl_mod) %>% 
-    dplyr::select(-out_mct) %>%
-    mutate(loc = purrr::map_dbl(mod, ~extract_loc(.)),
-           scale = purrr::map_dbl(mod, ~extract_scale(.))) %>% 
-    rowwise() %>% 
-    mutate(rp_diag = calc_return_period_byrow(cwd_lue0_nSIF, loc, scale)) %>% 
-    ungroup()
-  
-}
+source("R/calc_return_period.R")
 
 load("data/df_corr.RData")
 
-df_rp_diag <- df_corr %>% 
-  dplyr::select(lon, lat, cwd_lue0_nSIF) %>% 
-  drop_na() %>% 
-  group_by(lon) %>% 
-  nest() %>% 
-  mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
-  ungroup() %>% 
-  mutate(data = purrr::map2(ilon, data, ~calc_return_period(.x, .y))) %>% 
-  mutate(data = purrr::map(data, ~dplyr::select(lat, rp_diag))) %>% 
-  unnest(data)
+df_corr <- df_corr %>% 
+  mutate(idx = 1:n()) %>%
+  mutate(chunk = rep(1:as.integer(args[2]), each = (nrow(.)/as.integer(args[2])), len = nrow(.)))
 
-save("data/df_rp_diag.RData")
+## split sites data frame into (almost) equal chunks
+list_df_split <- df_corr %>%
+  group_by(chunk) %>%
+  group_split()
+
+## retain only the one required for this chunk
+df_corr_sub <- list_df_split[[as.integer(args[1])]]
+
+print("This chunk contains these rows of the full site data frame:")
+print(df_corr_sub$idx)
+
+##------------------------------------------------------------------------
+## ingest forcing data, run P-model, and get climate indeces at once
+##------------------------------------------------------------------------
+filn <- paste0("data/df_rp_diag/df_rp_diag_ichunk_", args[1], "_", args[2], ".RData")
+if (!file.exists(filn)){
+	df_rp_diag <- df_corr_sub %>% 
+	  dplyr::select(lon, lat, cwd_lue0_nSIF) %>% 
+	  drop_na() %>% 
+	  group_by(lon) %>% 
+	  nest() %>% 
+	  mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
+	  ungroup() %>% 
+	  mutate(data = purrr::map2(ilon, data, ~calc_return_period(.x, .y))) %>% 
+	  mutate(data = purrr::map(data, ~dplyr::select(lat, rp_diag))) %>% 
+	  unnest(data)
+  save(df_rp_diag, file = filn)
+} else {
+  print(paste("File exists already: ", filn))
+}
