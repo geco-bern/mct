@@ -20,7 +20,8 @@ calc_return_level <- function(ilon, df_s0){
 
 f_calc_return_level <- function(x, mod){
 
-  return_period <- c(seq(2, 9, by = 1), seq(10, 95, by = 5), seq(100, 300, by = 10), seq(400, 1000, by = 100))
+  # return_period <- c(seq(2, 9, by = 1), seq(10, 95, by = 5), seq(100, 300, by = 10), seq(400, 1000, by = 100))
+  return_period <- c(seq(10, 95, by = 10), seq(100, 500, by = 50))
   
   return_level <- try(extRemes::return.level(
     mod, 
