@@ -2821,53 +2821,39 @@ ggsave("fig/map_bias_cwdx20_casia.pdf", width = 9, height = 5)
 ggsave("fig/map_bias_cwdx20_casia.png", width = 9, height = 5)
 ```
 
-### Diagnose the return period.
+## Diagnose the return period.
 
-Given the SIF and EF-based S0, back-calculate the return period for each gridcell, using the fitted Gumbel parameters for the respective cell. This is done with the script `rscript_rp_diag.R`.
+Given the SIF and EF-based S0, back-calculate the return period for each gridcell, using the fitted Gumbel parameters for the respective cell. This is done with the script `rscript_rp_diag.R`, then `rscript_collect_rp_diag.R`.
 
 ```{r}
-load("data/df_corr.RData")
+load("data/df_rp_diag_nSIF.RData")
+load("data/df_rp_diag_fet.RData")
 
-calc_return_period <- function(ilon, df_s0){
-  
-  load(paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData"))
-  
-  df_s0 %>% 
-    mutate(lat = round(lat, digits = 3)) %>% 
-    left_join(df %>% 
-                mutate(lat = round(lat, digits = 3)), 
-              by = "lat") %>% 
-    mutate(mod = purrr::map(out_mct, "mod")) %>% 
-    dplyr::select(-out_mct) %>% 
-    mutate(results = purrr::map(mod, "results")) %>% 
-    dplyr::select(-mod) %>% 
-    mutate(par = purrr::map(results, "par")) %>% 
-    dplyr::select(-results) %>% 
-    mutate(loc = purrr::map_dbl(par, "location")) %>% 
-    mutate(scale = purrr::map_dbl(par, "scale")) %>% 
-    dplyr::select(-par) %>% 
-    rowwise() %>% 
-    mutate(rp_diag = calc_return_period_byrow(cwd_lue0_nSIF, loc, scale)) %>% 
-    ungroup()
+df_rp_diag_nSIF %>% 
+  ggplot(aes(x = 1, y = rp_diag)) + 
+  geom_violin() +
+  ylim(0, 200)
 
-}
+df_rp_diag_fet %>% 
+  ggplot(aes(x = 1, y = rp_diag)) + 
+  geom_violin() +
+  ylim(0, 200)
+```
+Convert to map, regrid, and plot.
+```{r}
+nc <- df_to_grid(df_rp_diag_nSIF, varnam = "rp_diag", lonnam = "lon", latnam = "lat")
+write_nc2(nc, varnams = "rp_diag", lon = df_rp_diag_nSIF$lon %>% unique() %>% sort(), lat = df_rp_diag_nSIF$lat %>% unique() %>% sort(), path = "data/return_period_nSIF.nc", make_zdim = FALSE)
 
-calc_return_period_byrow <- function(x, loc, scale){
-  1 / (1 - exp( -exp(-(x - loc)/scale)))
-}
+system("cdo remapbil,gridfile_tenthdeg.txt data/return_period_nSIF.nc data/return_period_nSIF_tenthdeg.nc")
 
-df_rp_diag <- df_corr %>% 
-  dplyr::select(lon, lat, cwd_lue0_nSIF) %>% 
-  drop_na() %>% 
-  group_by(lon) %>% 
-  nest() %>% 
-  mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
-  ungroup() %>% 
-  mutate(data = purrr::map2(ilon, data, ~calc_return_period(.x, .y))) %>% 
-  mutate(data = purrr::map(data, ~dplyr::select(lat, rp_diag))) %>% 
-  unnet(data)
-
-save("data/df_rp_diag.RData")
+nc <- read_nc_onefile("data/return_period_nSIF_tenthdeg.nc", varnam = "rp_diag")
+gg <- plot_map3(nc, varnam = "rp_diag", breaks = c(seq(0, 200, by = 20), Inf), latmin = -55, latmax = 80,
+          spacing = "constant", combine = FALSE, colorscale = viridis::cividis, legend_title = "(yr)")
+gg$ggmap <- gg$ggmap + 
+  labs(title = expression(italic(T)[nSIF]))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_return_period_nSIF.pdf", width = 10, height = 6)
+ggsave("fig/map_return_period_nSIF.png", width = 10, height = 6)
 ```
 
 
