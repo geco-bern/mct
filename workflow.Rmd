@@ -2759,7 +2759,7 @@ ggsave("fig/bias_sif_dsif_vegtype.pdf", width = 6, height = 4)
 ggsave("fig/bias_sif_dsif_vegtype.png", width = 6, height = 4)
 
 
-## using EF
+## violin plot using EF
 df_corr_bias %>%
   dplyr::select(starts_with("bias_fet_")) %>% 
   pivot_longer(cols = everything(), names_to = "return_period", values_to = "bias", names_prefix = "bias_fet_") %>%
@@ -2773,6 +2773,7 @@ ggsave("fig/bias_dfet.pdf", width = 6, height = 4)
 ggsave("fig/bias_dfet.png", width = 6, height = 4)
 
 
+## boxplot by veg type using EF
 df_corr_bias %>%
   mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>% 
   dplyr::select(starts_with("bias_fet_"), vegetation) %>%

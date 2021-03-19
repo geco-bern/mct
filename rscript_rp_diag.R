@@ -1,11 +1,11 @@
 #!/usr/bin/env Rscript
 
-args = commandArgs(trailingOnly=TRUE)
-# args <- c(10, 30)
+# args = commandArgs(trailingOnly=TRUE)
+args <- c(7, 30)
 
 library(tidyverse)
 
-source("R/calc_return_period.R")
+#source("R/calc_return_period.R")
 
 load("data/df_corr.RData")
 
@@ -23,21 +23,27 @@ list_df_split <- df_corr %>%
 df_corr_sub <- list_df_split[[as.integer(args[1])]]
 
 ##------------------------------------------------------------------------
-## ingest forcing data, run P-model, and get climate indeces at once
+## asdf
 ##------------------------------------------------------------------------
 filn <- paste0("data/df_rp_diag/df_rp_diag_ichunk_", args[1], "_", args[2], ".RData")
-if (!file.exists(filn)){
-	df_rp_diag <- df_corr_sub %>% 
-	  dplyr::select(lon, lat, s0 = cwd_lue0_fet) %>% 
-	  drop_na() %>% 
-	  group_by(lon) %>% 
-	  nest() %>% 
-	  mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
-	  ungroup() %>% 
-	  mutate(data = purrr::map2(ilon, data, ~calc_return_period(.x, .y))) %>% 
-	  unnest(data) %>% 
-	  dplyr::select(lon, lat, loc, scale, rp_diag)
-  save(df_rp_diag, file = filn)
+df_rp_diag <- df_corr_sub %>% 
+  dplyr::select(lon, lat, s0 = cwd_lue0_fet) %>% 
+  drop_na() %>% 
+  group_by(lon) %>% 
+  nest() %>% 
+  mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
+  ungroup()
+
+if (nrow(df_rp_diag)>0){
+  if (!file.exists(filn)){
+    df_rp_diag <- df_rp_diag %>% 
+      mutate(data = purrr::map2(ilon, data, ~calc_return_period(.x, .y))) %>% 
+      unnest(data) %>% 
+      dplyr::select(lon, lat, loc, scale, rp_diag)
+    save(df_rp_diag, file = filn)
+  } else {
+    print(paste("File exists already: ", filn))
+  }
 } else {
-  print(paste("File exists already: ", filn))
+  print("No data available for this chunk.")
 }
