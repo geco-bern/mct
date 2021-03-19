@@ -21,9 +21,6 @@ list_df_split <- df_corr %>%
 ## retain only the one required for this chunk
 df_corr_sub <- list_df_split[[as.integer(args[1])]]
 
-print("This chunk contains these rows of the full site data frame:")
-print(df_corr_sub$idx)
-
 ##------------------------------------------------------------------------
 ## ingest forcing data, run P-model, and get climate indeces at once
 ##------------------------------------------------------------------------
