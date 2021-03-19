@@ -1,10 +1,6 @@
 calc_return_period <- function(ilon, df_s0){
   
-  print(names(df_s0))
-  print((nrow(df_s0)))
   load(paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData"))
-  
-  print(names(df))
   
   df_s0 %>% 
     mutate(lat = round(lat, digits = 3)) %>% 

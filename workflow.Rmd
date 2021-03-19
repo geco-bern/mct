@@ -2730,6 +2730,16 @@ df_corr_bias <- df_corr %>%
          bias_fet_200 = -log(cwdx200 / cwd_lue0_fet)
          )
 
+df_corr_fet <- df_corr_bias %>% 
+  select(lon, lat, cwd_lue0_fet) %>% 
+  drop_na()
+save(df_corr_fet, file = "data/df_corr_fet.RData")
+  
+df_corr_nSIF <- df_corr_bias %>% 
+  select(lon, lat, cwd_lue0_nSIF) %>% 
+  drop_na()
+save(df_corr_nSIF, file = "data/df_corr_nSIF.RData")
+
 ## violin plots of bias by return period using SIF
 df_corr_bias %>%
   dplyr::select(starts_with("bias_sif_")) %>% 
