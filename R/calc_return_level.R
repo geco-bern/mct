@@ -22,17 +22,23 @@ f_calc_return_level <- function(x, mod){
 
   return_period <- c(seq(2, 9, by = 1), seq(10, 95, by = 5), seq(100, 300, by = 10), seq(400, 1000, by = 100))
   
-  return_level <- extRemes::return.level(
+  return_level <- try(extRemes::return.level(
     mod, 
-    return.period = return_period)
+    return.period = return_period))
   
-  df_return_level <- tibble( 
-    return_period = return_period, 
-    return_level = unname(c(return_level)))
-  
-  # return_period_best <- df_return_level %>% 
-  #   dplyr::filter(return_level == return_level[which.min(abs(return_level - x))]) %>% 
-  #   pull(return_period)
+  if (class(return_level) != "try-error"){
+    df_return_level <- tibble( 
+      return_period = return_period, 
+      return_level = unname(c(return_level)))
+    
+    # return_period_best <- df_return_level %>% 
+    #   dplyr::filter(return_level == return_level[which.min(abs(return_level - x))]) %>% 
+    #   pull(return_period)
+  } else {
+    df_return_level <- tibble( 
+      return_period = return_period, 
+      return_level = NA)
+  }
   
   return(df_return_level)
 }
