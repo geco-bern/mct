@@ -6,7 +6,7 @@ args = commandArgs(trailingOnly=TRUE)
 library(tidyverse)
 library(extRemes)
 
-source("R/calc_return_period.R")
+source("R/calc_return_level.R")
 
 load("data/df_corr_fet.RData")  # must use df_corr_fet, and cwd_lue0_fet below
 # load("data/df_corr_nSIF.RData") # must use df_corr_nSIF, and cwd_lue0_nSIF below
@@ -38,9 +38,11 @@ df_rl_diag <- df_corr_sub %>%
 
 if (nrow(df_rl_diag)>0){
   if (!file.exists(filn)){
-    df_rl_diag <- df_rl_diag %>% 
-      mutate(data = purrr::map2(ilon, data, ~calc_return_level(.x, .y)))
-    save(df_rl_diag, file = filn)
+    df <- df_rl_diag %>% 
+      mutate(data = purrr::map2(ilon, data, ~calc_return_level(.x, .y))) %>% 
+      unnest(data) %>% 
+      dplyr::select(-ilon)
+    save(df, file = filn)
   } else {
     print(paste("File exists already: ", filn))
   }
