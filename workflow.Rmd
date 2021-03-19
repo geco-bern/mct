@@ -2799,6 +2799,12 @@ ggsave("fig/bias_dfet_vegtype.pdf", width = 6, height = 4)
 ggsave("fig/bias_dfet_vegtype.png", width = 6, height = 4)
 ```
 
+Hi-res return period analysis.
+```{r}
+load("data/df_rl/df_rl_fet_ichunk_10_30.RData")
+```
+
+
 ### Bias map
 
 ```{r}

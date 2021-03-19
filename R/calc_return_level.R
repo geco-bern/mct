@@ -13,8 +13,10 @@ calc_return_level <- function(ilon, df_s0){
     dplyr::filter(!notavl_mod) %>% 
     dplyr::select(-out_mct) %>%
     mutate(df_rl = purrr::map2(s0, mod, ~f_calc_return_level(.x, .y))) %>% 
+    dplyr::select(-mod, -notavl_mod) %>% 
     unnest(df_rl) %>% 
-    mutate(logbias = log(s0 / return_level))
+    mutate(logbias = log(s0 / return_level)) %>% 
+    dplyr::select(-return_level, -s0)
 
 }
 
