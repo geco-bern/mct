@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
-# args = commandArgs(trailingOnly=TRUE)
-args <- c(7, 30)
+args = commandArgs(trailingOnly=TRUE)
+# args <- c(7, 30)
 
 library(tidyverse)
 
