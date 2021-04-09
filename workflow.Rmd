@@ -2827,9 +2827,14 @@ ggsave("fig/map_bias_cwdx20_casia.pdf", width = 9, height = 5)
 ggsave("fig/map_bias_cwdx20_casia.png", width = 9, height = 5)
 ```
 
-## Diagnose the return period.
+## Diagnose the return level
 
-Given the SIF and EF-based S0, back-calculate the return period for each gridcell, using the fitted Gumbel parameters for the respective cell. This is done with the script `rscript_rp_diag.R`, then `rscript_collect_rp_diag.R`.
+OLD: Tried with deriving return level directly from SIF and EF-based S0. 
+<!-- Given the SIF and EF-based S0, back-calculate the return period for each gridcell, using the fitted Gumbel parameters for the respective cell. This is done with the script `rscript_rp_diag.R`, then `rscript_collect_rp_diag.R`. -->
+
+For each gridcell, use fitted Gumbel distribution to calculate return level for a set of return periods. This is done with `rscript_return_level.R`. 
+
+Then calculate the bias with EF and SIF-based S0 for each return period.
 
 ```{r}
 load("data/df_rp_diag_nSIF.RData")
