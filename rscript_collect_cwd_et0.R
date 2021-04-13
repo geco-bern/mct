@@ -43,7 +43,7 @@ if (ncores > 1){
 
 ## write to file
 dirn <- "~/mct/data/"
-filn <- paste0("df_cwd_et0_2.RData")
+filn <- paste0("df_cwd_et0_3.RData")
 path <- paste0(dirn, filn)
 print(paste("Writing file:", path))
 save(df, file = path)
