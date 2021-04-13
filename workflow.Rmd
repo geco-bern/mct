@@ -1227,7 +1227,8 @@ gg <- df_cwdx %>%
             colorscale = viridis::cividis,
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE
+            hillshade = TRUE,
+            scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
@@ -1244,7 +1245,8 @@ gg <- df_cwdx %>%
             colorscale = viridis::cividis,
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE
+            hillshade = TRUE,
+            scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
@@ -1260,7 +1262,8 @@ gg <- df_cwdx %>%
             combine = FALSE, 
             colorscale = viridis::cividis, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE
+            hillshade = TRUE,
+            scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
@@ -1277,6 +1280,7 @@ gg <- df_cwdx %>%
             colorscale = viridis::cividis, legend_title = "(mm)",
             hillshade = TRUE,
             expand_size_y = 0.6,
+            scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80])) 
@@ -2370,7 +2374,7 @@ Run script that wraps `calc_cwd_et0_byilon()` and `calc_cwd_et0()` (submission f
 Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's huge, therefore split them up and re-write smaller files.
 
 ```{r}
-load("data/df_cwd_et0_2.RData")
+load("data/df_cwd_et0_3.RData")
 df_cwd_et0 <- df
 rm("df")
 
@@ -2416,46 +2420,74 @@ rm("df")
 ### Regional
 
 ```{r}
-load("data/df_cwd_et0_2.RData")
-df_cwd_et0 <- df
-rm("df")
+# load("data/df_cwd_et0_3.RData")
+# df_cwd_et0 <- df
+# rm("df")
 
 ## central asia EF
-gg <- df_cwd_et0 %>% 
-  plot_map4(varnam = "cwd_lue0_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+gg <- plot_map4(df_cwd_et0,
+            varnam = "cwd_lue0_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
             colorscale = viridis::cividis, 
-            hillshade = TRUE
+            legend_title = "(mm)", 
+            hillshade = TRUE,
+            rivers = TRUE,
+            scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dEF])))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
-ggsave("fig/map_cwd_lue0_fet0_casia2.png", width = 10, height = 6)
 
-## central asia groundwater
+ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
+
+df_cwd_et0 <- df_cwd_et0 %>%
+  
+  ## S0 detected -> type2 = NA (for transparent plotting)
+  mutate(type2_fet = ifelse(!is.na(cwd_lue0_fet), NA,
+
+                            ## flattening -> type2 = "B"
+                            ifelse(type_fet %in% c("Aa", "A1", "A2a"), "B",
+                                   
+                                   ## all others: unresponsive -> type2 = "C"
+                                   "C"
+                                   )))
+           
+## central asia type2
 gg <- df_cwd_et0 %>%
-  mutate(groundwater = ifelse(type_fet %in% "A2", "A", "B")) %>% 
-  # mutate(groundwater = ifelse(type_fet %in% c("Aa", "Ab", "A1", "A2a"), 
-  #                             "A", 
-  #                             ifelse(type_fet %in% c("Ba", "Bb", "B1a", "B1"), 
-  #                                    "B", "C"))) %>%  # 
-  plot_map4(varnam = "groundwater", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  plot_map4(varnam = "type2_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
             spacing = "constant",
             breaks = 0:2, #  0:3,
             combine = TRUE,
             # colorscale = viridis::plasma,
             colorscale = wesanderson::wes_palette(n=2, name="Darjeeling1"),
             make_discrete = FALSE,
-            hillshade = FALSE,
+            hillshade = TRUE,
             expand_size_y = 0.5,
             scale = "medium",
-            rivers = FALSE, lakes = FALSE
+            rivers = TRUE
             )
-ggsave("fig/map_types_casia2.pdf", width = 10, height = 6)
-ggsave("fig/map_types_casia2.png", width = 10, height = 6)
+gg
+ggsave("fig/map_types_type2_fet.pdf", width = 10, height = 6)
+
+## central asia: not responsive
+gg <- df_cwd_et0 %>%
+  mutate(unresponsive = ifelse(type_fet %in% c("B1", "Ba"), "A", NA)) %>% 
+  plot_map4(varnam = "unresponsive", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+            spacing = "constant",
+            breaks = 0:2, #  0:3,
+            combine = TRUE,
+            # colorscale = viridis::plasma,
+            colorscale = wesanderson::wes_palette(n=2, name="Darjeeling1"),
+            make_discrete = FALSE,
+            hillshade = TRUE,
+            expand_size_y = 0.5,
+            scale = "medium",
+            rivers = TRUE
+            )
+gg
+ggsave("fig/map_types_unresponsive.pdf", width = 10, height = 6)
 
 ## central asia S0-Teuling
 gg <- df_cwd_et0 %>% 
@@ -2674,7 +2706,7 @@ df_cwd_lue0 <- df %>%
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 rm("df")
 
-load("data/df_cwd_et0_2.RData")
+load("data/df_cwd_et0_3.RData")  # loads 'df'
 df_cwd_et0 <- df %>% 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 rm("df")
@@ -2707,125 +2739,125 @@ df_corr <- df_cwdx %>%
 save(df_corr, file = "data/df_corr.RData")
 ```
 
-### Bias by return period and vegetation type
+<!-- ### Bias by return period and vegetation type -->
 
-Distinguishing grasslands and forests.
+<!-- Distinguishing grasslands and forests. -->
 
-```{r}
-load("data/df_corr.RData")
+<!-- ```{r} -->
+<!-- #load("data/df_corr.RData") -->
 
-df_corr_bias <- df_corr %>%
-  mutate(bias_sif_10 = -log(cwdx10 / cwd_lue0_nSIF),
-         bias_sif_20 = -log(cwdx20 / cwd_lue0_nSIF),
-         bias_sif_40 = -log(cwdx40 / cwd_lue0_nSIF),
-         bias_sif_80 = -log(cwdx80 / cwd_lue0_nSIF),
-         bias_sif_100 = -log(cwdx100 / cwd_lue0_nSIF),
-         bias_sif_200 = -log(cwdx200 / cwd_lue0_nSIF),
+<!-- df_corr_bias <- df_corr %>% -->
+<!--   mutate(bias_sif_10 = -log(cwdx10 / cwd_lue0_nSIF), -->
+<!--          bias_sif_20 = -log(cwdx20 / cwd_lue0_nSIF), -->
+<!--          bias_sif_40 = -log(cwdx40 / cwd_lue0_nSIF), -->
+<!--          bias_sif_80 = -log(cwdx80 / cwd_lue0_nSIF), -->
+<!--          bias_sif_100 = -log(cwdx100 / cwd_lue0_nSIF), -->
+<!--          bias_sif_200 = -log(cwdx200 / cwd_lue0_nSIF), -->
 
-         bias_fet_10 = -log(cwdx10 / cwd_lue0_fet),
-         bias_fet_20 = -log(cwdx20 / cwd_lue0_fet),
-         bias_fet_40 = -log(cwdx40 / cwd_lue0_fet),
-         bias_fet_80 = -log(cwdx80 / cwd_lue0_fet),
-         bias_fet_100 = -log(cwdx100 / cwd_lue0_fet),
-         bias_fet_200 = -log(cwdx200 / cwd_lue0_fet)
-         )
+<!--          bias_fet_10 = -log(cwdx10 / cwd_lue0_fet), -->
+<!--          bias_fet_20 = -log(cwdx20 / cwd_lue0_fet), -->
+<!--          bias_fet_40 = -log(cwdx40 / cwd_lue0_fet), -->
+<!--          bias_fet_80 = -log(cwdx80 / cwd_lue0_fet), -->
+<!--          bias_fet_100 = -log(cwdx100 / cwd_lue0_fet), -->
+<!--          bias_fet_200 = -log(cwdx200 / cwd_lue0_fet) -->
+<!--          ) -->
 
-df_corr_fet <- df_corr_bias %>%
-  select(lon, lat, cwd_lue0_fet) %>%
-  drop_na()
-save(df_corr_fet, file = "data/df_corr_fet.RData")
+<!-- df_corr_fet <- df_corr_bias %>% -->
+<!--   dplyr::select(lon, lat, cwd_lue0_fet) %>% -->
+<!--   drop_na() -->
+<!-- save(df_corr_fet, file = "data/df_corr_fet.RData") -->
 
-df_corr_nSIF <- df_corr_bias %>%
-  select(lon, lat, cwd_lue0_nSIF) %>%
-  drop_na()
-save(df_corr_nSIF, file = "data/df_corr_nSIF.RData")
+<!-- df_corr_nSIF <- df_corr_bias %>% -->
+<!--   select(lon, lat, cwd_lue0_nSIF) %>% -->
+<!--   drop_na() -->
+<!-- save(df_corr_nSIF, file = "data/df_corr_nSIF.RData") -->
 
-## violin plots of bias by return period using SIF
-df_corr_bias %>%
-  dplyr::select(starts_with("bias_sif_")) %>%
-  pivot_longer(cols = everything(), names_to = "return_period", values_to = "bias", names_prefix = "bias_sif_") %>%
-  mutate(return_period = as.factor(as.integer(return_period))) %>%
-  ggplot(aes(x = return_period, y = bias)) +
-  geom_violin(draw_quantiles = 0.5) +
-  labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dSIF] ~ "/S"[CWDX] ~ ")")) +
-  geom_hline(yintercept = 0, linetype = "dotted")
+<!-- ## violin plots of bias by return period using SIF -->
+<!-- df_corr_bias %>% -->
+<!--   dplyr::select(starts_with("bias_sif_")) %>% -->
+<!--   pivot_longer(cols = everything(), names_to = "return_period", values_to = "bias", names_prefix = "bias_sif_") %>% -->
+<!--   mutate(return_period = as.factor(as.integer(return_period))) %>% -->
+<!--   ggplot(aes(x = return_period, y = bias)) + -->
+<!--   geom_violin(draw_quantiles = 0.5) + -->
+<!--   labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dSIF] ~ "/S"[CWDX] ~ ")")) + -->
+<!--   geom_hline(yintercept = 0, linetype = "dotted") -->
 
-ggsave("fig/bias_sif_dsif2.pdf", width = 6, height = 4)
-ggsave("fig/bias_sif_dsif2.png", width = 6, height = 4)
+<!-- ggsave("fig/bias_sif_dsif2.pdf", width = 6, height = 4) -->
+<!-- ggsave("fig/bias_sif_dsif2.png", width = 6, height = 4) -->
 
-## boxplot of bias by return period and vegetation type
-df_corr_bias %>%
-  mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>%
-  dplyr::select(starts_with("bias_sif_"), vegetation) %>%
-  drop_na(vegetation) %>%
-  pivot_longer(cols = starts_with("bias_sif_"), names_to = "return_period", values_to = "bias", names_prefix = "bias_sif_") %>%
-  mutate(return_period = as.factor(as.integer(return_period))) %>%
-  ggplot(aes(x = return_period, y = bias, fill = vegetation)) +
-  geom_boxplot(outlier.shape = NA) +
-  labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dSIF] ~ "/S"[CWDX] ~ ")")) +
-  geom_hline(yintercept = 0, linetype = "dotted")
+<!-- ## boxplot of bias by return period and vegetation type -->
+<!-- df_corr_bias %>% -->
+<!--   mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>% -->
+<!--   dplyr::select(starts_with("bias_sif_"), vegetation) %>% -->
+<!--   drop_na(vegetation) %>% -->
+<!--   pivot_longer(cols = starts_with("bias_sif_"), names_to = "return_period", values_to = "bias", names_prefix = "bias_sif_") %>% -->
+<!--   mutate(return_period = as.factor(as.integer(return_period))) %>% -->
+<!--   ggplot(aes(x = return_period, y = bias, fill = vegetation)) + -->
+<!--   geom_boxplot(outlier.shape = NA) + -->
+<!--   labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dSIF] ~ "/S"[CWDX] ~ ")")) + -->
+<!--   geom_hline(yintercept = 0, linetype = "dotted") -->
 
-ggsave("fig/bias_sif_dsif_vegtype.pdf", width = 6, height = 4)
-ggsave("fig/bias_sif_dsif_vegtype.png", width = 6, height = 4)
-
-
-## violin plot using EF
-df_corr_bias %>%
-  dplyr::select(starts_with("bias_fet_")) %>%
-  pivot_longer(cols = everything(), names_to = "return_period", values_to = "bias", names_prefix = "bias_fet_") %>%
-  mutate(return_period = as.factor(as.integer(return_period))) %>%
-  ggplot(aes(x = return_period, y = bias)) +
-  geom_violin(draw_quantiles = 0.5) +
-  labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dEF] ~ "/S"[CWDX] ~ ")")) +
-  geom_hline(yintercept = 0, linetype = "dotted")
-
-ggsave("fig/bias_dfet.pdf", width = 6, height = 4)
-ggsave("fig/bias_dfet.png", width = 6, height = 4)
+<!-- ggsave("fig/bias_sif_dsif_vegtype.pdf", width = 6, height = 4) -->
+<!-- ggsave("fig/bias_sif_dsif_vegtype.png", width = 6, height = 4) -->
 
 
-## boxplot by veg type using EF
-df_corr_bias %>%
-  mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>%
-  dplyr::select(starts_with("bias_fet_"), vegetation) %>%
-  drop_na(vegetation) %>%
-  pivot_longer(cols = starts_with("bias_fet_"), names_to = "return_period", values_to = "bias", names_prefix = "bias_fet_") %>%
-  mutate(return_period = as.factor(as.integer(return_period))) %>%
-  ggplot(aes(x = return_period, y = bias, fill = vegetation)) +
-  geom_boxplot(outlier.shape = NA) +
-  labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dEF] ~ "/S"[CWDX] ~ ")")) +
-  geom_hline(yintercept = 0, linetype = "dotted")
+<!-- ## violin plot using EF -->
+<!-- df_corr_bias %>% -->
+<!--   dplyr::select(starts_with("bias_fet_")) %>% -->
+<!--   pivot_longer(cols = everything(), names_to = "return_period", values_to = "bias", names_prefix = "bias_fet_") %>% -->
+<!--   mutate(return_period = as.factor(as.integer(return_period))) %>% -->
+<!--   ggplot(aes(x = return_period, y = bias)) + -->
+<!--   geom_violin(draw_quantiles = 0.5) + -->
+<!--   labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dEF] ~ "/S"[CWDX] ~ ")")) + -->
+<!--   geom_hline(yintercept = 0, linetype = "dotted") -->
 
-ggsave("fig/bias_dfet_vegtype.pdf", width = 6, height = 4)
-ggsave("fig/bias_dfet_vegtype.png", width = 6, height = 4)
-```
-
-Hi-res return period analysis.
-```{r}
-load("data/df_rl/df_rl_fet_ichunk_10_30.RData")
-```
+<!-- ggsave("fig/bias_dfet.pdf", width = 6, height = 4) -->
+<!-- ggsave("fig/bias_dfet.png", width = 6, height = 4) -->
 
 
-### Bias map
+<!-- ## boxplot by veg type using EF -->
+<!-- df_corr_bias %>% -->
+<!--   mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>% -->
+<!--   dplyr::select(starts_with("bias_fet_"), vegetation) %>% -->
+<!--   drop_na(vegetation) %>% -->
+<!--   pivot_longer(cols = starts_with("bias_fet_"), names_to = "return_period", values_to = "bias", names_prefix = "bias_fet_") %>% -->
+<!--   mutate(return_period = as.factor(as.integer(return_period))) %>% -->
+<!--   ggplot(aes(x = return_period, y = bias, fill = vegetation)) + -->
+<!--   geom_boxplot(outlier.shape = NA) + -->
+<!--   labs(x = expression("Return period used for S"[CWDX]), y = expression("log(S"[dEF] ~ "/S"[CWDX] ~ ")")) + -->
+<!--   geom_hline(yintercept = 0, linetype = "dotted") -->
 
-```{r}
-#load("data/df_rivers.RData")
+<!-- ggsave("fig/bias_dfet_vegtype.pdf", width = 6, height = 4) -->
+<!-- ggsave("fig/bias_dfet_vegtype.png", width = 6, height = 4) -->
+<!-- ``` -->
 
-## central asia
-gg <- df_corr_bias %>%
-  plot_map3(varnam = "bias_20", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-            spacing = "constant",
-            breaks = c(4, 2, 1, 0.5, 0.2, 0, -0.2, -0.5, -1, -2, -4),
-            combine = FALSE,
-            colorscale = c( "royalblue4", "royalblue2", "wheat", "tomato2", "tomato4" ),
-            legend_title = "(unitless)"
-            )
-gg$ggmap <- gg$ggmap +
-  labs(title =  expression("log(S"[dSIF] ~ "/S"[CWDX] ~ ")")) +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_bias_cwdx20_casia.pdf", width = 9, height = 5)
-ggsave("fig/map_bias_cwdx20_casia.png", width = 9, height = 5)
-```
+<!-- Hi-res return period analysis. -->
+<!-- ```{r} -->
+<!-- load("data/df_rl/df_rl_fet_ichunk_10_30.RData") -->
+<!-- ``` -->
+
+
+<!-- ### Bias map -->
+
+<!-- ```{r} -->
+<!-- #load("data/df_rivers.RData") -->
+
+<!-- ## central asia -->
+<!-- gg <- df_corr_bias %>% -->
+<!--   plot_map3(varnam = "bias_20", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, -->
+<!--             spacing = "constant", -->
+<!--             breaks = c(4, 2, 1, 0.5, 0.2, 0, -0.2, -0.5, -1, -2, -4), -->
+<!--             combine = FALSE, -->
+<!--             colorscale = c( "royalblue4", "royalblue2", "wheat", "tomato2", "tomato4" ), -->
+<!--             legend_title = "(unitless)" -->
+<!--             ) -->
+<!-- gg$ggmap <- gg$ggmap + -->
+<!--   labs(title =  expression("log(S"[dSIF] ~ "/S"[CWDX] ~ ")")) + -->
+<!--   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2) -->
+<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
+<!-- ggsave("fig/map_bias_cwdx20_casia.pdf", width = 9, height = 5) -->
+<!-- ggsave("fig/map_bias_cwdx20_casia.png", width = 9, height = 5) -->
+<!-- ``` -->
 
 ## Diagnose the return level
 

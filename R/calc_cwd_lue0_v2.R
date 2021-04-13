@@ -222,6 +222,8 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
           
         } else {
           
+          # slope1 > slope2
+          
           if (npsi == 1){
             ##--------------------------------------------------
             ## (B) single changepoint
@@ -240,6 +242,9 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
               ##--------------------------------------------------
               ## take slope 2 for x-axis cutoff
               cwd_lue0 <- - c0 / slope2
+              
+              # cwd_lue0 <- - d0 / slope3 # changed to this on 10.4. - not yet run
+              
               is_flattening <- FALSE
               type <- "Bb"
               
@@ -310,7 +315,6 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
       cp1 <- NA
       type <- "0"
 
-
       ## metric
       rsq <- summary(linmod)$adj.r.squared
 
@@ -330,6 +334,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
           ## get x-axis cutoff
           cwd_lue0 <- - coef(linmod)["(Intercept)"] / coef(linmod)["deficit"]
           df_fit <- tibble(y = predict(linmod, newdata = df), x = df$deficit)
+          is_flattening <- FALSE
         } else {
           cwd_lue0 <- NA
         }
