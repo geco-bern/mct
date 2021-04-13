@@ -2714,14 +2714,14 @@ Distinguishing grasslands and forests.
 ```{r}
 load("data/df_corr.RData")
 
-df_corr_bias <- df_corr %>% 
+df_corr_bias <- df_corr %>%
   mutate(bias_sif_10 = -log(cwdx10 / cwd_lue0_nSIF),
          bias_sif_20 = -log(cwdx20 / cwd_lue0_nSIF),
          bias_sif_40 = -log(cwdx40 / cwd_lue0_nSIF),
          bias_sif_80 = -log(cwdx80 / cwd_lue0_nSIF),
          bias_sif_100 = -log(cwdx100 / cwd_lue0_nSIF),
          bias_sif_200 = -log(cwdx200 / cwd_lue0_nSIF),
-         
+
          bias_fet_10 = -log(cwdx10 / cwd_lue0_fet),
          bias_fet_20 = -log(cwdx20 / cwd_lue0_fet),
          bias_fet_40 = -log(cwdx40 / cwd_lue0_fet),
@@ -2730,19 +2730,19 @@ df_corr_bias <- df_corr %>%
          bias_fet_200 = -log(cwdx200 / cwd_lue0_fet)
          )
 
-df_corr_fet <- df_corr_bias %>% 
-  select(lon, lat, cwd_lue0_fet) %>% 
+df_corr_fet <- df_corr_bias %>%
+  select(lon, lat, cwd_lue0_fet) %>%
   drop_na()
 save(df_corr_fet, file = "data/df_corr_fet.RData")
-  
-df_corr_nSIF <- df_corr_bias %>% 
-  select(lon, lat, cwd_lue0_nSIF) %>% 
+
+df_corr_nSIF <- df_corr_bias %>%
+  select(lon, lat, cwd_lue0_nSIF) %>%
   drop_na()
 save(df_corr_nSIF, file = "data/df_corr_nSIF.RData")
 
 ## violin plots of bias by return period using SIF
 df_corr_bias %>%
-  dplyr::select(starts_with("bias_sif_")) %>% 
+  dplyr::select(starts_with("bias_sif_")) %>%
   pivot_longer(cols = everything(), names_to = "return_period", values_to = "bias", names_prefix = "bias_sif_") %>%
   mutate(return_period = as.factor(as.integer(return_period))) %>%
   ggplot(aes(x = return_period, y = bias)) +
@@ -2755,9 +2755,9 @@ ggsave("fig/bias_sif_dsif2.png", width = 6, height = 4)
 
 ## boxplot of bias by return period and vegetation type
 df_corr_bias %>%
-  mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>% 
+  mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>%
   dplyr::select(starts_with("bias_sif_"), vegetation) %>%
-  drop_na(vegetation) %>% 
+  drop_na(vegetation) %>%
   pivot_longer(cols = starts_with("bias_sif_"), names_to = "return_period", values_to = "bias", names_prefix = "bias_sif_") %>%
   mutate(return_period = as.factor(as.integer(return_period))) %>%
   ggplot(aes(x = return_period, y = bias, fill = vegetation)) +
@@ -2771,7 +2771,7 @@ ggsave("fig/bias_sif_dsif_vegtype.png", width = 6, height = 4)
 
 ## violin plot using EF
 df_corr_bias %>%
-  dplyr::select(starts_with("bias_fet_")) %>% 
+  dplyr::select(starts_with("bias_fet_")) %>%
   pivot_longer(cols = everything(), names_to = "return_period", values_to = "bias", names_prefix = "bias_fet_") %>%
   mutate(return_period = as.factor(as.integer(return_period))) %>%
   ggplot(aes(x = return_period, y = bias)) +
@@ -2785,9 +2785,9 @@ ggsave("fig/bias_dfet.png", width = 6, height = 4)
 
 ## boxplot by veg type using EF
 df_corr_bias %>%
-  mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>% 
+  mutate(vegetation = ifelse(forest, "forest", ifelse(grassland, "grassland", NA))) %>%
   dplyr::select(starts_with("bias_fet_"), vegetation) %>%
-  drop_na(vegetation) %>% 
+  drop_na(vegetation) %>%
   pivot_longer(cols = starts_with("bias_fet_"), names_to = "return_period", values_to = "bias", names_prefix = "bias_fet_") %>%
   mutate(return_period = as.factor(as.integer(return_period))) %>%
   ggplot(aes(x = return_period, y = bias, fill = vegetation)) +
@@ -2811,15 +2811,15 @@ load("data/df_rl/df_rl_fet_ichunk_10_30.RData")
 #load("data/df_rivers.RData")
 
 ## central asia
-gg <- df_corr_bias %>% 
-  plot_map3(varnam = "bias_20", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+gg <- df_corr_bias %>%
+  plot_map3(varnam = "bias_20", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
             spacing = "constant",
             breaks = c(4, 2, 1, 0.5, 0.2, 0, -0.2, -0.5, -1, -2, -4),
-            combine = FALSE, 
-            colorscale = c( "royalblue4", "royalblue2", "wheat", "tomato2", "tomato4" ), 
+            combine = FALSE,
+            colorscale = c( "royalblue4", "royalblue2", "wheat", "tomato2", "tomato4" ),
             legend_title = "(unitless)"
             )
-gg$ggmap <- gg$ggmap + 
+gg$ggmap <- gg$ggmap +
   labs(title =  expression("log(S"[dSIF] ~ "/S"[CWDX] ~ ")")) +
   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
@@ -2827,39 +2827,86 @@ ggsave("fig/map_bias_cwdx20_casia.pdf", width = 9, height = 5)
 ggsave("fig/map_bias_cwdx20_casia.png", width = 9, height = 5)
 ```
 
-## Diagnose the return period.
+## Diagnose the return level
 
-Given the SIF and EF-based S0, back-calculate the return period for each gridcell, using the fitted Gumbel parameters for the respective cell. This is done with the script `rscript_rp_diag.R`, then `rscript_collect_rp_diag.R`.
+OLD: Tried with deriving return level directly from SIF and EF-based S0. 
+<!-- Given the SIF and EF-based S0, back-calculate the return period for each gridcell, using the fitted Gumbel parameters for the respective cell. This is done with the script `rscript_rp_diag.R`, then `rscript_collect_rp_diag.R`. -->
+
+For each gridcell, use fitted Gumbel distribution to calculate return level for a set of return periods. This is done with `rscript_return_level.R` and `rscript_collect_rl.R`. The latter writes `"data/df_rl_nSIF.RData"` and `"data/df_rl_fet.RData"`.
 
 ```{r}
-load("data/df_rp_diag_nSIF.RData")
-load("data/df_rp_diag_fet.RData")
+load("data/df_rl_fet.RData")
+load("data/df_rl_nSIF.RData")
 
-df_rp_diag_nSIF %>% 
-  ggplot(aes(x = 1, y = rp_diag)) + 
-  geom_violin() +
-  ylim(0, 200)
+## function to determine the return period with the lowest bias (absolute)
+find_rp_diag <- function(df){
+  out <- df %>% 
+    group_by(return_period) %>% 
+    summarise(logbias = median(logbias, na.rm = TRUE)) %>% 
+    slice(which.min(abs(logbias))) %>% 
+    pull(return_period)
+  out <- ifelse(length(out)==0, NA, out)
+  return(out)
+}
 
-df_rp_diag_fet %>% 
-  ggplot(aes(x = 1, y = rp_diag)) + 
-  geom_violin() +
-  ylim(0, 200)
+## bin into gridcells to be able to get a distribution (0.5 deg contains a maximum of 100 pixels)
+dlon <- 1
+dlat <- 1
+lon_breaks <- seq(from = -180, to = 180, by = dlon)
+lat_breaks <- seq(from = -90, to = 90, by = dlat)
+
+## this takes about 1 min
+df_rl_fet_agg <- df_rl_fet %>%
+  ungroup() %>% 
+  mutate(ilon = cut(lon, 
+                    breaks = lon_breaks
+                    # labels = as.character(seq(length(lon_breaks)-1))
+                    ),
+         ilat = cut(lat, 
+                    breaks = lat_breaks
+                    # labels = as.character(seq(length(lat_breaks)-1))
+                    )
+         ) %>% 
+  mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
+         lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
+         lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )
+         ) %>% 
+  mutate(lon_mid = (lon_lower + lon_upper)/2,
+         lat_mid = (lat_lower + lat_upper)/2) %>% 
+  dplyr::select(-ilon, -ilat, -lon_lower, -lat_lower, -lat_upper, -lon_upper) %>% 
+  
+  ## nest by gridcell and determine return period for which the absolute of the bias is lowest
+  group_by(lon_mid, lat_mid) %>% 
+  nest() %>% 
+  ungroup() %>% 
+  mutate(rp_diag = purrr::map_dbl(data, ~find_rp_diag(.))) %>% 
+  dplyr::select(-data) %>% 
+  rename(lon = lon_mid, lat = lat_mid)
+
+## distribution of diagnosed return periods
+df_rl_fet_agg %>% 
+  ggplot(aes(rp_diag, ..count..)) + 
+  geom_histogram()
+
+## global analysis of best return period
+df_rl_fet %>% 
+  ggplot(aes(as.factor(return_period), logbias)) +
+  # geom_violin(draw_quantiles = 0.5) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  ylim(-1.2, 1.2)
 ```
-Convert to map, regrid, and plot.
+
+Convert to map and plot.
 ```{r}
-nc <- df_to_grid(df_rp_diag_nSIF, varnam = "rp_diag", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "rp_diag", lon = df_rp_diag_nSIF$lon %>% unique() %>% sort(), lat = df_rp_diag_nSIF$lat %>% unique() %>% sort(), path = "data/return_period_nSIF.nc", make_zdim = FALSE)
+nc <- df_to_grid(
+  df_rl_fet_agg, 
+  varnam = "rp_diag", 
+  lonnam = "lon", latnam = "lat"
+  )
 
-system("cdo remapbil,gridfile_tenthdeg.txt data/return_period_nSIF.nc data/return_period_nSIF_tenthdeg.nc")
-
-nc <- read_nc_onefile("data/return_period_nSIF_tenthdeg.nc", varnam = "rp_diag")
-gg <- plot_map3(nc, varnam = "rp_diag", breaks = c(seq(0, 200, by = 20), Inf), latmin = -55, latmax = 80,
-          spacing = "constant", combine = FALSE, colorscale = viridis::cividis, legend_title = "(yr)")
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(italic(T)[nSIF]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_return_period_nSIF.pdf", width = 10, height = 6)
-ggsave("fig/map_return_period_nSIF.png", width = 10, height = 6)
+plot_map4(df_rl_fet_agg)
 ```
 
 

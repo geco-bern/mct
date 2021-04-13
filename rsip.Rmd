@@ -29,9 +29,16 @@ Use `gsheet::gsheet2tbl`
 
 Read the data.
 ```{r}
-df <- read_csv("data/RSIP_Analysis_sheet.csv") %>% 
+df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
   rename(lon = Long, lat = Lat) %>% 
-  rowid_to_column(var = "id")
+  rowid_to_column(var = "id") %>% 
+  
+  ## problem: some have a reference error
+  dplyr::filter(lon != "#REF!") %>% 
+  mutate(lon = as.numeric(lon), lat = as.numeric(lat), 
+         Dr = as.numeric(Dr),
+         wtd = as.numeric(Water_Table_Depth_Fan))
+  
 print(paste("Total number of entries:", nrow(df)))
 ```
 
@@ -157,11 +164,11 @@ df_wwf <- ingest(
   mutate(data = purrr::map(data, ~slice(., 1))) %>% 
   unnest(data)
 
-save(df_wwf, file = "data/df_wwf.RData")
+save(df_wwf, file = "data/df_wwf_rsip.RData")
 ```
 
 ```{r}
-load("data/df_wwf.RData")
+load("data/df_wwf_rsip.RData")
 
 df <- df %>% 
   left_join(
@@ -216,15 +223,20 @@ df %>%
   geom_boxplot() +
   # geom_violin() +
   # geom_bar(stat = "summary", fun.ymax = "max", position=position_dodge()) +
-  theme(axis.text.x = element_text(angle=90, hjust=1))
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  ylim(-20,0)
 
-## barplot
+ggsave("fig/zroot_biomes_rsip_boxplot_modobs.pdf", height = 10, width = 10)
+
+## barplot: quantile - THIS LOOKS ACTUALLY VERY NICE FOR THE 5% QUANTILE!!!
 df %>% 
   rename(obs = Dr, mod = zroot_cwdx80) %>% 
   pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
   ggplot(aes(x = biome_name, fill = source)) +
-  stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.01), geom = "bar", position=position_dodge()) +
+  stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.05), geom = "bar", position=position_dodge()) +
   theme(axis.text.x = element_text(angle=90, hjust=1))
+
+ggsave("fig/zroot_biomes_rsip_barplot_modobs.pdf", height = 10, width = 10)
 
 ## ridge plot
 biome_exclude <- df %>% 
@@ -327,4 +339,289 @@ gg_rsip_90 <- out$gg + labs(title = "90% quantile by biome, RSIP data",
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_rsip_90
 save(gg_rsip_90, file = "data/gg_rsip_90.RData")
+```
+
+### Analysis Fan subset
+
+Analyse data and model-data agreement for a subset of the data where water table depth observations are available, and set modelled rooting depth to WTD if it exceeds WTD.
+```{r}
+df_wtd <- df %>% 
+  dplyr::filter(!is.na(wtd)) %>% 
+
+  mutate(zroot_cwdx80 = ifelse(zroot_cwdx80 > wtd, wtd, zroot_cwdx80)) %>% 
+  
+  ## and observed rooting depth > wtd removed
+  mutate(Dr = ifelse(Dr > wtd, NA, Dr)) %>%
+  
+  dplyr::filter(!is.na(Dr) & !is.na(zroot_cwdx80))
+
+print(paste("Total number of entries:", nrow(df_wtd)))
+```
+
+Plot as in Fan et al., 2017, Fig. 3F.
+```{r}
+df %>% 
+  dplyr::filter(!is.na(wtd)) %>%   
+  mutate(log_wtd = log10(wtd), log_Dr = log10(Dr)) %>% 
+  ggplot(aes(log_wtd, -log_Dr)) +
+  geom_point() + 
+  geom_abline(intercept=0, slope=-1, linetype="dotted")
+```
+
+Plots with subset of data, where modelled values > WTD are removed.
+```{r}
+out <- df_wtd %>% 
+  analyse_modobs2("zroot_cwdx80", "Dr")
+out$gg +
+  xlim(0,10) + ylim(0,10)
+```
+
+```{r}
+## boxplot
+df_wtd %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, y = -zroot, fill = source)) +
+  geom_boxplot() +
+  # geom_violin() +
+  # geom_bar(stat = "summary", fun.ymax = "max", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  ylim(-20,0)
+
+ggsave("fig/zroot_biomes_rsip_boxplot_modobs_wtd.pdf", height = 10, width = 10)
+
+## barplot: quantile
+df_wtd %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, fill = source)) +
+  stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.05), geom = "bar", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+ggsave("fig/zroot_biomes_rsip_barplot_modobs_wtd.pdf", height = 10, width = 10)
+
+## ridge plot
+biome_exclude <- df_wtd %>% 
+  group_by(biome_name) %>% 
+  summarise(count = n()) %>% 
+  dplyr::filter(count < 3) %>% 
+  pull(biome_name)
+
+df_wtd %>% 
+  dplyr::filter(!(biome_name %in% biome_exclude)) %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_name)) %>% 
+  dplyr::filter(biome_name!="Mangroves") %>%   
+  ggplot(aes(x = zroot, y = biome_name, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0), name = "") +
+  scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  labs(title = expression("Rooting depth, RSIP data")) +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip_wtd.pdf", width = 15, height = 10)
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip_wtd.png", width = 15, height = 10)
+```
+
+Focus on data points with large overestimation of rooting depth.
+```{r}
+tmp <- df %>% 
+  mutate(bias = zroot_cwdx80/Dr)
+
+tmp %>% 
+  ggplot(aes(bias, ..count..)) +
+  geom_histogram()
+
+tmp <- tmp %>% 
+  dplyr::filter(!is.na(wtd)) %>%
+  dplyr::filter(bias > 1)
+```
+
+## Aggregated by sites
+
+1705 distinct sites based on lon and lat info.
+```{r}
+# most_frequent <- function(x){x %>% table() %>% sort() %>% rev() %>% head(1) %>% names()}
+
+df_sites <- df %>% 
+  mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) %>% 
+  group_by(sitename) %>% 
+  summarise(Dr = mean(Dr, na.rm = TRUE), zroot_cwdx80 = mean(zroot_cwdx80, na.rm = TRUE), wtd = mean(wtd, na.rm = TRUE))
+
+## add WWF biome info
+df_wwf_sites <- ingest(
+  df %>% 
+    distinct(lon, lat) %>% 
+    mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))),
+  source = "wwf",
+  dir = "~/data/biomes/wwf_ecoregions/official/",
+  settings = list(layer = "wwf_terr_ecos")
+  )%>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  unnest(data)
+
+df_sites <- df_sites %>% 
+  left_join(
+    df_wwf_sites %>% 
+      dplyr::select(sitename, biome = BIOME, biome_name = BIOME_NAME),
+    by = "sitename"
+  )
+```
+
+Plots with data aggregated by sites.
+```{r}
+## boxplot
+df_sites %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, y = -zroot, fill = source)) +
+  geom_boxplot() +
+  # geom_violin() +
+  # geom_bar(stat = "summary", fun.ymax = "max", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  ylim(-20,0)
+
+ggsave("fig/zroot_biomes_rsip_boxplot_modobs_sites.pdf", height = 10, width = 10)
+
+## barplot: quantile - THIS LOOKS ACTUALLY VERY NICE FOR THE 5% QUANTILE!!!
+df_sites %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, fill = source)) +
+  stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.05), geom = "bar", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+ggsave("fig/zroot_biomes_rsip_barplot_modobs_sites.pdf", height = 10, width = 10)
+
+## ridge plot
+biome_exclude <- df_sites %>% 
+  group_by(biome_name) %>% 
+  summarise(count = n()) %>% 
+  dplyr::filter(count < 3) %>% 
+  pull(biome_name)
+
+df_sites %>% 
+  dplyr::filter(!(biome_name %in% biome_exclude)) %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_name)) %>% 
+  dplyr::filter(biome_name!="Mangroves") %>%   
+  ggplot(aes(x = zroot, y = biome_name, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0), name = "") +
+  scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  labs(title = expression("Rooting depth, RSIP data")) +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip_sites.pdf", width = 15, height = 10)
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip_sites.png", width = 15, height = 10)
+```
+
+### Analysis Fan subset at site-level
+
+Analyse data and model-data agreement for a subset of the data where water table depth observations are available, and set modelled rooting depth to WTD if it exceeds WTD.
+```{r}
+df_sites_wtd <- df_sites %>% 
+  dplyr::filter(!is.na(wtd)) %>% 
+
+  mutate(zroot_cwdx80 = ifelse(zroot_cwdx80 > wtd, wtd, zroot_cwdx80)) %>% 
+  
+  # ## and observed rooting depth > wtd removed
+  # mutate(Dr = ifelse(Dr > wtd, NA, Dr)) %>%
+  
+  dplyr::filter(!is.na(Dr) & !is.na(zroot_cwdx80))
+
+print(paste("Total number of entries:", nrow(df_sites_wtd)))
+```
+
+Plots
+```{r}
+## boxplot
+df_sites_wtd %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, y = -zroot, fill = source)) +
+  geom_boxplot() +
+  # geom_violin() +
+  # geom_bar(stat = "summary", fun.ymax = "max", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) +
+  ylim(-20,0)
+
+ggsave("fig/zroot_biomes_rsip_boxplot_modobs_sites_wtd.pdf", height = 10, width = 10)
+
+## barplot: quantile - THIS LOOKS ACTUALLY VERY NICE FOR THE 5% QUANTILE!!!
+df_sites_wtd %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
+  ggplot(aes(x = biome_name, fill = source)) +
+  stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.05), geom = "bar", position=position_dodge()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+ggsave("fig/zroot_biomes_rsip_barplot_modobs_sites_wtd.pdf", height = 10, width = 10)
+
+## ridge plot
+biome_exclude <- df_sites_wtd %>% 
+  group_by(biome_name) %>% 
+  summarise(count = n()) %>% 
+  dplyr::filter(count < 3) %>% 
+  pull(biome_name)
+
+df_sites_wtd %>% 
+  dplyr::filter(!(biome_name %in% biome_exclude)) %>% 
+  rename(obs = Dr, mod = zroot_cwdx80) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "zroot") %>% 
+  dplyr::filter(!is.na(biome_name)) %>% 
+  dplyr::filter(biome_name!="Mangroves") %>%   
+  ggplot(aes(x = zroot, y = biome_name, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0), name = "") +
+  scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  labs(title = expression("Rooting depth, RSIP data - WTD limit")) +
+  theme_ridges(center = TRUE)
+
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip_sites_wtd.pdf", width = 15, height = 10)
+ggsave("fig/modobs_ridges_zroot_biome_wwf_rsip_sites_wtd.png", width = 15, height = 10)
 ```
