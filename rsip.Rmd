@@ -42,6 +42,21 @@ df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%   
 print(paste("Total number of entries:", nrow(df)))
 ```
 
+xplorations with ree height
+```{r}
+df2 <- df %>% 
+  mutate(Hs = as.numeric(Hs)) %>% 
+  mutate(log_dr = log10(Dr), log_hs = log10(Hs)) %>% 
+  dplyr::filter(!is.nan(log_dr) & !is.nan(log_hs) & !is.na(log_dr) & !is.na(log_hs) & !is.infinite(log_dr) & !is.infinite(log_hs))
+
+linmod <- lm(log_dr ~ log_hs, data = df2)
+
+plot(linmod)
+
+df2 %>% 
+  ggplot(aes(log_hs, log_dr)) + geom_point(alpha = 0.7) + geom_smooth(method = "lm")
+```
+
 Bin the data into grid points, summarise, and expand to grid
 ```{r}
 ## bin

@@ -2868,7 +2868,7 @@ For each gridcell, use fitted Gumbel distribution to calculate return level for 
 
 ```{r}
 load("data/df_rl_fet.RData")
-load("data/df_rl_nSIF.RData")
+# load("data/df_rl_nSIF.RData")
 
 ## function to determine the return period with the lowest bias (absolute)
 find_rp_diag <- function(df){
