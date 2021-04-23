@@ -2939,6 +2939,32 @@ nc <- df_to_grid(
   )
 
 plot_map4(df_rl_fet_agg)
+ggsave("fig/map_rl.pdf", width = 12, height = 8)
+
+## missing lon-bands
+tmp <- df_rl_fet %>%
+  ungroup() %>% 
+  mutate(ilon = cut(lon, 
+                    breaks = lon_breaks
+                    # labels = as.character(seq(length(lon_breaks)-1))
+                    ),
+         ilat = cut(lat, 
+                    breaks = lat_breaks
+                    # labels = as.character(seq(length(lat_breaks)-1))
+                    )
+         ) %>% 
+  mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
+         lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
+         lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )
+         ) %>% 
+  mutate(lon_mid = (lon_lower + lon_upper)/2,
+         lat_mid = (lat_lower + lat_upper)/2) %>% 
+  dplyr::select(-ilon, -ilat, -lon_lower, -lat_lower, -lat_upper, -lon_upper)
+
+tmp %>% 
+  dplyr::filter(lon_mid > 120 & lon_mid < 121)
+  # dplyr::filter(lon_mid == 120.5)
 ```
 
 
