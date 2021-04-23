@@ -2867,8 +2867,12 @@ OLD: Tried with deriving return level directly from SIF and EF-based S0.
 For each gridcell, use fitted Gumbel distribution to calculate return level for a set of return periods. This is done with `rscript_return_level.R` and `rscript_collect_rl.R`. The latter writes `"data/df_rl_nSIF.RData"` and `"data/df_rl_fet.RData"`.
 
 ```{r}
-load("data/df_rl_fet.RData")
+load("data/df_rl_fet.RData")  # loads df_rl_fet
 # load("data/df_rl_nSIF.RData")
+
+# ## xxx debug
+# load("data/df_rl/df_rl_fet_ichunk_TEST.RData")  # loads df
+# df_rl_fet <- df
 
 ## function to determine the return period with the lowest bias (absolute)
 find_rp_diag <- function(df){
@@ -2882,13 +2886,14 @@ find_rp_diag <- function(df){
 }
 
 ## bin into gridcells to be able to get a distribution (0.5 deg contains a maximum of 100 pixels)
-dlon <- 1
-dlat <- 1
+dlon <- 5
+dlat <- 5
 lon_breaks <- seq(from = -180, to = 180, by = dlon)
 lat_breaks <- seq(from = -90, to = 90, by = dlat)
 
 ## this takes about 1 min
-df_rl_fet_agg <- df_rl_fet %>%
+df_rl_agg <- df_rl_fet %>%
+# df_rl_agg <- df_rl_nSIF %>% 
   ungroup() %>% 
   mutate(ilon = cut(lon, 
                     breaks = lon_breaks
@@ -2917,7 +2922,7 @@ df_rl_fet_agg <- df_rl_fet %>%
   rename(lon = lon_mid, lat = lat_mid)
 
 ## distribution of diagnosed return periods
-df_rl_fet_agg %>% 
+df_rl_agg %>% 
   ggplot(aes(rp_diag, ..count..)) + 
   geom_histogram()
 
@@ -2932,14 +2937,14 @@ df_rl_fet %>%
 
 Convert to map and plot.
 ```{r}
-nc <- df_to_grid(
-  df_rl_fet_agg, 
-  varnam = "rp_diag", 
-  lonnam = "lon", latnam = "lat"
-  )
+# nc <- df_to_grid(
+#   df_rl_agg, 
+#   varnam = "rp_diag", 
+#   lonnam = "lon", latnam = "lat"
+#   )
 
-plot_map4(df_rl_fet_agg)
-ggsave("fig/map_rl.pdf", width = 12, height = 8)
+plot_map4(df_rl_agg)
+ggsave("fig/map_rl_sif.pdf", width = 12, height = 8)
 
 ## missing lon-bands
 tmp <- df_rl_fet %>%
@@ -2960,7 +2965,10 @@ tmp <- df_rl_fet %>%
          ) %>% 
   mutate(lon_mid = (lon_lower + lon_upper)/2,
          lat_mid = (lat_lower + lat_upper)/2) %>% 
-  dplyr::select(-ilon, -ilat, -lon_lower, -lat_lower, -lat_upper, -lon_upper)
+  dplyr::select(-ilon, -ilat, -lon_lower, -lat_lower, -lat_upper, -lon_upper) %>% 
+  group_by(lon_mid, lat_mid) %>% 
+  nest() %>% 
+  mutate(count = map_int(data, ~nrow(.)))
 
 tmp %>% 
   dplyr::filter(lon_mid > 120 & lon_mid < 121)

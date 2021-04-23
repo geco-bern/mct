@@ -40,8 +40,10 @@ df_rl_diag <- df_corr_sub %>%
   mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
   ungroup()
 
-## xxx debug
-df_rl_diag <- df_rl_diag %>% dplyr::filter(lon > 120 & lon < 121)
+# ## xxx debug
+# filn <- paste0("data/df_rl/df_rl_fet_ichunk_TEST.RData")
+# df_rl_diag <- df_rl_diag %>% 
+#   dplyr::filter(lon > 120 & lon < 121)
 
 if (nrow(df_rl_diag)>0){
   if (!file.exists(filn)){
