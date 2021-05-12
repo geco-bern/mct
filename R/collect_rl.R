@@ -9,10 +9,10 @@ collect_rl_nSIF <- function(ichunk){
     load(path)
   } else {
     rlang::inform(paste("File does not exist:", path))
-    df_rl_diag <- tibble()
+    df <- tibble()
   }
   
-  return(df_rl_diag)
+  return(df)
 }
 
 collect_rl_fet <- function(ichunk){

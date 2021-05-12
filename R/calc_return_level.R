@@ -1,6 +1,6 @@
 calc_return_level <- function(ilon, df_s0){
   
-  load(paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData"))
+  load(paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData"))  # loads df
   
   df_s0 %>% 
     mutate(lat = round(lat, digits = 3)) %>% 

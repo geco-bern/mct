@@ -2424,9 +2424,41 @@ rm("df")
 # df_cwd_et0 <- df
 # rm("df")
 
-## central asia EF
+## Detect flattening
+df_cwd_et0 <- df_cwd_et0 %>%
+  mutate(flat_fet = ifelse(type_fet %in% c("Aa", "A1", "A2a"), TRUE, NA))
+
+df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai") %>% 
+      drop_na() %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      rename(irr = aai)
+
+## central asia, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_et0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42,
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
+ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
+
+## central asia EF only S_dEF
 gg <- plot_map4(df_cwd_et0,
-            varnam = "cwd_lue0_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            varnam = "cwd_lue0_fet", 
+            # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
@@ -2439,55 +2471,8 @@ gg <- plot_map4(df_cwd_et0,
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dEF])))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-
 ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
 
-df_cwd_et0 <- df_cwd_et0 %>%
-  
-  ## S0 detected -> type2 = NA (for transparent plotting)
-  mutate(type2_fet = ifelse(!is.na(cwd_lue0_fet), NA,
-
-                            ## flattening -> type2 = "B"
-                            ifelse(type_fet %in% c("Aa", "A1", "A2a"), "B",
-                                   
-                                   ## all others: unresponsive -> type2 = "C"
-                                   "C"
-                                   )))
-           
-## central asia type2
-gg <- df_cwd_et0 %>%
-  plot_map4(varnam = "type2_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-            spacing = "constant",
-            breaks = 0:2, #  0:3,
-            combine = TRUE,
-            # colorscale = viridis::plasma,
-            colorscale = wesanderson::wes_palette(n=2, name="Darjeeling1"),
-            make_discrete = FALSE,
-            hillshade = TRUE,
-            expand_size_y = 0.5,
-            scale = "medium",
-            rivers = TRUE
-            )
-gg
-ggsave("fig/map_types_type2_fet.pdf", width = 10, height = 6)
-
-## central asia: not responsive
-gg <- df_cwd_et0 %>%
-  mutate(unresponsive = ifelse(type_fet %in% c("B1", "Ba"), "A", NA)) %>% 
-  plot_map4(varnam = "unresponsive", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-            spacing = "constant",
-            breaks = 0:2, #  0:3,
-            combine = TRUE,
-            # colorscale = viridis::plasma,
-            colorscale = wesanderson::wes_palette(n=2, name="Darjeeling1"),
-            make_discrete = FALSE,
-            hillshade = TRUE,
-            expand_size_y = 0.5,
-            scale = "medium",
-            rivers = TRUE
-            )
-gg
-ggsave("fig/map_types_unresponsive.pdf", width = 10, height = 6)
 
 ## central asia S0-Teuling
 gg <- df_cwd_et0 %>% 
@@ -2503,7 +2488,73 @@ gg$ggmap <- gg$ggmap +
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_s0_teuling_fet_casia2.pdf", width = 10, height = 6)
 ggsave("fig/map_s0_teuling_fet_casia2.png", width = 10, height = 6)
+
+
+
+## Western USA, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_et0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47, 
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_wusa.pdf", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_types_fet0_wusa.png", width = 10, height = 6)
+
+
+## Amazon, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_et0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  lonmin = -83, lonmax = -33, latmin = -25, latmax = 12,
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_amazon.pdf", width = 9, height = 6)
+ggsave("fig/map_cwd_lue0_types_fet0_amazon.png", width = 9, height = 6)
+
+
+## Europe, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_et0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  lonmin = -10, lonmax = 25, latmin = 35, latmax = 55, 
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_europe.pdf", width = 8, height = 6)
+ggsave("fig/map_cwd_lue0_types_fet0_europe.png", width = 8, height = 6)
 ```
+
+
 
 Convert to nc object and write to file.
 
@@ -2859,7 +2910,7 @@ save(df_corr, file = "data/df_corr.RData")
 <!-- ggsave("fig/map_bias_cwdx20_casia.png", width = 9, height = 5) -->
 <!-- ``` -->
 
-## Diagnose the return level
+## Diagnose the return period
 
 OLD: Tried with deriving return level directly from SIF and EF-based S0. 
 <!-- Given the SIF and EF-based S0, back-calculate the return period for each gridcell, using the fitted Gumbel parameters for the respective cell. This is done with the script `rscript_rp_diag.R`, then `rscript_collect_rp_diag.R`. -->
@@ -2867,8 +2918,12 @@ OLD: Tried with deriving return level directly from SIF and EF-based S0.
 For each gridcell, use fitted Gumbel distribution to calculate return level for a set of return periods. This is done with `rscript_return_level.R` and `rscript_collect_rl.R`. The latter writes `"data/df_rl_nSIF.RData"` and `"data/df_rl_fet.RData"`.
 
 ```{r}
-load("data/df_rl_fet.RData")
+# load("data/df_rl_fet.RData")  # loads df_rl_fet
 # load("data/df_rl_nSIF.RData")
+
+# ## xxx debug
+# load("data/df_rl/df_rl_fet_ichunk_TEST.RData")  # loads df
+# df_rl_fet <- df
 
 ## function to determine the return period with the lowest bias (absolute)
 find_rp_diag <- function(df){
@@ -2888,7 +2943,8 @@ lon_breaks <- seq(from = -180, to = 180, by = dlon)
 lat_breaks <- seq(from = -90, to = 90, by = dlat)
 
 ## this takes about 1 min
-df_rl_fet_agg <- df_rl_fet %>%
+# df_rl_agg <- df_rl_fet %>%
+df_rl_agg <- df_rl_nSIF %>%
   ungroup() %>% 
   mutate(ilon = cut(lon, 
                     breaks = lon_breaks
@@ -2917,7 +2973,7 @@ df_rl_fet_agg <- df_rl_fet %>%
   rename(lon = lon_mid, lat = lat_mid)
 
 ## distribution of diagnosed return periods
-df_rl_fet_agg %>% 
+df_rl_agg %>% 
   ggplot(aes(rp_diag, ..count..)) + 
   geom_histogram()
 
@@ -2932,14 +2988,14 @@ df_rl_fet %>%
 
 Convert to map and plot.
 ```{r}
-nc <- df_to_grid(
-  df_rl_fet_agg, 
-  varnam = "rp_diag", 
-  lonnam = "lon", latnam = "lat"
-  )
+# nc <- df_to_grid(
+#   df_rl_agg, 
+#   varnam = "rp_diag", 
+#   lonnam = "lon", latnam = "lat"
+#   )
 
-plot_map4(df_rl_fet_agg)
-ggsave("fig/map_rl.pdf", width = 12, height = 8)
+plot_map4(df_rl_agg)
+ggsave("fig/map_rl_nSIF.pdf", width = 12, height = 8)
 
 ## missing lon-bands
 tmp <- df_rl_fet %>%
@@ -2960,7 +3016,10 @@ tmp <- df_rl_fet %>%
          ) %>% 
   mutate(lon_mid = (lon_lower + lon_upper)/2,
          lat_mid = (lat_lower + lat_upper)/2) %>% 
-  dplyr::select(-ilon, -ilat, -lon_lower, -lat_lower, -lat_upper, -lon_upper)
+  dplyr::select(-ilon, -ilat, -lon_lower, -lat_lower, -lat_upper, -lon_upper) %>% 
+  group_by(lon_mid, lat_mid) %>% 
+  nest() %>% 
+  mutate(count = map_int(data, ~nrow(.)))
 
 tmp %>% 
   dplyr::filter(lon_mid > 120 & lon_mid < 121)
