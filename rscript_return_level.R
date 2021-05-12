@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(6, 30)
+# args <- c(5, 30)
 
 library(tidyverse)
 library(extRemes)
