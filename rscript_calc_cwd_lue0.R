@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
-args = commandArgs(trailingOnly=TRUE)
-# args <- c(5600, 7200)
+# args = commandArgs(trailingOnly=TRUE)
+args <- c(2161, 7200)
 
 library(dplyr)
 library(purrr)
@@ -13,7 +13,7 @@ library(lubridate)
 library(rbeni)
 library(segmented)
 
-source("R/calc_cwd_lue0_byilon.R")
+# source("R/calc_cwd_lue0_byilon.R")
 
 ##------------------------------------------------------------------------
 ## split it up into chunks (total number of chunks provided by argument 2)
@@ -60,6 +60,6 @@ if (ncores > 1){
 } else {
 
   ## testing
-  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2", verbose = TRUE))
+  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2", verbose = FALSE))
 
 }
