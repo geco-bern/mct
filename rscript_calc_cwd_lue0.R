@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(5600, 7200)
+# args <- c(2161, 7200)
 
 library(dplyr)
 library(purrr)
@@ -18,20 +18,25 @@ source("R/calc_cwd_lue0_byilon.R")
 ##------------------------------------------------------------------------
 ## split it up into chunks (total number of chunks provided by argument 2)
 ##------------------------------------------------------------------------
-## first round
-nlon <- 7200
-ilat <- seq(1:nlon)
-##----
+# ## first round
+# nlon <- 7200
+# ilon <- seq(1:nlon)
+# ##----
 
 # ## second round: do only missing ones
 # load("./data/df_file_availability_cwd_lue0.RData")
-# ilat <- df %>% dplyr::filter(!avl_cwd_lue0) %>% pull(ilon)
-# nlon <- length(ilat)
+# ilon <- df %>% dplyr::filter(!avl_cwd_lue0) %>% pull(ilon)
+# nlon <- length(ilon)
+
+## this is created in rscript_collect_cwd_lue0.R
+load("data/vec_ilon_missing.RData") # loads vec_ilon_missing
+ilon <- vec_ilon_missing
+nlon <- length(ilon)
 ##----
 
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
 nrows_chunk <- ceiling(nlon/nchunk)
-irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
+irow_chunk <- split(ilon, ceiling(seq_along(ilon)/nrows_chunk))
 
 print("getting data for longitude indices:")
 print(irow_chunk[[as.integer(args[1])]]) 
@@ -60,6 +65,6 @@ if (ncores > 1){
 } else {
 
   ## testing
-  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2", verbose = TRUE))
+  df_out <- purrr::map(as.list(irow_chunk[[as.integer(args[1])]]), ~calc_cwd_lue0_byilon(., dirn = "~/mct/data/df_cwd_lue0_2", verbose = FALSE))
 
 }

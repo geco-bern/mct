@@ -1781,93 +1781,14 @@ df_cwd_lue0 <- df
 rm("df")
 ```
 
-<!-- Regional -->
-
-<!-- ```{r} -->
-<!-- ## central asia SIF -->
-<!-- gg <- df_cwd_lue0 %>%  -->
-<!--   plot_map3(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,  -->
-<!--             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),  -->
-<!--             spacing = "constant", -->
-<!--             combine = FALSE,  -->
-<!--             colorscale = viridis::cividis -->
-<!--             ) -->
-<!-- gg$ggmap <- gg$ggmap +  -->
-<!--   labs(title = expression(paste(italic("S")[dSIF]))) + -->
-<!--   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2) -->
-<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
-<!-- ggsave("fig/map_cwd_lue0_SIF_casia2.pdf", width = 10, height = 6) -->
-<!-- ggsave("fig/map_cwd_lue0_SIF_casia2.png", width = 10, height = 6) -->
-
-<!-- ## central asia nSIF -->
-<!-- gg <- df_cwd_lue0 %>%  -->
-<!--   plot_map3(varnam = "cwd_lue0_nSIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,  -->
-<!--             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),  -->
-<!--             spacing = "constant", -->
-<!--             combine = FALSE,  -->
-<!--             colorscale = viridis::cividis -->
-<!--             ) -->
-<!-- gg$ggmap <- gg$ggmap +  -->
-<!--   labs(title = expression(paste(italic("S")[dSIF]))) + -->
-<!--   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2) -->
-<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
-<!-- ggsave("fig/map_cwd_lue0_nSIF_casia2.pdf", width = 10, height = 6) -->
-<!-- ggsave("fig/map_cwd_lue0_nSIF_casia2.png", width = 10, height = 6) -->
-
-<!-- ## central asia flue -->
-<!-- gg <- df_cwd_lue0 %>%  -->
-<!--   plot_map3(varnam = "flue_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,  -->
-<!--             breaks = seq(0, 1, by = 0.1),  -->
-<!--             spacing = "constant", -->
-<!--             combine = FALSE,  -->
-<!--             colorscale = viridis::cividis -->
-<!--             ) -->
-<!-- gg$ggmap <- gg$ggmap +  -->
-<!--   labs(title = "SIF reduction", subtitle = "Relative magnitude at maximum CWD") + -->
-<!--   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2) -->
-<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
-<!-- ggsave("fig/map_flue_SIF_casia2.pdf", width = 10, height = 6) -->
-<!-- ggsave("fig/map_flue_SIF_casia2.png", width = 10, height = 6) -->
-<!-- ``` -->
-
-### Regional
+Regional hi-res plots.
 
 ```{r}
-## Detect flattening
-df_cwd_lue0 <- df_cwd_lue0 %>%
-  mutate(flat_fet = ifelse(type_fet %in% c("Aa", "A1", "A2a"), TRUE, NA))
+load("data/df_rivers.RData")
 
-df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai") %>% 
-      drop_na() %>% 
-      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
-      rename(irr = aai)
-
-## central asia, multi layer map
-gg <- plot_map_cwdx_type_irrigation(
-  df_cwd_lue0, df_irr,
-  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
-  # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-  lonmin = 60, lonmax = 70, latmin = 35, latmax = 42,
-  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-  spacing = "constant",
-  combine = FALSE, 
-  colorscale = viridis::cividis, 
-  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
-  hillshade = TRUE,
-  rivers = TRUE,
-  scale = "medium",
-  expand_size_y = 0.4,
-  irr_cutoff = 0.3
-  )
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
-ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
-ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
-
-## central asia EF only S_dEF
-gg <- plot_map4(df_cwd_lue0,
-            varnam = "cwd_lue0_fet", 
-            lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-            # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
+## central asia SIF
+gg <- df_cwd_lue0 %>% 
+  plot_map3(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
@@ -1974,11 +1895,37 @@ Convert to nc object and write to file.
 ```{r}
 ## SIF
 nc <- df_to_grid(df_cwd_lue0, varnam = "cwd_lue0_SIF", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwd_lue0_SIF", lon = df_cwd_lue0$lon %>% unique() %>% sort(), lat = df_cwd_lue0$lat %>% unique() %>% sort(), path = "data/cwd_lue0_SIF2.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwd_lue0_SIF", lon = df_cwd_lue0$lon %>% unique() %>% sort() %>% round(digits = 3), lat = df_cwd_lue0$lat %>% unique() %>% sort() %>% round(digits = 3), path = "data/cwd_lue0_SIF.nc", make_zdim = FALSE)
+
+# ## aggregate using raster
+# rasta <- raster(nc, 
+#                 xmn = min(round(sort(unique(df_cwd_lue0$lon)), digits = 3)) - 0.05,
+#                 xmx = max(round(sort(unique(df_cwd_lue0$lon)), digits = 3)) + 0.05,
+#                 ymn = min(round(sort(unique(df_cwd_lue0$lat)), digits = 3)) - 0.05,
+#                 ymx = max(round(sort(unique(df_cwd_lue0$lat)), digits = 3)) + 0.05
+#                 )
+# rasta_agg <- aggregate(rasta, fact=2, fun=mean, expand=TRUE, na.rm=TRUE)
+# writeRaster( rasta_agg, "data/cwd_lue0_SIF_tenthdeg_raster.nc", 
+#              overwrite=TRUE, format="CDF", varname="cwd_lue0_SIF", varunit="mm", 
+#              longname="S_dSIF", xname="lon", yname="lat"
+#              )
 
 ## nSIF
 nc <- df_to_grid(df_cwd_lue0, varnam = "cwd_lue0_nSIF", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwd_lue0_nSIF", lon = df_cwd_lue0$lon %>% unique() %>% sort(), lat = df_cwd_lue0$lat %>% unique() %>% sort(), path = "data/cwd_lue0_nSIF2.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwd_lue0_nSIF", lon = df_cwd_lue0$lon %>% unique() %>% sort() %>% round(digits = 3), lat = df_cwd_lue0$lat %>% unique() %>% sort() %>% round(digits = 3), path = "data/cwd_lue0_nSIF.nc", make_zdim = FALSE)
+
+# ## aggregate using raster
+# rasta <- raster(nc, 
+#                 xmn = min(round(sort(unique(df_cwd_lue0$lon)), digits = 3)) - 0.05,
+#                 xmx = max(round(sort(unique(df_cwd_lue0$lon)), digits = 3)) + 0.05,
+#                 ymn = min(round(sort(unique(df_cwd_lue0$lat)), digits = 3)) - 0.05,
+#                 ymx = max(round(sort(unique(df_cwd_lue0$lat)), digits = 3)) + 0.05
+#                 )
+# rasta_agg <- aggregate(rasta, fact=2, fun=mean, expand=TRUE, na.rm=TRUE)
+# writeRaster( rasta_agg, "data/cwd_lue0_nSIF_tenthdeg_raster.nc", 
+#              overwrite=TRUE, format="CDF", varname="cwd_lue0_nSIF", varunit="mm", 
+#              longname="S_dnSIF", xname="lon", yname="lat"
+#              )
 
 # ## lambda_decay_SIF
 # nc <- df_to_grid(df_cwd_lue0_SIF, varnam = "lambda_decay_SIF", lonnam = "lon", latnam = "lat")
@@ -1989,21 +1936,52 @@ write_nc2(nc, varnams = "cwd_lue0_nSIF", lon = df_cwd_lue0$lon %>% unique() %>% 
 # write_nc2(nc, varnams = "lambda_decay_nSIF", lon = df_cwd_lue0_nSIF$lon %>% unique() %>% sort(), lat = df_cwd_lue0_nSIF$lat %>% unique() %>% sort(), path = "data/lambda_decay_nSIF.nc", make_zdim = FALSE)
 ```
 
-Regrid to 0.1 deg
+Regrid to 0.1 deg.
 
 ```{r}
-system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_SIF.nc data/cwd_lue0_SIF_tenthdeg2.nc")
-system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_nSIF.nc data/cwd_lue0_nSIF_tenthdeg2.nc")
-# system("cdo remapbil,gridfile_tenthdeg.txt data/lambda_decay_SIF.nc data/lambda_decay_SIF_tenthdeg.nc")
-# system("cdo remapbil,gridfile_tenthdeg.txt data/lambda_decay_nSIF.nc data/lambda_decay_nSIF_tenthdeg.nc")
+## bin to half-degree gridcells for determining climate forcing
+dlon <- 0.1
+dlat <- 0.1
+lon_breaks <- seq(from = floor(min(df_cwd_lue0$lon)), to = ceiling(max(df_cwd_lue0$lon)), by = dlon)
+lat_breaks <- seq(from = floor(min(df_cwd_lue0$lat)), to = ceiling(max(df_cwd_lue0$lat)), by = dlat)
+
+df_cwd_lue0 <- df_cwd_lue0 %>%
+  ungroup() %>%
+  mutate(ilon = cut(lon,
+                    breaks = lon_breaks
+                    ),
+         ilat = cut(lat,
+                    breaks = lat_breaks
+                    )
+         ) %>%
+  mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
+         lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
+         lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )
+         ) %>%
+  mutate(lon_mid = (lon_lower + lon_upper)/2,
+         lat_mid = (lat_lower + lat_upper)/2) %>%
+
+  ## create cell name to associate with climate input
+  dplyr::select(-ilon, -ilat, -lon_lower, -lon_upper, -lat_lower, -lat_upper)
+
+df_cwd_lue0_agg <- df_cwd_lue0 %>% 
+  group_by(lon_mid, lat_mid) %>% 
+  summarise(cwd_lue0_SIF = mean(cwd_lue0_SIF, na.rm = TRUE), cwd_lue0_nSIF = mean(cwd_lue0_nSIF, na.rm = TRUE)) %>% 
+  rename(lon = lon_mid, lat = lat_mid) %>% 
+  mutate(cwd_lue0_SIF = ifelse(is.nan(cwd_lue0_SIF), NA, cwd_lue0_SIF),
+         cwd_lue0_nSIF = ifelse(is.nan(cwd_lue0_nSIF), NA, cwd_lue0_nSIF))
 ```
+
+
+### Global map
 
 Read tenth-degree global file and plot.
 
 ```{r}
 ## SIF
-nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_SIF_tenthdeg2.nc", varnam = "cwd_lue0_SIF")
-gg <- plot_map3(nc_tenthdeg, 
+# nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_SIF_tenthdeg.nc", varnam = "cwd_lue0_SIF")
+gg <- plot_map3(df_cwd_lue0_agg, 
                 varnam = "cwd_lue0_SIF", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
                 spacing = "constant", maxval = 6000, 
@@ -2012,12 +1990,12 @@ gg <- plot_map3(nc_tenthdeg,
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dSIF])))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_SIF2.pdf", width = 10, height = 6)
-ggsave("fig/map_cwd_lue0_SIF2.png", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_SIF.pdf", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_SIF.png", width = 10, height = 6)
 
 ## nSIF
-nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_nSIF_tenthdeg2.nc", varnam = "cwd_lue0_nSIF")
-gg <- plot_map3(nc_tenthdeg, 
+# nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_nSIF_tenthdeg.nc", varnam = "cwd_lue0_nSIF")
+gg <- plot_map3(df_cwd_lue0_agg, 
                 varnam = "cwd_lue0_nSIF", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
                 latmin = -55, latmax = 80,
@@ -2029,8 +2007,8 @@ gg <- plot_map3(nc_tenthdeg,
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dnSIF])))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_nSIF2.pdf", width = 10, height = 6)
-ggsave("fig/map_cwd_lue0_nSIF2.png", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_nSIF.pdf", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_nSIF.png", width = 10, height = 6)
 
 # ## lambda_decay_SIF
 # nc_tenthdeg <- read_nc_onefile("data/lambda_decay_SIF_tenthdeg.nc", varnam = "lambda_decay_SIF")

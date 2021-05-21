@@ -48,3 +48,12 @@ path <- paste0(dirn, filn)
 print(paste("Writing file:", path))
 save(df, file = path)
 
+## determine missing
+vec_lon_avl <- round(unique(df$lon), digits = 3)
+vec_lon_hires <- round(seq(-179.975, 179.975, by = 0.05), digits = 3)
+vec_lon_missing <- vec_lon_hires[!(vec_lon_hires %in% vec_lon_avl)]
+vec_ilon_missing <- (vec_lon_missing + 179.975)/0.05 + 1
+save(vec_ilon_missing, file = "data/vec_ilon_missing.RData")
+
+## run rscript_calc_cwd_lue0.R again for missing longitude bands
+
