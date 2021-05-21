@@ -22,12 +22,12 @@ Perform change point detection in SIF ~ CWD regression.
 
 ```{r}
 ## get data for one longitude slice, based on SIF
-calc_cwd_lue0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_lue0_2")
-load("~/mct/data/df_cwd_lue0_SENS/df_cwd_lue0_5600.RData")
+calc_cwd_lue0_byilon(5000, drop_data = FALSE, dirn = "~/mct/data/df_cwd_lue0_2")
+load("~/mct/data/df_cwd_lue0_2/df_cwd_lue0_5000.RData")
 
 ## get data for one longitude slice, based on EF
-calc_cwd_et0_byilon(5600, drop_data = FALSE, dirn = "~/mct/data/df_cwd_et0_2/")
-load("~/mct/data/df_cwd_lue0_SENS/df_cwd_et0_5600.RData")
+calc_cwd_et0_byilon(5000, drop_data = FALSE, dirn = "~/mct/data/df_cwd_et0_2/")
+load("~/mct/data/df_cwd_et0_2/df_cwd_et0_5000.RData")
 ```
 
 Look at one cell.
@@ -37,12 +37,12 @@ Look at one cell.
 # caused problem: 18.175
 
 df_data <- df %>% 
-  filter(lat == 18.175) %>% 
+  filter(lat == 37.175) %>% 
   select(data) %>% 
   unnest(data)
 
 df_inst <- df %>% 
-  filter(lat == 18.175) %>% 
+  filter(lat == 37.175) %>% 
   select(data_inst) %>% 
   unnest(data_inst)
 
@@ -58,7 +58,7 @@ df_inst <- df %>%
 Steps above are now implemented as
 ```{r}
 out <- calc_cwd_lue0(df = df_data, inst = df_inst, nam_lue = "fet", do_plot = TRUE, verbose = TRUE)
-out$gg
+out$gg + ylim(0,0.6)
 out$cwd_lue0
 ```
  

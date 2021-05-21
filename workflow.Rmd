@@ -1771,7 +1771,7 @@ out$gg
 
 Approach is to derive CWD(LUE=0) for estimating CWDX.
 
-Run script that wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()` (submission file: `submit_calc_cwd_lue0.sh`). Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
+Run script `rscript_calc_cwd_lue0.R`, which wraps `calc_cwd_lue0_byilon()` and `calc_cwd_lue0()` (submission file: `submit_calc_cwd_lue0.sh`). Collects CWD data (including instances), SIF data, and WATCH-WFDEI SWdown data into one data frame per pixel and determines sensitivity (linear regression slope) of SIF vs. CWD and SIF/SW (nSIF) vs. CWD. Also determines fractional reduction in SIF and nSIF in highest CWD bin (using function `get_flue_cwdmax()`).
 
 Then collect outputs using `rscript_collect_cwd_lue0.R` and read the file. It's huge.
 
@@ -1779,94 +1779,193 @@ Then collect outputs using `rscript_collect_cwd_lue0.R` and read the file. It's 
 load("data/df_cwd_lue0_2.RData")
 df_cwd_lue0 <- df
 rm("df")
-
-## this was necessary for the first round with the nested df
-# df_cwd_lue0_SIF <- df %>% 
-#   dplyr::select(lon, lat, cwd_lue0_SIF)
-# save(df_cwd_lue0_SIF, file = "data/df_cwd_lue0_SIF.RData")
-# 
-# df_cwd_lue0_nSIF <- df %>% 
-#   dplyr::select(lon, lat, cwd_lue0_nSIF) 
-# save(df_cwd_lue0_nSIF, file = "data/df_cwd_lue0_nSIF.RData")
-# 
-# df_df_flue_SIF <- df %>% 
-#   dplyr::select(lon, lat, df_flue_SIF)
-# save(df_df_flue_SIF, file = "data/df_df_flue_SIF.RData")
-# 
-# df_df_flue_nSIF <- df %>% 
-#   dplyr::select(lon, lat, df_flue_nSIF)
-# save(df_df_flue_nSIF, file = "data/df_df_flue_nSIF.RData")
-# 
-# df_flue_SIF <- df %>% 
-#   dplyr::select(lon, lat, flue_SIF)
-# save(df_flue_SIF, file = "data/df_flue_SIF.RData")
-# 
-# df_flue_nSIF <- df %>% 
-#   dplyr::select(lon, lat, flue_nSIF)
-# save(df_flue_nSIF, file = "data/df_flue_nSIF.RData")
-# 
-# rm("df")
 ```
 
-Load files after they're written.
+<!-- Regional -->
+
+<!-- ```{r} -->
+<!-- ## central asia SIF -->
+<!-- gg <- df_cwd_lue0 %>%  -->
+<!--   plot_map3(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,  -->
+<!--             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),  -->
+<!--             spacing = "constant", -->
+<!--             combine = FALSE,  -->
+<!--             colorscale = viridis::cividis -->
+<!--             ) -->
+<!-- gg$ggmap <- gg$ggmap +  -->
+<!--   labs(title = expression(paste(italic("S")[dSIF]))) + -->
+<!--   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2) -->
+<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
+<!-- ggsave("fig/map_cwd_lue0_SIF_casia2.pdf", width = 10, height = 6) -->
+<!-- ggsave("fig/map_cwd_lue0_SIF_casia2.png", width = 10, height = 6) -->
+
+<!-- ## central asia nSIF -->
+<!-- gg <- df_cwd_lue0 %>%  -->
+<!--   plot_map3(varnam = "cwd_lue0_nSIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,  -->
+<!--             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),  -->
+<!--             spacing = "constant", -->
+<!--             combine = FALSE,  -->
+<!--             colorscale = viridis::cividis -->
+<!--             ) -->
+<!-- gg$ggmap <- gg$ggmap +  -->
+<!--   labs(title = expression(paste(italic("S")[dSIF]))) + -->
+<!--   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2) -->
+<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
+<!-- ggsave("fig/map_cwd_lue0_nSIF_casia2.pdf", width = 10, height = 6) -->
+<!-- ggsave("fig/map_cwd_lue0_nSIF_casia2.png", width = 10, height = 6) -->
+
+<!-- ## central asia flue -->
+<!-- gg <- df_cwd_lue0 %>%  -->
+<!--   plot_map3(varnam = "flue_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,  -->
+<!--             breaks = seq(0, 1, by = 0.1),  -->
+<!--             spacing = "constant", -->
+<!--             combine = FALSE,  -->
+<!--             colorscale = viridis::cividis -->
+<!--             ) -->
+<!-- gg$ggmap <- gg$ggmap +  -->
+<!--   labs(title = "SIF reduction", subtitle = "Relative magnitude at maximum CWD") + -->
+<!--   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2) -->
+<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
+<!-- ggsave("fig/map_flue_SIF_casia2.pdf", width = 10, height = 6) -->
+<!-- ggsave("fig/map_flue_SIF_casia2.png", width = 10, height = 6) -->
+<!-- ``` -->
+
+### Regional
 
 ```{r}
-load("data/df_cwd_lue0_SIF.RData")
-load("data/df_cwd_lue0_nSIF.RData")
-load("data/df_flue_SIF.RData")
-#load("data/df_df_flue_SIF.RData")
-#load("data/df_df_flue_nSIF.RData")
-load("data/df_rivers.RData")
-```
+## Detect flattening
+df_cwd_lue0 <- df_cwd_lue0 %>%
+  mutate(flat_fet = ifelse(type_fet %in% c("Aa", "A1", "A2a"), TRUE, NA))
 
-Regional hi-res plots.
+df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai") %>% 
+      drop_na() %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      rename(irr = aai)
 
-```{r}
-## central asia SIF
+## central asia, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_lue0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  lonmin = 60, lonmax = 70, latmin = 35, latmax = 42,
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
+ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
+
+## central asia EF only S_dEF
+gg <- plot_map4(df_cwd_lue0,
+            varnam = "cwd_lue0_fet", 
+            lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+            # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = viridis::cividis, 
+            legend_title = "(mm)", 
+            hillshade = TRUE,
+            rivers = TRUE,
+            scale = "medium"
+            )
+gg$ggmap <- gg$ggmap + 
+  labs(title = expression(paste(italic("S")[dEF])))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
+
+
+## central asia S0-Teuling
 gg <- df_cwd_lue0 %>% 
-  plot_map3(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+  plot_map3(varnam = "s0_teuling_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
             colorscale = viridis::cividis
             )
 gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("S")[dSIF]))) +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
+  labs(title = expression(paste(italic("S")[0-Teuling]))) +
+  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_SIF_casia2.pdf", width = 10, height = 6)
-ggsave("fig/map_cwd_lue0_SIF_casia2.png", width = 10, height = 6)
+ggsave("fig/map_s0_teuling_fet_casia2.pdf", width = 10, height = 6)
+ggsave("fig/map_s0_teuling_fet_casia2.png", width = 10, height = 6)
 
-## central asia nSIF
-gg <- df_cwd_lue0 %>% 
-  plot_map3(varnam = "cwd_lue0_nSIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-            spacing = "constant",
-            combine = FALSE, 
-            colorscale = viridis::cividis
-            )
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("S")[dSIF]))) +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_nSIF_casia2.pdf", width = 10, height = 6)
-ggsave("fig/map_cwd_lue0_nSIF_casia2.png", width = 10, height = 6)
 
-## central asia flue
-gg <- df_cwd_lue0 %>% 
-  plot_map3(varnam = "flue_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = seq(0, 1, by = 0.1), 
-            spacing = "constant",
-            combine = FALSE, 
-            colorscale = viridis::cividis
-            )
-gg$ggmap <- gg$ggmap + 
-  labs(title = "SIF reduction", subtitle = "Relative magnitude at maximum CWD") +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue", size = 0.2)
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_flue_SIF_casia2.pdf", width = 10, height = 6)
-ggsave("fig/map_flue_SIF_casia2.png", width = 10, height = 6)
+
+## Western USA, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_lue0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47, 
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_wusa.pdf", width = 10, height = 6)
+ggsave("fig/map_cwd_lue0_types_fet0_wusa.png", width = 10, height = 6)
+
+
+## Amazon, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_lue0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  lonmin = -83, lonmax = -33, latmin = -25, latmax = 12,
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_amazon.pdf", width = 9, height = 6)
+ggsave("fig/map_cwd_lue0_types_fet0_amazon.png", width = 9, height = 6)
+
+
+## Europe, multi layer map
+gg <- plot_map_cwdx_type_irrigation(
+  df_cwd_lue0, df_irr,
+  name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
+  lonmin = -10, lonmax = 25, latmin = 35, latmax = 55, 
+  breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+  spacing = "constant",
+  combine = FALSE, 
+  colorscale = viridis::cividis, 
+  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  hillshade = TRUE,
+  rivers = TRUE,
+  scale = "medium",
+  expand_size_y = 0.4,
+  irr_cutoff = 0.3
+  )
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+ggsave("fig/map_cwd_lue0_types_fet0_europe.pdf", width = 8, height = 6)
+ggsave("fig/map_cwd_lue0_types_fet0_europe.png", width = 8, height = 6)
 ```
+
+
+
+### Global
 
 ### Regrid and map
 
@@ -1898,9 +1997,6 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_nSIF.nc data/cwd_lue0_n
 # system("cdo remapbil,gridfile_tenthdeg.txt data/lambda_decay_SIF.nc data/lambda_decay_SIF_tenthdeg.nc")
 # system("cdo remapbil,gridfile_tenthdeg.txt data/lambda_decay_nSIF.nc data/lambda_decay_nSIF_tenthdeg.nc")
 ```
-
-
-### Global map
 
 Read tenth-degree global file and plot.
 
@@ -2367,8 +2463,6 @@ ggsave("fig/map_cwd_lue0_nSIF2.png", width = 10, height = 6)
 
 Approach is to derive CWD(ET/Rn=0) for estimating CWDX.
 
-### Read data
-
 Run script that wraps `calc_cwd_et0_byilon()` and `calc_cwd_et0()` (submission file: `submit_calc_cwd_et0.sh`). Collects CWD data (including instances), net radiation, and ET data into one data frame per pixel and determines sensitivity (linear regression slope) of ET/Rn vs. CWD. Also determines fractional reduction in ET/Rn in highest CWD bin (using function `get_fet_cwdmax()`).
 
 Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's huge, therefore split them up and re-write smaller files.
@@ -2377,45 +2471,8 @@ Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's h
 load("data/df_cwd_et0_3.RData")
 df_cwd_et0 <- df
 rm("df")
-
-# df_cwd_lue0_et <- df %>% 
-#   dplyr::select(lon, lat, cwd_lue0_et)
-# save(df_cwd_lue0_et, file = "data/df_cwd_lue0_et.RData")
-# 
-# df_cwd_lue0_fet <- df %>% 
-#   dplyr::select(lon, lat, cwd_lue0_fet)
-# save(df_cwd_lue0_fet, file = "data/df_cwd_lue0_fet.RData")
-# 
-# df_s0_teuling_et <- df %>% 
-#   dplyr::select(lon, lat, s0_teuling_et)
-# save(df_s0_teuling_et, file = "data/df_s0_teuling_et.RData")
-# 
-# df_df_flue_et <- df %>% 
-#   dplyr::select(lon, lat, df_flue_et)
-# save(df_df_flue_et, file = "data/df_df_flue_et.RData")
-# 
-# df_df_flue_fet <- df %>% 
-#   dplyr::select(lon, lat, df_flue_fet)
-# save(df_df_flue_fet, file = "data/df_df_flue_fet.RData")
-# 
-# rm("df")
 ```
 
-<!-- Load smaller datasets. -->
-
-<!-- ```{r} -->
-
-<!-- load("data/df_cwd_lue0_et.RData") -->
-
-<!-- load("data/df_cwd_lue0_fet.RData") -->
-
-<!-- load("data/df_s0_teuling_et.RData") -->
-
-<!-- # load("data/df_df_flue_et.RData") -->
-
-<!-- # load("data/df_df_flue_fet.RData") -->
-
-<!-- ``` -->
 
 ### Regional
 
@@ -2437,8 +2494,8 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
 gg <- plot_map_cwdx_type_irrigation(
   df_cwd_et0, df_irr,
   name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
-  lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-  # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42,
+  # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  lonmin = 60, lonmax = 70, latmin = 35, latmax = 42,
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
@@ -2457,8 +2514,8 @@ ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
 ## central asia EF only S_dEF
 gg <- plot_map4(df_cwd_et0,
             varnam = "cwd_lue0_fet", 
-            # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
+            lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+            # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
