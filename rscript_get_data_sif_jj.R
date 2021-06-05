@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
-# args <- c(221, 7200)
+# args <- c(1, 30)
 
 library(dplyr)
 library(tidyr)
@@ -28,9 +28,16 @@ timedimnam <- "time"
 ## split it up into chunks (total number of chunks provided by argument 2)
 ##------------------------------------------------------------------------
 nchunk <- as.integer(args[2]) # 1000  # make sure this is consistent with the number of parallel jobs (job array!) in the submission script
-nlon <- 7200
+
+# ## first round: all longitudes
+# nlon <- 7200
+# nrows_chunk <- ceiling(nlon/nchunk)
+# ilat <- seq(1:nlon)
+
+## second round
+ilat <- 3961:4176
+nlon <- length(ilat)
 nrows_chunk <- ceiling(nlon/nchunk)
-ilat <- seq(1:nlon)
 irow_chunk <- split(ilat, ceiling(seq_along(ilat)/nrows_chunk))
 
 print("getting data for longitude indices:")
