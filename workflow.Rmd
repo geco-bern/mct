@@ -25,6 +25,7 @@ library(stringr)
 library(ggridges)
 library(rgdal)
 library(broom)
+library(cowplot)
 
 #files.sources = list.files("./R")
 #out <- sapply(paste0("R/", files.sources), source)
@@ -1982,8 +1983,6 @@ df_cwd_lue0_agg <- df_cwd_lue0 %>%
 ```
 
 
-### Global map
-
 Read tenth-degree global file and plot.
 
 ```{r}
@@ -2003,7 +2002,7 @@ ggsave("fig/map_cwd_lue0_SIF.png", width = 10, height = 6)
 
 ## nSIF
 # nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_nSIF_tenthdeg.nc", varnam = "cwd_lue0_nSIF")
-gg <- plot_map3(df_cwd_lue0_agg, 
+gg <- plot_map4(df_cwd_lue0_agg, 
                 varnam = "cwd_lue0_nSIF", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
                 latmin = -55, latmax = 80,
@@ -2013,10 +2012,12 @@ gg <- plot_map3(df_cwd_lue0_agg,
                 colorscale = viridis::cividis, 
                 legend_title = "(mm)")
 gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("S")[dnSIF])))
+  labs(title = expression(paste(italic("S")[dSIF])))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwd_lue0_nSIF.pdf", width = 10, height = 6)
 ggsave("fig/map_cwd_lue0_nSIF.png", width = 10, height = 6)
+
+gg_fig1b <- gg$ggmap
 
 # ## lambda_decay_SIF
 # nc_tenthdeg <- read_nc_onefile("data/lambda_decay_SIF_tenthdeg.nc", varnam = "lambda_decay_SIF")
@@ -2507,22 +2508,26 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
 gg <- plot_map_cwdx_type_irrigation(
   df_cwd_et0, df_irr,
   name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
-  # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-  lonmin = 60, lonmax = 70, latmin = 35, latmax = 42,
+  lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
   colorscale = viridis::cividis, 
-  legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
+  legend_title = "(mm)", 
   hillshade = TRUE,
   rivers = TRUE,
   scale = "medium",
-  expand_size_y = 0.4,
+  expand_size_y = 0.5,
   irr_cutoff = 0.3
   )
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+gg$ggmap <- gg$ggmap +
+  labs(title = expression(paste(italic("S")[dEF])))
+gg <- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
+gg
 ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
 ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
+
+gg_fig1c <- gg
 
 ## central asia EF only S_dEF
 gg <- plot_map4(df_cwd_et0,
@@ -2558,7 +2563,6 @@ gg$ggmap <- gg$ggmap +
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_s0_teuling_fet_casia2.pdf", width = 10, height = 6)
 ggsave("fig/map_s0_teuling_fet_casia2.png", width = 10, height = 6)
-
 
 
 ## Western USA, multi layer map
@@ -2786,6 +2790,9 @@ df_cwd_et0_agg <- df_cwd_et0 %>%
 Read tenth-degree global file and plot.
 
 ```{r}
+df_box <- tibble(
+  long = c())
+
 ## EF
 gg <- plot_map4(df_cwd_et0_agg, 
                 varnam = "cwd_lue0_fet", 
@@ -2800,16 +2807,16 @@ gg <- plot_map4(df_cwd_et0_agg,
                 rivers = FALSE,
                 expand_size_y = 0.5)
 gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("S")[dEF])))
+  labs(title = expression(paste(italic("S")[dEF]))) +
+  ## add red box for zoom
+  geom_path(aes(x = long, y = lat, group = group), data = df_box, size = 0.3, color = "red")
+  
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwd_lue0_fet.pdf", width = 10, height = 6)
 ggsave("fig/map_cwd_lue0_fet.png", width = 10, height = 6)
+
+gg_fig1a <- gg$ggmap
 ```
-
-
-
-
-
 
 
 
@@ -3300,7 +3307,8 @@ df_rl_agg_test <- tmp_gti %>%
   mutate(test = forestcoverfraction * gti) %>% 
   mutate(gti_bin = cut(gti, breaks = c(1:5, 10)),
          fcf_bin = cut(forestcoverfraction, seq(0, 1, by = 0.1)),
-         wtd_bin = cut(WTD, c(0, 5, 10, 15, 200)))
+         wtd_bin = cut(WTD, c(0, 5, 10, 15, 200))) %>% 
+  mutate(forest = ifelse(forestcoverfraction > 0.4, TRUE, FALSE))
 ```
 
 Visualisations
@@ -3331,6 +3339,11 @@ df_rl_agg_test %>%
   geom_boxplot()
 
 df_rl_agg_test %>% 
+  drop_na(gti_bin, rp_diag) %>% 
+  ggplot(aes(x = gti_bin, y = rp_diag)) +
+  geom_boxplot()
+
+df_rl_agg_test %>% 
   drop_na(fcf_bin, rp_diag) %>% 
   ggplot(aes(x = fcf_bin, y = rp_diag)) +
   geom_boxplot()
@@ -3339,6 +3352,11 @@ df_rl_agg_test %>%
   drop_na(wtd_bin, rp_diag) %>% 
   ggplot(aes(x = wtd_bin, y = rp_diag)) +
   geom_boxplot()
+
+df_rl_agg_test %>% 
+  drop_na(gti_bin, rp_diag, forest) %>% 
+  ggplot(aes(x = gti_bin, y = rp_diag, fill = forest)) +
+  geom_violin()
 ```
 
 Maps
@@ -4313,4 +4331,11 @@ df_corr %>% dplyr::select(biome_name, obs = cwd_lue0_fet, mod = cwdx40) %>%
 
 ggsave("fig/modobs_ridges_cwdx_fet.pdf", width = 15, height = 10)
 ggsave("fig/modobs_ridges_cwdx_fet.png", width = 15, height = 10)
+```
+
+## Publication figures
+
+```{r}
+plot_grid(gg_fig1a, gg_fig1b, gg_fig1c, ncol = 1, labels = c('a', 'b', 'c'))
+ggsave("fig/fig1.png", width = 8, height = 11)
 ```
