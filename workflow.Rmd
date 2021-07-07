@@ -1136,49 +1136,71 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx200.nc data/cwdx200_tenthdeg
 Read tenth-degree global files and plot.
 
 ```{r}
-## 20 yr
-nc_tenthdeg <- read_nc_onefile("data/cwdx20_tenthdeg.nc", varnam = "cwdx20")
-gg <- plot_map3(nc_tenthdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(italic(S)[CWDX20]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
-ggsave("fig/map_cwdx20.png", width = 10, height = 6)
-
-## 40 yr
-nc_tenthdeg <- read_nc_onefile("data/cwdx40_tenthdeg.nc", varnam = "cwdx40")
-gg <- plot_map3(nc_tenthdeg, varnam = "cwdx40", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(italic(S)[CWDX40]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx40.pdf", width = 10, height = 6)
-ggsave("fig/map_cwdx40.png", width = 10, height = 6)
-
 ## 80 yr
-nc_tenthdeg <- read_nc_onefile("data/cwdx80_tenthdeg.nc", varnam = "cwdx80")
-gg <- plot_map4(nc_tenthdeg, varnam = "cwdx80", 
+nc_tenthdeg <- nc_to_df("data/cwdx80_tenthdeg.nc", varnam = "cwdx80") %>% 
+  mutate(cwdx80 = ifelse(lat > 75, NA, cwdx80))
+gg <- plot_map4(nc_tenthdeg, 
+                varnam = "cwdx80", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
                 latmin = -55, latmax = 80,
-                spacing = "constant", maxval = 6000, combine = FALSE, 
-                colorscale = viridis::cividis, legend_title = "(mm)",
-                expand_size_y = 0.5)
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = FALSE, 
+                colorscale = viridis::cividis, 
+                legend_title = "(mm)",
+                hillshade = FALSE,
+                rivers = FALSE,
+                expand_size_y = 0.5,
+                legend_direction = "horizontal")
 gg$ggmap <- gg$ggmap + 
-  labs(title = expression(italic(S)[CWDX80]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx80.pdf", width = 10, height = 6)
-ggsave("fig/map_cwdx80.png", width = 10, height = 6)
+  labs(title = expression(paste(italic("S")[CWDX80])))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.15))
+ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
+ggsave("fig/map_cwdx80.png", width = 10, height = 5)
 
-## 100 yr
-nc_tenthdeg <- read_nc_onefile("data/cwdx100_tenthdeg.nc", varnam = "cwdx100")
-gg <- plot_map3(nc_tenthdeg, varnam = "cwdx100", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-          spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(italic(S)[CWDX100]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwdx100.pdf", width = 10, height = 6)
-ggsave("fig/map_cwdx100.png", width = 10, height = 6)
+# ## 20 yr
+# nc_tenthdeg <- read_nc_onefile("data/cwdx20_tenthdeg.nc", varnam = "cwdx20")
+# gg <- plot_map3(nc_tenthdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
+#           spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
+# gg$ggmap <- gg$ggmap + 
+#   labs(title = expression(italic(S)[CWDX20]))
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
+# ggsave("fig/map_cwdx20.png", width = 10, height = 6)
+# 
+# ## 40 yr
+# nc_tenthdeg <- read_nc_onefile("data/cwdx40_tenthdeg.nc", varnam = "cwdx40")
+# gg <- plot_map3(nc_tenthdeg, varnam = "cwdx40", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
+#           spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
+# gg$ggmap <- gg$ggmap + 
+#   labs(title = expression(italic(S)[CWDX40]))
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# ggsave("fig/map_cwdx40.pdf", width = 10, height = 6)
+# ggsave("fig/map_cwdx40.png", width = 10, height = 6)
+# 
+# ## 80 yr
+# nc_tenthdeg <- read_nc_onefile("data/cwdx80_tenthdeg.nc", varnam = "cwdx80")
+# gg <- plot_map4(nc_tenthdeg, varnam = "cwdx80", 
+#                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+#                 latmin = -55, latmax = 80,
+#                 spacing = "constant", maxval = 6000, combine = FALSE, 
+#                 colorscale = viridis::cividis, legend_title = "(mm)",
+#                 expand_size_y = 0.5)
+# gg$ggmap <- gg$ggmap + 
+#   labs(title = expression(italic(S)[CWDX80]))
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# ggsave("fig/map_cwdx80.pdf", width = 10, height = 6)
+# ggsave("fig/map_cwdx80.png", width = 10, height = 6)
+# 
+# ## 100 yr
+# nc_tenthdeg <- read_nc_onefile("data/cwdx100_tenthdeg.nc", varnam = "cwdx100")
+# gg <- plot_map3(nc_tenthdeg, varnam = "cwdx100", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
+#           spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
+# gg$ggmap <- gg$ggmap + 
+#   labs(title = expression(italic(S)[CWDX100]))
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# ggsave("fig/map_cwdx100.pdf", width = 10, height = 6)
+# ggsave("fig/map_cwdx100.png", width = 10, height = 6)
 ```
 
 #### Regional
@@ -1799,22 +1821,22 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
       rename(irr = aai)
 
-# ## central asia SIF
-# gg <- df_cwd_lue0 %>% 
-#   plot_map4(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-#             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-#             spacing = "constant",
-#             combine = FALSE, 
-#             colorscale = viridis::cividis, 
-#             legend_title = "(mm)", 
-#             hillshade = TRUE,
-#             rivers = TRUE,
-#             scale = "medium"
-#             )
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(paste(italic("S")[dEF])))
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
+## central asia SIF
+gg <- df_cwd_lue0 %>%
+  plot_map4(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),
+            spacing = "constant",
+            combine = FALSE,
+            colorscale = viridis::cividis,
+            legend_title = "(mm)",
+            hillshade = TRUE,
+            rivers = TRUE,
+            scale = "medium"
+            )
+gg$ggmap <- gg$ggmap +
+  labs(title = expression(paste(italic("S")[dEF])))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
 
 
 # ## central asia S0-Teuling
@@ -1980,25 +2002,28 @@ df_cwd_lue0_agg <- df_cwd_lue0 %>%
   rename(lon = lon_mid, lat = lat_mid) %>% 
   mutate(cwd_lue0_SIF = ifelse(is.nan(cwd_lue0_SIF), NA, cwd_lue0_SIF),
          cwd_lue0_nSIF = ifelse(is.nan(cwd_lue0_nSIF), NA, cwd_lue0_nSIF))
+
+save(df_cwd_lue0_agg, file = "data/df_cwd_lue0_agg.Rdata")
 ```
 
 
 Read tenth-degree global file and plot.
-
 ```{r}
-## SIF
-# nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_SIF_tenthdeg.nc", varnam = "cwd_lue0_SIF")
-gg <- plot_map3(df_cwd_lue0_agg, 
-                varnam = "cwd_lue0_SIF", 
-                breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-                spacing = "constant", maxval = 6000, 
-                combine = FALSE, 
-                colorscale = viridis::cividis, legend_title = "(mm)")
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("S")[dSIF])))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_SIF.pdf", width = 10, height = 6)
-ggsave("fig/map_cwd_lue0_SIF.png", width = 10, height = 6)
+# load("data/df_cwd_lue0_agg.Rdata")
+
+# ## SIF
+# # nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_SIF_tenthdeg.nc", varnam = "cwd_lue0_SIF")
+# gg <- plot_map3(df_cwd_lue0_agg, 
+#                 varnam = "cwd_lue0_SIF", 
+#                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
+#                 spacing = "constant", maxval = 6000, 
+#                 combine = FALSE, 
+#                 colorscale = viridis::cividis, legend_title = "(mm)")
+# gg$ggmap <- gg$ggmap + 
+#   labs(title = expression(paste(italic("S")[dSIF])))
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# ggsave("fig/map_cwd_lue0_SIF.pdf", width = 10, height = 6)
+# ggsave("fig/map_cwd_lue0_SIF.png", width = 10, height = 6)
 
 ## nSIF
 # nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_nSIF_tenthdeg.nc", varnam = "cwd_lue0_nSIF")
@@ -2010,14 +2035,18 @@ gg <- plot_map4(df_cwd_lue0_agg,
                 maxval = 6000, 
                 combine = FALSE, 
                 colorscale = viridis::cividis, 
-                legend_title = "(mm)")
+                legend_title = "(mm)",
+                legend_direction = "horizontal"
+                )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dSIF])))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.2))
 ggsave("fig/map_cwd_lue0_nSIF.pdf", width = 10, height = 6)
 ggsave("fig/map_cwd_lue0_nSIF.png", width = 10, height = 6)
 
 gg_fig1b <- gg$ggmap
+gg_fig1_legend <- gg$gglegend
+save(gg_fig1b, file = "data/gg_fig1b.Rdata")
 
 # ## lambda_decay_SIF
 # nc_tenthdeg <- read_nc_onefile("data/lambda_decay_SIF_tenthdeg.nc", varnam = "lambda_decay_SIF")
@@ -2486,14 +2515,6 @@ Then collect outputs using `rscript_collect_cwd_et0.R` and read the file. It's h
 load("data/df_cwd_et0_3.RData")
 df_cwd_et0 <- df
 rm("df")
-```
-
-
-### Regional
-
-```{r}
-load("data/df_rivers.RData")
-source("R/plot_map_cwdx_type_irrigation.R")
 
 ## Detect flattening
 df_cwd_et0 <- df_cwd_et0 %>%
@@ -2503,6 +2524,40 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
       drop_na() %>% 
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
       rename(irr = aai)
+```
+
+
+### Regional
+
+S_dEF ~ GTI at regional scale?
+```{r}
+df_tmp <- df_cwd_et0 %>% 
+  
+  ## cut to central asia
+  dplyr::filter(lon < 95 & lon > 45, lat > 25, lat < 47.5) %>% 
+  left_join(df_irr, by = c("lon", "lat")) %>% 
+  
+  ## exclude irrigated areas
+  dplyr::filter(irr < 0.3) %>% 
+  
+  ## add GTI info
+  left_join(
+    nc_to_df("~/data/gti_marthews/ga2_casia_05deg.nc", varnam = "Band1") %>% 
+      rename(gti = Band1),
+    by = c("lon", "lat"))
+
+df_tmp %>% 
+  mutate(gti_bin = cut(gti, breaks = 0:12)) %>% 
+  ggplot(aes(x = gti_bin, y = cwd_lue0_fet)) +
+  geom_boxplot(outlier.shape = NA) +
+  ylim(0, 500)
+```
+
+
+```{r}
+load("data/df_rivers.RData")
+source("R/plot_map_cwdx_type_irrigation.R")
+
 
 ## central asia, multi layer map
 gg <- plot_map_cwdx_type_irrigation(
@@ -2517,7 +2572,7 @@ gg <- plot_map_cwdx_type_irrigation(
   hillshade = TRUE,
   rivers = TRUE,
   scale = "medium",
-  expand_size_y = 0.5,
+  expand_size_y = 0.7,
   irr_cutoff = 0.3
   )
 gg$ggmap <- gg$ggmap +
@@ -2527,7 +2582,9 @@ gg
 ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
 ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
 
+## save for publication figure
 gg_fig1c <- gg
+save(gg_fig1c, file = "data/gg_fig1c.Rdata")
 
 ## central asia EF only S_dEF
 gg <- plot_map4(df_cwd_et0,
@@ -2633,132 +2690,23 @@ Convert to nc object and write to file.
 ```{r}
 ## fET (ET/Rn)
 nc <- df_to_grid(df_cwd_et0, varnam = "cwd_lue0_fet", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwd_lue0_fet", lon = df_cwd_et0$lon %>% unique() %>% sort(), lat = df_cwd_et0$lat %>% unique() %>% sort(), path = "data/cwd_lue0_fet2.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwd_lue0_fet", lon = df_cwd_et0$lon %>% unique() %>% sort(), lat = df_cwd_et0$lat %>% unique() %>% sort(), path = "data/cwd_lue0_fet.nc", make_zdim = FALSE)
 
 ## s0_teuling_et
 nc <- df_to_grid(df_cwd_et0 %>% mutate(s0_teuling_fet = remove_outliers(s0_teuling_fet, coef = 10)), varnam = "s0_teuling_et", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "s0_teuling_fet", lon = df_cwd_et0$lon %>% unique() %>% sort(), lat = df_cwd_et0$lat %>% unique() %>% sort(), path = "data/s0_teuling_fet2.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "s0_teuling_fet", lon = df_cwd_et0$lon %>% unique() %>% sort(), lat = df_cwd_et0$lat %>% unique() %>% sort(), path = "data/s0_teuling_fet.nc", make_zdim = FALSE)
 ```
 
-```{r}
-## central asia
-gg <- df_cwd_lue0_fet %>% 
-  plot_map3(varnam = "cwd_lue0_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-            spacing = "constant",
-            combine = FALSE, 
-            colorscale = viridis::cividis
-            )
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(italic(S)[dEF]))
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_fet_casia.pdf", width = 15, height = 10)
-
-## central asia
-gg <- df %>% 
-  plot_map3(varnam = "s0_teuling_et", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf) * 10, 
-            spacing = "constant",
-            combine = FALSE, 
-            colorscale = viridis::cividis
-            )
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(italic(S)[0-Teuling]))
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_s0_teuling_et_casia.pdf", width = 15, height = 10)
-```
 
 ### Global
 
-<!-- Regrid to 0.1 deg -->
-
-<!-- ```{r} -->
-<!-- system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_et.nc data/cwd_lue0_et_tenthdeg2.nc") -->
-<!-- system("cdo remapbil,gridfile_tenthdeg.txt data/cwd_lue0_fet.nc data/cwd_lue0_fet_tenthdeg2.nc") -->
-<!-- system("cdo remapbil,gridfile_tenthdeg.txt data/s0_teuling_et.nc data/s0_teuling_et_tenthdeg2.nc") -->
-<!-- ``` -->
-
-<!-- Read half-degree global file and plot. -->
-
-<!-- ```{r} -->
-<!-- ## ET -->
-<!-- nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_et_tenthdeg2.nc", varnam = "cwd_lue0_et") -->
-<!-- gg <- plot_map4(nc_tenthdeg,  -->
-<!--                 varnam = "cwd_lue0_et",  -->
-<!--                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),  -->
-<!--                 latmin = -55, latmax = 80, -->
-<!--                 spacing = "constant",  -->
-<!--                 maxval = 6000,  -->
-<!--                 combine = FALSE,  -->
-<!--                 colorscale = viridis::cividis,  -->
-<!--                 legend_title = "(mm)", -->
-<!--                 hillshade = TRUE, -->
-<!--                 rivers = TRUE, -->
-<!--                 scale = "medium" -->
-<!--                 ) -->
-<!-- gg$ggmap <- gg$ggmap +  -->
-<!--   labs(title = expression(italic(S)[dET])) -->
-<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
-<!-- ggsave("fig/map_cwd_lue0_et.pdf", width = 10, height = 6) -->
-<!-- ggsave("fig/map_cwd_lue0_et.png", width = 10, height = 6) -->
-
-
-<!-- ## ET/Rn -->
-<!-- nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_fet_tenthdeg2.nc", varnam = "cwd_lue0_fet") -->
-<!-- gg <- plot_map4(nc_tenthdeg,  -->
-<!--                 varnam = "cwd_lue0_fet",  -->
-<!--                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),  -->
-<!--                 latmin = -55, latmax = 80, -->
-<!--                 spacing = "constant",  -->
-<!--                 maxval = 6000,  -->
-<!--                 combine = FALSE,  -->
-<!--                 colorscale = viridis::cividis,  -->
-<!--                 legend_title = "(mm)", -->
-<!--                 hillshade = TRUE, -->
-<!--                 rivers = TRUE, -->
-<!--                 scale = "medium" -->
-<!--                 ) -->
-<!-- gg$ggmap <- gg$ggmap +  -->
-<!--   labs(title = expression(italic(S)[dEF])) -->
-<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
-<!-- ggsave("fig/map_cwd_lue0_fet.pdf", width = 10, height = 6) -->
-<!-- ggsave("fig/map_cwd_lue0_fet.png", width = 10, height = 6) -->
-
-<!-- ## s0_teuling_et -->
-<!-- nc_tenthdeg <- read_nc_onefile("data/s0_teuling_et_tenthdeg.nc", varnam = "s0_teuling_et") -->
-<!-- gg <- plot_map3(nc_tenthdeg,  -->
-<!--                 varnam = "s0_teuling_et",  -->
-<!--                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),  -->
-<!--                 latmin = -55, latmax = 80, -->
-<!--                 spacing = "constant",  -->
-<!--                 maxval = 6000,  -->
-<!--                 combine = FALSE,  -->
-<!--                 colorscale = viridis::cividis,  -->
-<!--                 legend_title = "(mm)" -->
-<!--                 ) -->
-<!-- gg$ggmap <- gg$ggmap +  -->
-<!--   labs(title = expression(italic(S)[0-Teuling])) -->
-<!-- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2)) -->
-<!-- ggsave("fig/map_s0_teuling_et.pdf", width = 10, height = 6) -->
-<!-- ggsave("fig/map_s0_teuling_et.png", width = 10, height = 6) -->
-<!-- ``` -->
-
-
-
-<!-- xxxxxxx -->
-
 Regrid to 0.1 deg.
-
 ```{r}
 ## bin to half-degree gridcells for determining climate forcing
 dlon <- 0.1
 dlat <- 0.1
-lon_breaks <- seq(from = floor(min(df_cwd_lue0$lon)), to = ceiling(max(df_cwd_lue0$lon)), by = dlon)
-lat_breaks <- seq(from = floor(min(df_cwd_lue0$lat)), to = ceiling(max(df_cwd_lue0$lat)), by = dlat)
+lon_breaks <- seq(from = floor(min(df_cwd_et0$lon)), to = ceiling(max(df_cwd_et0$lon)), by = dlon)
+lat_breaks <- seq(from = floor(min(df_cwd_et0$lat)), to = ceiling(max(df_cwd_et0$lat)), by = dlat)
 
 df_cwd_et0 <- df_cwd_et0 %>%
   ungroup() %>%
@@ -2791,7 +2739,7 @@ Read tenth-degree global file and plot.
 
 ```{r}
 df_box <- tibble(
-  long = c())
+  long = c(45, 95, 95, 45, 45), lat = c(47.5, 47.5, 25, 25, 47.5), order = 1:5, group = rep(1, 5))
 
 ## EF
 gg <- plot_map4(df_cwd_et0_agg, 
@@ -2805,17 +2753,22 @@ gg <- plot_map4(df_cwd_et0_agg,
                 legend_title = "(mm)",
                 hillshade = FALSE,
                 rivers = FALSE,
-                expand_size_y = 0.5)
+                expand_size_y = 0.5,
+                legend_direction = "horizontal")
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dEF]))) +
   ## add red box for zoom
-  geom_path(aes(x = long, y = lat, group = group), data = df_box, size = 0.3, color = "red")
+  geom_path(aes(x = long, y = lat, group = group), data = df_box, size = 0.3, color = "red", )
   
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_heights = c(1, 0.2))
 ggsave("fig/map_cwd_lue0_fet.pdf", width = 10, height = 6)
 ggsave("fig/map_cwd_lue0_fet.png", width = 10, height = 6)
 
 gg_fig1a <- gg$ggmap
+save(gg_fig1a, file = "data/gg_fig1a.Rdata")
+
+gg_fig1_legend <- gg$gglegend
+save(gg_fig1_legend, file = "data/gg_fig1_legend.Rdata")
 ```
 
 
@@ -3133,6 +3086,8 @@ df_rl_fet %>%
   geom_boxplot(outlier.shape = NA) +
   geom_hline(yintercept = 0, linetype = "dotted") +
   ylim(-1.2, 1.2)
+
+save(df_rl_fet, file = "data/df_rl_fet.RData")
 ```
 
 Convert to map and plot.
@@ -3143,8 +3098,31 @@ Convert to map and plot.
 #   lonnam = "lon", latnam = "lat"
 #   )
 
-plot_map4(df_rl_agg_fet)
-ggsave("fig/map_rl_fet.pdf", width = 12, height = 8)
+df_rl_agg_fet <- df_rl_agg_fet %>% 
+  mutate(rp_diag = ifelse(lat > 75, NA, rp_diag))
+
+gg <- plot_map4(df_rl_agg_fet, 
+                varnam = "rp_diag", 
+                breaks = c(seq(0, 500, by = 50), Inf), 
+                latmin = -57, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = FALSE, 
+                colorscale = viridis::magma, 
+                legend_title = "(yr)",
+                hillshade = FALSE,
+                rivers = FALSE,
+                expand_size_y = 0.5,
+                legend_direction = "horizontal"
+                )
+gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[EF]))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.1))
+gg_fig4a <- gg$ggmap
+gg_fig4_legend <- gg$gglegend
+save(gg_fig4a, file = "data/gg_fig4a.Rdata")
+
+ggsave("fig/map_rp_fet.pdf", width = 8, height = 5)
+ggsave("fig/map_rp_fet.pdf", width = 8, height = 5)
 ```
 
 ### SIF
@@ -3226,8 +3204,28 @@ Convert to map and plot.
 #   lonnam = "lon", latnam = "lat"
 #   )
 
-plot_map4(df_rl_agg_nSIF)
-ggsave("fig/map_rl_nSIF.pdf", width = 12, height = 8)
+df_rl_agg_nSIF <- df_rl_agg_nSIF %>% 
+  mutate(rp_diag = ifelse(lat > 75, NA, rp_diag))
+
+gg <- plot_map4(df_rl_agg_nSIF, 
+                varnam = "rp_diag", 
+                breaks = c(seq(0, 500, by = 50), Inf), 
+                latmin = -57, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = FALSE, 
+                colorscale = viridis::magma, 
+                legend_title = "(yr)",
+                hillshade = FALSE,
+                rivers = FALSE,
+                expand_size_y = 0.5)
+gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[SIF]))
+
+gg_fig4b <- gg$ggmap
+save(gg_fig4b, file = "data/gg_fig4b.Rdata")
+
+ggsave("fig/map_rp_nsif.pdf", width = 8, height = 5)
+ggsave("fig/map_rp_nsif.pdf", width = 8, height = 5)
 
 # ## missing lon-bands
 # tmp <- df_rl_fet %>%
@@ -3274,6 +3272,8 @@ df_rl_agg <- df_rl_agg_nSIF %>%
                           ifelse(is.na(rp_diag_fet), 
                                  rp_diag_nsif,
                                  (rp_diag_fet + rp_diag_nsif) / 2)))
+
+save(df_rl_agg, file = "data/df_rl_agg.RData")
 ```
 
 Plot mean map.
@@ -3299,64 +3299,53 @@ tmp_wtd <- nc_to_df("~/data/watertable_fan13sci/Global_wtd_lowres_1.0deg.nc", va
 tmp_fcf <- nc_to_df("~/data/modis_forestcover/MODIS-TERRA_C6__MOD44B__ForestCoverFraction__LPDAAC__GLOBAL__1.0degree__UHAM-ICDC__20100306__fv0.02.nc", varnam = "forestcoverfraction") %>% 
           mutate(lon = round(lon, digits = 1), lat = round(lat, digits = 1))  %>% 
           mutate(forestcoverfraction = forestcoverfraction / 100)
+  
+tmp_pll <- nc_to_df("~/data/pelletier/average_soil_and_sedimentary-deposit_thickness_1x1deg.nc", varnam = "layer") %>% 
+          mutate(lon = round(lon, digits = 1), lat = round(lat, digits = 1))  %>% 
+          rename(ssdth = layer)
+
 
 df_rl_agg_test <- tmp_gti %>% 
   left_join(tmp_fcf, by = c("lon", "lat")) %>% 
   left_join(df_rl_agg_test, by = c("lon", "lat")) %>% 
   left_join(tmp_wtd, by = c("lon", "lat")) %>% 
-  mutate(test = forestcoverfraction * gti) %>% 
-  mutate(gti_bin = cut(gti, breaks = c(1:5, 10)),
-         fcf_bin = cut(forestcoverfraction, seq(0, 1, by = 0.1)),
-         wtd_bin = cut(WTD, c(0, 5, 10, 15, 200))) %>% 
+  left_join(tmp_pll, by = c("lon", "lat")) %>% 
+  mutate(gti_bin = cut(gti, breaks = c(1:4, 10)),
+         fcf_bin = cut(forestcoverfraction, c(seq(0, 0.5, by = 0.1), 0.9)),
+         wtd_bin = cut(WTD, c(0, 5, 10, 15, 200)),
+         ssdth_bin = cut(ssdth, seq(0, 50, by = 5))) %>% 
   mutate(forest = ifelse(forestcoverfraction > 0.4, TRUE, FALSE))
+
+save(df_rl_agg_test, file = "data/df_rl_agg_test.Rdata")
 ```
 
 Visualisations
 ```{r}
-df_rl_agg_test %>% 
-  ggplot(aes(x = gti, y = ..count..)) +
-  geom_histogram()
-
-df_rl_agg_test %>% 
-  ggplot(aes(x = forestcoverfraction, y = ..count..)) +
-  geom_histogram()
-
-df_rl_agg_test %>% 
-  ggplot(aes(x = rp_diag, y = ..count..)) +
-  geom_histogram()
-
-df_rl_agg_test %>% 
-  ggplot(aes(x = (WTD), y = ..count..)) +
-  geom_histogram()
-
-df_rl_agg_test %>% 
-  ggplot(aes(x = test, y = ..count..)) +
-  geom_histogram()
-
-df_rl_agg_test %>% 
+load("data/df_rl_agg_test.Rdata")
+gg_fig4c <- df_rl_agg_test %>% 
   drop_na(gti_bin, rp_diag) %>% 
   ggplot(aes(x = gti_bin, y = rp_diag)) +
-  geom_boxplot()
+  geom_boxplot(fill = "grey70") +
+  theme_classic() +
+  labs(x = "GTI", y = "Return period (yr)")
 
-df_rl_agg_test %>% 
-  drop_na(gti_bin, rp_diag) %>% 
-  ggplot(aes(x = gti_bin, y = rp_diag)) +
-  geom_boxplot()
-
-df_rl_agg_test %>% 
+gg_fig4d <- df_rl_agg_test %>% 
   drop_na(fcf_bin, rp_diag) %>% 
   ggplot(aes(x = fcf_bin, y = rp_diag)) +
-  geom_boxplot()
+  geom_boxplot(fill = "grey70") +
+  theme_classic() +
+  labs(x = "Forest cover fraction", y = "Return period (yr)")
 
-df_rl_agg_test %>% 
-  drop_na(wtd_bin, rp_diag) %>% 
-  ggplot(aes(x = wtd_bin, y = rp_diag)) +
-  geom_boxplot()
+gg_fig4e <- df_rl_agg_test %>% 
+  drop_na(ssdth_bin, rp_diag) %>% 
+  ggplot(aes(x = ssdth_bin, y = rp_diag)) +
+  geom_boxplot(fill = "grey70") +
+  theme_classic() +
+  labs(x = "Soil and sedimentary deposit thickness", y = "Return period (yr)")
 
-df_rl_agg_test %>% 
-  drop_na(gti_bin, rp_diag, forest) %>% 
-  ggplot(aes(x = gti_bin, y = rp_diag, fill = forest)) +
-  geom_violin()
+gg_fig4c
+gg_fig4d
+gg_fig4e
 ```
 
 Maps
@@ -3368,7 +3357,7 @@ plot_map3(df_rl_agg_test, varnam = "test")
 plot_map3(df_rl_agg_test, varnam = "WTD", breaks = c(0, 5, 10, 15, 20, 100, 200))
 ```
 
-Train linear regression model. WTD is not significant.
+Train linear regression model. WTD and soil/sedimentary deposit thickness are not significant.
 ```{r}
 print("-----with WTD-------")
 linmod <- lm(rp_diag ~ gti + forestcoverfraction + WTD, data = df_rl_agg_test)
@@ -3376,6 +3365,10 @@ summary(linmod)
 
 print("-----without WTD-------")
 linmod <- lm(rp_diag ~ gti + forestcoverfraction, data = df_rl_agg_test)
+summary(linmod)
+
+print("-----with soil and sedimentary deposit thickness-------")
+linmod <- lm(rp_diag ~ gti + forestcoverfraction + WTD + ssdth, data = df_rl_agg_test)
 summary(linmod)
 ```
 
@@ -4336,6 +4329,16 @@ ggsave("fig/modobs_ridges_cwdx_fet.png", width = 15, height = 10)
 ## Publication figures
 
 ```{r}
-plot_grid(gg_fig1a, gg_fig1b, gg_fig1c, ncol = 1, labels = c('a', 'b', 'c'))
-ggsave("fig/fig1.png", width = 8, height = 11)
+# load("data/gg_fig1a.Rdata")
+# load("data/gg_fig1c.Rdata")
+# load("data/gg_fig1b.Rdata")
+
+plot_grid(gg_fig1a, gg_fig1b, gg_fig1_legend, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2))
+ggsave("fig/fig1.png", width = 8, height = 8)
+ggsave("fig/fig1.pdf", width = 8, height = 8)
+
+# bottom_row <- plot_grid(gg_fig4c, gg_fig4d, ncol = 2, labels = c('c', 'd'))
+# plot_grid(gg_fig4a, gg_fig4b, gg_fig4_legend, bottom_row, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2,0.7))
+# ggsave("fig/fig4.png", width = 8, height = 10)
+# ggsave("fig/fig4.pdf", width = 8, height = 10)
 ```
