@@ -2,6 +2,8 @@
 
 source ~/.bash_profile 
 
+cd data 
+
 euurs df_corr.RData
 euurs gg_fig1a 
 euurs gg_fig1b
@@ -43,3 +45,5 @@ euurs cwdx100_tenthdeg.nc
 euurs cwdx200_tenthdeg.nc
 euurs gg_fig1c.Rdata
 euurs gg_fig1b.Rdata
+
+cd ..
