@@ -1823,7 +1823,7 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
 
 ## central asia SIF
 gg <- df_cwd_lue0 %>%
-  plot_map4(varnam = "cwd_lue0_SIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  plot_map4(varnam = "cwd_lue0_nSIF", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),
             spacing = "constant",
             combine = FALSE,
@@ -2844,6 +2844,30 @@ out$gg +
 # out$gg +
 #   scale_x_continuous(expand = c(0,0), limits = c(0,1000)) + 
 #   scale_y_continuous(expand = c(0,0), limits = c(0,100))
+```
+
+### Correlation SIF and EF
+
+```{r}
+tmp <- df_cwd_lue0 %>% 
+  dplyr::select(lon, lat, cwd_lue0_nSIF) %>% 
+  left_join(df_cwd_et0 %>% 
+              dplyr::select(lon, lat, cwd_lue0_fet), 
+            by = c("lon", "lat"))
+
+out <- tmp %>% 
+  analyse_modobs2("cwd_lue0_fet", "cwd_lue0_nSIF", type = "hex", plot_linmod = FALSE)
+gg_corr <- out$gg +
+  scale_x_continuous(expand = c(0,0), limits = c(0,1200)) + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,1200)) +
+  labs(x = expression(italic(S)[dEF] ~ " (mm)"), 
+       y = expression(italic(S)[dSIF] ~ " (mm)")) +
+  scale_fill_gradientn(
+        colours = colorRampPalette( c("gray65", "navy", "red", "yellow"))(5), 
+        trans = "log", breaks = c(1, 10, 100, 1000, 10000))
+gg_corr
+ggsave("fig/corr_cwd_lue0_nSIF_EF.pdf", width = 6, height = 5)
+ggsave("fig/corr_cwd_lue0_nSIF_EF.png", width = 6, height = 5)
 ```
 
 ## Bias analysis
