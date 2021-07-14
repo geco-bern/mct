@@ -3808,14 +3808,14 @@ Looking at the bias calculated in chunk above, and testing whether it correlates
 
 ```{r}
 ## central asia cutout
-nc_gti <- read_nc_onefile("~/data/gti_marthews/ga2_casia_05deg.nc", varnam = "Band1")
-
-df_gti <- nc_to_df(nc_gti, varnam = "Band1") %>% 
-  rename(gti = myvar) %>% 
+df_gti <- nc_to_df("~/data/gti_marthews/ga2_casia_05deg.nc", varnam = "Band1") %>% 
+  rename(gti = Band1) %>% 
   left_join(df_corr_bias, by = c("lon", "lat"))
 
 df_gti %>% 
   analyse_modobs2("gti", "bias_20", type = "hex")
+
+save(df_gti, file = "data/df_gti.RData")
 ```
 
 ### Correlations
