@@ -773,200 +773,58 @@ Manipulates data frames prepared by step 2, reduced data frames with only 1 colu
 
 ### ET in mm
 
-#### Global
+#### Hires
 
 -   Convert units to get ET in mm. Run scripts `submit_get_et_mm.sh` to run `rscript_get_et_mm.R`.
 
-#### Site-level
+#### Lores
 
-```{r}
-filn <- paste0("data/df_clean_", siteset, ".RData")
-if (!file.exists(filn)){
-  
-  df_clean <- df_alexi %>%
-    ungroup() %>% 
-    
-    # ## xxx debug
-    # dplyr::filter(idx == "BF03a") %>%
-
-    ## add elevation to the nested dataframes (repeating same value for each time step)
-    tidyr::unnest(df) %>%
-    drop_na(date) %>% 
-    dplyr::select(-elv) %>% 
-    left_join(dplyr::select(siteinfo, idx = sitename, elv),
-              by = "idx") %>%
-    dplyr::group_by(lon, lat, idx) %>%
-    tidyr::nest() %>%
-
-    ## convert units: get ET in mm d-1
-    ## total ET
-    dplyr::mutate(et_mm = purrr::map(data, ~convert_et(.$et, .$temp, .$elv))) %>% 
-    dplyr::mutate(et_mm = purrr::map(et_mm, ~tibble(et_mm = .))) %>% 
-    dplyr::mutate(data    = purrr::map(data, ~dplyr::select(., -et_mm))) %>% 
-    dplyr::mutate(data    = purrr::map2(data, et_mm, ~bind_cols(.x, .y))) %>% 
-    dplyr::select(-et_mm) %>% 
-    dplyr::mutate(data    = purrr::map(data, ~drop_na(., date)))  # Problem: The first row in `df_alexi$df` is always NA. This is a bug. Drop the row.
-
-  # ## get flat table
-  # df_clean <- df_alexi %>% 
-  #   
-  #   ## clean something weird
-  #   group_by(idx) %>% 
-  #   nest() %>% 
-  #   mutate(data = purrr::map(data, ~slice(., 1))) %>% 
-  #   unnest(data) %>% 
-  #   
-  #   ## make flat
-  #   unnest(df) %>% 
-  #   rename(sitename = idx)
-  # 
-  # ## add prec and snow from df_watch
-  # avl_prec_snow <- ("prec" %in% names(df_clean) && "snow" %in% names(df_clean))
-  # if (!avl_prec_snow){
-  #   df_clean <- df_clean %>% 
-  #     left_join(df_watch %>% 
-  #                 unnest(data),
-  #               by = "sitename")
-  # }
-  # 
-  # ## Get ET in mm
-  # avl_et_mm <- "et_mm" %in% names(df_clean)
-  # if (!avl_et_mm){
-  #   
-  #   avl_elv <- "elv" %in% names(df_clean)
-  #   if (!avl_elv){
-  #     ## get elevation data from siteinfo
-  #     df_clean <- df_clean %>% 
-  #       left_join(dplyr::select(siteinfo, sitename, elv),
-  #                 by = "sitename")
-  #   }
-  #   
-  #   avl_temp <- ("temp" %in% names(df_clean))
-  #   if (!avl_temp){
-  #     df_clean <- df_clean %>% 
-  #       left_join(df_watch %>% 
-  #                   unnest(data) %>% 
-  #                   dplyr::select(sitename, temp),
-  #                 by = "sitename"
-  #                )
-  #   }
-  #   
-  #   ## Apply conversion function
-  #   df_clean <- df_clean %>% 
-  #     rowwise() %>% 
-  #     mutate(et_mm = convert_et(et, temp, elv)) %>% 
-  #     
-  #     ## nest again for next step
-  #     group_by(sitename) %>% 
-  #     tidyr::nest() %>% 
-  #     
-  #     ## interpolate missing values in et_mm
-  #     mutate(data = purrr::map(data, ~myapprox(.$et_mm)))
-  #   
-  # }
-  
-  # ## nest again, if unnested
-  # unnested <- (df_clean$sitename %>% table() %>% as_tibble() %>% slice(1) %>% pull(n) > 1)
-  # if (unnested){
-  #   df_clean <- df_clean %>% 
-  #     group_by(sitename) %>% 
-  #     nest()
-  # }
-    
-  save(df_clean, file = filn)  
-
-} else {
-  load(filn)
-}
-```
+(Already provided in mm.) NO!!!
 
 ### Snow
 
-#### Global
+#### Hires
 
 Run script `rscript_simulate_snow.R` on Euler (submission file: `submit_simulate_snow.R`).
 
-#### Site-level
+#### Lores
 
-```{r}
-filn <- paste0("data/df_snow_", siteset, ".RData")
-if (!file.exists(filn)){
-
-  ## Simulate snow water balance (no missing data allowed for 'prec', 'snow', or 'temp')
-  avl_snow_pool <- ("snow_pool" %in% names(df_clean$data[[1]]) && "liquid_to_soil" %in% names(df_clean$data[[1]]))
-  n_avl_prec <- function(df){
-    sum(is.na(df$prec))
-  }
-  n_avl_snow <- function(df){
-    sum(is.na(df$snow))
-  }
-  n_avl_temp <- function(df){
-    sum(is.na(df$temp))
-  }
-
-  # ## debug
-  # df_clean <- df_clean %>% 
-  #   mutate(missing_snow = purrr::map_int(data, ~n_avl_snow(.))) %>% 
-  #   mutate(missing_prec = purrr::map_int(data, ~n_avl_prec(.))) %>% 
-  #   mutate(missing_temp = purrr::map_int(data, ~n_avl_temp(.)))
-  # df_test <- df_clean %>% 
-  #   dplyr::filter(missing_snow > 1 | missing_prec > 1 | missing_temp > 1 )
-  
-  
-  df_snow <- df_clean %>% 
-    mutate(data = purrr::map(data, ~drop_na(., date))) %>% 
-    mutate(data = purrr::map(data, ~simulate_snow(.)))
-  
-  save(df_snow, file = filn)
-  
-  # ## test plot visualising snow accumulation and melt
-  # df_snow$data[[1]] %>%
-  #    dplyr::filter(lubridate::year(date) == 2005) %>%
-  #    ggplot() +
-  #    geom_line(aes(date, snow_pool), col = "royalblue") +
-  #    geom_line(aes(date, liquid_to_soil), col = "springgreen4") +
-  #    geom_line(aes(date, prec), col = "tomato")
-
-} else {
-  load(filn)
-}
-```
+(Is the same as hires. Both at lores, in fact.)
 
 ### Daily water balance
 
-#### Global
+#### Hires
 
 Run script `rscript_get_bal.R` on Euler (submission file: `submit_get_bal.R`).
 
-#### Site-level
+#### Lores
 
-... and reduce data frames.
+Using PET from SOFUN instead of ALEXI-ET.
 
+Convert PET outputs to time series data frames.
 ```{r}
-source("R/get_bal.R")
+fileprefix <- "global_FULL_MODIS-C006_MOD15A2_v3.4.d.pet"
+dir <- "~/data/sofun_outputs/global_FULL_MODIS-C006_MOD15A2_v3.4/"
+nclist <- paste0(dir, list.files(dir, pattern = paste0(fileprefix, ".*.nc"), recursive = TRUE))
 
-filn <- paste0("data/df_bal_", siteset, ".RData")
-if (!file.exists(filn)){
+## create files for each longitude slice, containing full time series wrapped for each gridcell (latitude)
+nclist_to_df(
+  nclist, 
+  outdir = "~/data/sofun_outputs/global_FULL_MODIS-C006_MOD15A2_v3.4/data_tidy/", 
+  fileprefix = fileprefix, 
+  varnam = "pet", 
+  lonnam = "lon", 
+  timenam = "time", 
+  timedimnam = "time", 
+  ncores = 1, 
+  single_basedate = TRUE
+  )
+```
 
-  avl_et <- function(df, varnam_et){
-    any(!is.na(df[varnam_et]))
-  }
-
-  df_bal <- df_snow %>%
-    
-    # ## xxx debug
-    # dplyr::filter(idx == "BF03a")
-    
-    dplyr::mutate( data = purrr::map(data, ~get_bal(., varnam_bal = "bal", varnam_prec = "liquid_to_soil", varnam_et = "et_mm"))) %>% 
-    dplyr::mutate( avl_et = purrr::map_lgl(data, ~avl_et(., varnam_et = "et_mm"))) %>%
-    dplyr::filter( avl_et ) %>% 
-    dplyr::mutate( data = purrr::map(data, ~dplyr::select(., date, bal)))
-    
-  save(df_bal, file = filn)  
-
-} else {
-  load(filn)
-}
+Get daily water balance components. Writes into `"~/mct/data/df_bal_lores/"`
+```{r}
+source("R/get_bal_byilon_lores.R")
+df_out <- purrr::map(as.list(seq(720)), ~get_bal_byilon_lores(.))
 ```
 
 ### CWD events and extremes
@@ -977,30 +835,15 @@ Do both in one step. function `get_plantwhc_mct_bysite()` returns the CWD time s
 
 -   Use parameters determined from FLUXNET-sites analysis (`thresh_terminate = 0.0, thresh_drop = 0.9`)
 
-#### Global
+#### Hires
 
 Run script `rscript_get_cwdx.R` on Euler (submission file: `submit_get_cwdx.R`).
 
-#### Site-level
+#### Lores
 
 ```{r}
-filn <- paste0("data/df_cwd_", siteset, ".RData")
-if (!file.exists(filn)){
-  df_cwd <- df_bal %>% 
-    dplyr::mutate(
-      out_mct = purrr::map(
-        data,
-        ~get_plantwhc_mct_bysite(
-          .,
-          varname_wbal = "bal",
-          thresh_terminate = 0.0,
-          thresh_drop = 0.9,
-          fittype = "Gumbel"))
-      )
-  save(df_cwd, file = filn)
-} else {
-  load(filn)
-}
+source("R/get_cwdx_byilon_lores.R")
+df_out <- purrr::map(as.list(seq(720)), ~get_cwdx_byilon_lores(.))
 ```
 
 ## Check file availability
@@ -1312,6 +1155,100 @@ ggsave("fig/map_cwdx80_amazon.pdf", width = 9, height = 6)
 ggsave("fig/map_cwdx80_amazon.png", width = 9, height = 6)
 ```
 
+
+## WHC vs. CWDX
+
+Plot for SI: Distribution of WHC in top 1 m soil. WHC is calculated based on HWSD data (https://daac.ornl.gov/SOILS/guides/HWSD.html). Described as "Topsoil refers to soil between 0 and 30 cm and subsoil to soil between 30 and 100 cm."
+```{r}
+load("data/df_whc.RData")
+
+library(patchwork)
+
+df_whc <- df_whc %>% 
+  mutate(whc_1m = 300 * whc_top + 700 * whc_sub) %>% 
+  mutate(whc_2m = 300 * whc_top + 700 * whc_sub + 1000 * whc_sub)
+
+gg1 <- df_whc %>% 
+  ggplot(aes(x = whc_1m, y = ..density..)) + 
+  geom_histogram() + 
+  xlim(0, 250) +
+  labs(x = "WHC (mm)", subtitle = "Top 1 m soil")
+
+
+gg2 <- df_whc %>% 
+  ggplot(aes(x = whc_2m, y = ..density..)) + 
+  geom_histogram() + 
+  xlim(0, 400) +
+  labs(x = "WHC (mm)", subtitle = "Top 2 m soil")
+
+gg1 + gg2
+
+ggsave("fig/whc_soil.pdf", width = 8, height = 4)
+ggsave("fig/whc_soil.png", width = 8, height = 4)
+```
+
+Regrid to 0.1 deg.
+```{r}
+# source("R/regrid_df.R")
+# df_whc_agg <- regrid_df(df_whc, varnam = "whc_1m", dlon = 0.1, dlat = 0.1)
+
+lon_breaks <- seq(from = floor(min(df_whc$lon)), to = ceiling(max(df_whc$lon)), by = dlon)
+lat_breaks <- seq(from = floor(min(df_whc$lat)), to = ceiling(max(df_whc$lat)), by = dlat)
+
+df_whc <- df_whc %>%
+  ungroup() %>%
+  mutate(ilon = cut(lon,
+                    breaks = lon_breaks),
+         ilat = cut(lat,
+                    breaks = lat_breaks)) %>%
+  mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
+         lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
+         lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )) %>%
+  mutate(lon_mid = (lon_lower + lon_upper)/2,
+         lat_mid = (lat_lower + lat_upper)/2) %>%
+  
+  ## create cell name to associate with climate input
+  dplyr::select(-ilon, -ilat, -lon_lower, -lon_upper, -lat_lower, -lat_upper)
+
+df_whc_agg <- df_whc %>% 
+  group_by(lon_mid, lat_mid) %>% 
+  summarise(whc_1m = mean(whc_1m, na.rm = TRUE), whc_2m = mean(whc_2m, na.rm = TRUE)) %>% 
+  rename(lon = lon_mid, lat = lat_mid)
+  # mutate(!!varnam := ifelse(is.nan(!!varnam), NA, !!varnam))
+
+gg <- plot_map3(df_whc_agg, 
+                varnam = "whc_1m", 
+                breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+                latmin = -55, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = TRUE, 
+                colorscale = viridis::cividis, 
+                legend_title = "(mm)",
+                expand_size_y = 0.5)
+gg
+
+ggsave("fig/map_whc_1m.pdf", width = 10, height = 5)
+ggsave("fig/map_whc_1m.png", width = 10, height = 5)
+
+gg <- plot_map3(df_whc_agg, 
+                varnam = "whc_2m", 
+                breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+                latmin = -55, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = TRUE, 
+                colorscale = viridis::cividis, 
+                legend_title = "(mm)",
+                expand_size_y = 0.5)
+gg
+
+ggsave("fig/map_whc_2m.pdf", width = 10, height = 5)
+ggsave("fig/map_whc_2m.png", width = 10, height = 5)
+```
+
+
 ## Rooting depth
 
 ### Soil texture
@@ -1346,6 +1283,7 @@ df <- df %>%
 
 save(df, file = "data/df_mct_merged.RData")
 ```
+
 
 Test plot: WHC in southern South America.
 
