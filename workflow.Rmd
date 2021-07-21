@@ -1377,20 +1377,34 @@ df_mask <- df %>%
 save(df_mask, file = "data/df_mask.RData")
 ```
 
-Regrid and plot.
+Distribution of rooting depth
+```{r}
+load("data/df_zroot80.RData")
+
+df %>% 
+  ggplot(aes(zroot_cwd80/1000, ..density..)) + 
+  geom_density() +
+  xlim(0, 30)
+```
+
+Regrid and plot map.
 
 ```{r}
+load("data/df_zroot80.RData")
+
 nc <- df_to_grid(df, varnam = "zroot_cwd80", lonnam = "lon", latnam = "lat")
 write_nc2(nc, varnams = "zroot_cwd80", lon = df$lon %>% unique() %>% sort(), lat = df$lat %>% unique() %>% sort(), path = "data/zroot_cwd80.nc", make_zdim = FALSE)
 
 system("cdo remapbil,gridfile_quartdeg.txt data/zroot_cwd80.nc data/zroot_cwd80_quartdeg.nc")
 system("cdo remapbil,gridfile_tenthdeg.txt data/zroot_cwd80.nc data/zroot_cwd80_tenthdeg.nc")
+```
 
+```{r}
 nc_tenthdeg <- read_nc_onefile("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_cwd80")
 
 nc_tenthdeg$vars$zroot_cwd80 <- nc_tenthdeg$vars$zroot_cwd80 / 1000   # convert to m
 
-gg <- plot_map4(
+gg <- plot_map3(
   nc_tenthdeg, 
   varnam = "zroot_cwd80", 
   breaks = c(seq(0, 1, by = 0.2), 1.5, 2, 3, 5, 7, 10, 15, 20, 25, Inf), 
