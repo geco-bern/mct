@@ -266,7 +266,7 @@ plot_map_cwdx_type_irrigation <- function(
 	## add coast layer
 	if (coast){
 	  ggmap <- ggmap +
-	    geom_path(data = coast_crop, aes(x = long, y = lat, group = group), color = 'gray25', size = 0.1)
+	    geom_path(data = coast_crop, aes(x = long, y = lat, group = group), color = 'gray25', size = 0.1, linejoin = "mitre")
 	}
 
 	## add rivers layer

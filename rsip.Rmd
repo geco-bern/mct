@@ -30,7 +30,8 @@ Use `gsheet::gsheet2tbl`
 
 Read the data.
 ```{r}
-df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
+# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
+df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>% 
   rename(lon = Long, lat = Lat) %>% 
   rowid_to_column(var = "id") %>% 
   
@@ -43,7 +44,7 @@ df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%   
 print(paste("Total number of entries:", nrow(df)))
 ```
 
-xplorations with ree height
+Explorations with tree height
 ```{r}
 df2 <- df %>% 
   mutate(Hs = as.numeric(Hs)) %>% 
@@ -130,10 +131,9 @@ df <- df %>% ungroup()
 ```{r}
 df %>% 
   ggplot(aes(x = Dr)) +
-  geom_histogram(binwidth = 1, fill = "grey70", colour = "black") +
-  lims(x = c(0,125))
+  geom_histogram(binwidth = 0.5, fill = "grey70", colour = "black") +
+  xlim(0, 30)
 ```
-
 
 ### Distribution of values by bins.
 ```{r}
@@ -184,7 +184,7 @@ save(df_wwf, file = "data/df_wwf_rsip.RData")
 ```
 
 ```{r}
-load("data/df_wwf_rsip.RData")
+# load("data/df_wwf_rsip.RData")
 
 df <- df %>% 
   left_join(
@@ -300,6 +300,22 @@ Scatterplot of modelled vs. observed.
 ```{r}
 df %>% 
   analyse_modobs2("zroot_cwdx80", "Dr", type = "heat")
+```
+
+Distribution of values.
+```{r}
+df %>% 
+  dplyr::select(observed = Dr, modelled = zroot_cwdx80) %>% 
+  pivot_longer(cols = c("observed", "modelled"), names_to = "source", values_to = "zr") %>% 
+  ggplot() +
+  geom_histogram(aes(x = zr, y = ..density.., fill = source), 
+                 binwidth = 0.5, alpha = 0.5,
+                 position="identity") +
+#   geom_histogram(aes(x = Dr, y = ..density..), binwidth = 0.5, fill = "grey70", colour = "black") +
+#   geom_histogram(aes(x = zroot_cwdx80, y = ..density..), binwidth = 0.5, fill = "red", colour = "black", alpha = 0.5) +
+  xlim(0, 30) +
+  scale_fill_manual(values=c("red", "black")) +
+  theme_classic()
 ```
 
 Quantiles
@@ -563,6 +579,19 @@ df_sites <- df_sites %>%
     by = "sitename"
   )
 ```
+
+Plot sites on map
+```{r}
+plot_map_simpl() +
+  geom_point(data = df_sites %>% 
+               separate(sitename, into = c(NA, "lon", "lat"), sep = "_") %>% 
+               mutate(lon = as.numeric(lon), lat = as.numeric(lat)), 
+             aes(x = lon, y = lat, color = biome_name))
+
+ggsave("fig/sites_rsip.pdf", width = 15, height = 6)
+ggsave("fig/sites_rsip.png", width = 15, height = 6)
+```
+
 
 Plots with data aggregated by sites.
 ```{r}
