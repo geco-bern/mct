@@ -907,11 +907,15 @@ df %>%
 
 ## CWDX
 
+### Hires
+
+#### Extract
+
 Extract CWD-extremes from full output.
 
 Run `rscript_extract_cwdx.R` (with submit file `submit_extract_cwdx.sh`).
 
-### Collect data
+#### Collect data
 
 For the global application, combine CWDX and soil texture information into a global common data frame. Run `rscript_collect_cwdx.R`
 
@@ -933,7 +937,7 @@ for (i in 3:8){
 }
 ```
 
-### Write NetCDF
+#### Write NetCDF
 
 ```{r}
 ## 10 y return period
@@ -971,6 +975,20 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx80.nc data/cwdx80_tenthdeg.n
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx100.nc data/cwdx100_tenthdeg.nc")
 system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx200.nc data/cwdx200_tenthdeg.nc")
 ```
+
+### Lores
+
+#### Extract
+
+```{r}
+source("R/extract_cwdx_byilon_lores.R")
+
+out <- purrr::map(as.list(seq(720)), ~extract_cwdx_byilon_lores(.))
+```
+
+#### Collect
+
+#### Write
 
 ### Maps
 

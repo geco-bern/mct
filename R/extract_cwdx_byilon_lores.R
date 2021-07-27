@@ -1,15 +1,16 @@
-extract_cwdx_byilon <- function(ilon, overwrite = FALSE){
+extract_cwdx_byilon_lores <- function(ilon, overwrite = FALSE){
   
+  infil <- paste0("data/df_cwdx_lores/df_cwdx_ilon_", ilon, ".RData")
   
-  infil <- paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData")
+  df <- NA
   
   if (file.exists(infil)){
     
     load(infil)
     
-    dirn <- "~/mct/data/df_cwdx_10_20_40/"
+    dirn <- "~/mct/data/df_cwdx_10_20_40_lores/"
     filn <- paste0("df_cwdx_10_20_40_ilon_", ilon, ".RData")
-    if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_cwdx_10_20_40")
+    if (!dir.exists(dirn)) system("mkdir -p ~/mct/data/df_cwdx_10_20_40_lores")
     path <- paste0(dirn, filn)
     
     if (!file.exists(path) || overwrite){
@@ -35,6 +36,7 @@ extract_cwdx_byilon <- function(ilon, overwrite = FALSE){
       
     } else {
       print(paste("File exists already:", path))
+      load(path)
     }
     
   } else {
@@ -42,5 +44,5 @@ extract_cwdx_byilon <- function(ilon, overwrite = FALSE){
     print(paste("File missing:", infil))
     
   }
-  
+  return(df)
 }

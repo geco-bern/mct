@@ -184,7 +184,7 @@ save(df_wwf, file = "data/df_wwf_rsip.RData")
 ```
 
 ```{r}
-# load("data/df_wwf_rsip.RData")
+load("data/df_wwf_rsip.RData")
 
 df <- df %>% 
   left_join(
