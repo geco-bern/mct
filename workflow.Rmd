@@ -1882,7 +1882,8 @@ gg <- plot_map_cwdx_type_irrigation(
   rivers = TRUE,
   scale = "medium",
   expand_size_y = 0.4,
-  irr_cutoff = 0.3
+  irr_cutoff = 0.3,
+  legend_title = "(mm)"
   )
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
 ggsave("fig/map_cwd_lue0_types_lue0_europe.pdf", width = 8, height = 6)
@@ -1981,7 +1982,7 @@ save(df_cwd_lue0_agg, file = "data/df_cwd_lue0_agg.Rdata")
 
 Read tenth-degree global file and plot.
 ```{r}
-# load("data/df_cwd_lue0_agg.Rdata")
+load("data/df_cwd_lue0_agg.Rdata")
 
 # ## SIF
 # # nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_SIF_tenthdeg.nc", varnam = "cwd_lue0_SIF")
@@ -2498,104 +2499,7 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
       rename(irr = aai)
 ```
 
-### Flattening analysis
-
-Combine data frames, including irrigation information, and vegetation types.
-```{r}
-df_lc <- nc_to_df("~/data/landcover/modis_landcover__LPDAAC__v5.1__0.05deg__2010.nc", 
-                    varnam = "landcover") %>% 
-  mutate(lon = round(lon, digits = 1) - 0.05/2, lat = round(lat, digits = 1) - 0.05/2) %>% 
-  mutate(savannah_w = ifelse(landcover %in% c(9, 10), TRUE, FALSE), 
-         savannah   = ifelse(landcover == 9, TRUE, FALSE))
-
-# load("data/df_gti.RData")
-
-df_tmp <- df_cwd_et0 %>% 
-  dplyr::select(lon, lat, flat_fet) %>% 
-  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
-  left_join(df_irr %>% 
-      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)), 
-    by = c("lon", "lat")) %>% 
-  left_join(df_lc, by = c("lon", "lat"))
-  # left_join(
-  #   nc_to_df("~/data/gti_marthews/ga2_0_05deg.nc", varnam = "gti") %>% 
-  #     drop_na() %>% 
-  #     rename(gti = myvar) %>% 
-  #     mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)))
-
-plot_map3(df_tmp, varnam = "landcover")
-
-## only woody savannah
-gg1 <- df_tmp %>% 
-  drop_na(savannah) %>% 
-  group_by(savannah) %>% 
-  summarise(n_flat = sum(flat_fet, na.rm = TRUE), f_flat = sum(flat_fet, na.rm = TRUE)/n(), count = n()) %>% 
-  drop_na() %>% 
-  ggplot(aes(savannah, f_flat)) +
-  geom_bar(stat = "identity") +
-  theme_classic() +
-  labs(x = "Savannah", y = "Fraction flattening")
-
-## all land cover types
-gg1b <- df_tmp %>% 
-  drop_na(landcover) %>% 
-  group_by(landcover) %>% 
-  summarise(f_flat = sum(flat_fet, na.rm = TRUE)/n()) %>% 
-  drop_na() %>% 
-  ggplot(aes(landcover, f_flat)) +
-  geom_bar(stat = "identity") +
-  theme_classic() +
-  labs(x = "Land cover", y = "Fraction flattening")
-
-## by bins in irrigated area fraction
-df_irrbin <- df_tmp %>% 
-  drop_na(irr) %>% 
-  mutate(irr_bin = cut(irr, breaks = seq(0, 1, by = 0.2))) %>% 
-  group_by(irr_bin) %>% 
-  summarise(f_flat = sum(flat_fet, na.rm = TRUE)/n())
-
-save(df_irrbin, file = "data/df_irrbin.RData")
-
-gg2 <- df_irrbin %>% 
-  drop_na() %>% 
-  ggplot(aes(irr_bin, f_flat)) +
-  geom_bar(stat = "identity") +
-  theme_classic() +
-  labs(x = "Irrigated area fraction (bins)", y = "Fraction flattening")
-
-## create publication figure
-plot_grid(gg1, gg2, ncol = 2, labels = c('a', 'b'))
-ggsave("fig/flattening_analysis.pdf", width = 8, height = 4)
-ggsave("fig/flattening_analysis.png", width = 8, height = 4)
-```
-
-
 ### Regional
-
-S_dEF ~ GTI at regional scale?
-```{r}
-df_tmp <- df_cwd_et0 %>% 
-  
-  ## cut to central asia
-  dplyr::filter(lon < 95 & lon > 45, lat > 25, lat < 47.5) %>% 
-  left_join(df_irr, by = c("lon", "lat")) %>% 
-  
-  ## exclude irrigated areas
-  dplyr::filter(irr < 0.3) %>% 
-  
-  ## add GTI info
-  left_join(
-    nc_to_df("~/data/gti_marthews/ga2_casia_05deg.nc", varnam = "Band1") %>% 
-      rename(gti = Band1),
-    by = c("lon", "lat"))
-
-df_tmp %>% 
-  mutate(gti_bin = cut(gti, breaks = 0:12)) %>% 
-  ggplot(aes(x = gti_bin, y = cwd_lue0_fet)) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 500)
-```
-
 
 ```{r}
 load("data/df_rivers.RData")
@@ -2621,8 +2525,8 @@ gg$ggmap <- gg$ggmap +
   labs(title = expression(paste(italic("S")[dEF])))
 gg <- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
 gg
-ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
 ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
+ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
 
 ## save for publication figure
 gg_fig1c <- gg
@@ -2740,6 +2644,80 @@ write_nc2(nc, varnams = "s0_teuling_fet", lon = df_cwd_et0$lon %>% unique() %>% 
 ```
 
 
+
+
+### Flattening analysis
+
+Combine data frames, including irrigation information, and vegetation types.
+```{r}
+df_lc <- nc_to_df("~/data/landcover/modis_landcover__LPDAAC__v5.1__0.05deg__2010.nc", 
+                    varnam = "landcover") %>% 
+  mutate(lon = round(lon, digits = 1) - 0.05/2, lat = round(lat, digits = 1) - 0.05/2) %>% 
+  mutate(savannah_w = ifelse(landcover %in% c(9, 10), TRUE, FALSE), 
+         savannah   = ifelse(landcover == 9, TRUE, FALSE))
+
+# load("data/df_gti.RData")
+
+df_tmp <- df_cwd_et0 %>% 
+  dplyr::select(lon, lat, flat_fet) %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+  left_join(df_irr %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)), 
+    by = c("lon", "lat")) %>% 
+  left_join(df_lc, by = c("lon", "lat"))
+  # left_join(
+  #   nc_to_df("~/data/gti_marthews/ga2_0_05deg.nc", varnam = "gti") %>% 
+  #     drop_na() %>% 
+  #     rename(gti = myvar) %>% 
+  #     mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)))
+
+plot_map3(df_tmp, varnam = "landcover")
+
+## only woody savannah
+gg1 <- df_tmp %>% 
+  drop_na(savannah) %>% 
+  group_by(savannah) %>% 
+  summarise(n_flat = sum(flat_fet, na.rm = TRUE), f_flat = sum(flat_fet, na.rm = TRUE)/n(), count = n()) %>% 
+  drop_na() %>% 
+  ggplot(aes(savannah, f_flat)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  labs(x = "Savannah", y = "Fraction flattening")
+
+## all land cover types
+gg1b <- df_tmp %>% 
+  drop_na(landcover) %>% 
+  group_by(landcover) %>% 
+  summarise(f_flat = sum(flat_fet, na.rm = TRUE)/n()) %>% 
+  drop_na() %>% 
+  ggplot(aes(landcover, f_flat)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  labs(x = "Land cover", y = "Fraction flattening")
+
+## by bins in irrigated area fraction
+df_irrbin <- df_tmp %>% 
+  drop_na(irr) %>% 
+  mutate(irr_bin = cut(irr, breaks = seq(0, 1, by = 0.2))) %>% 
+  group_by(irr_bin) %>% 
+  summarise(f_flat = sum(flat_fet, na.rm = TRUE)/n())
+
+save(df_irrbin, file = "data/df_irrbin.RData")
+
+gg2 <- df_irrbin %>% 
+  drop_na() %>% 
+  ggplot(aes(irr_bin, f_flat)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  labs(x = "Irrigated area fraction (bins)", y = "Fraction flattening")
+
+## create publication figure
+plot_grid(gg1, gg2, ncol = 2, labels = c('a', 'b'))
+ggsave("fig/flattening_analysis.pdf", width = 8, height = 4)
+ggsave("fig/flattening_analysis.png", width = 8, height = 4)
+```
+
+
 ### Global
 
 Regrid to 0.1 deg.
@@ -2775,6 +2753,8 @@ df_cwd_et0_agg <- df_cwd_et0 %>%
   summarise(cwd_lue0_fet = mean(cwd_lue0_fet, na.rm = TRUE)) %>% 
   rename(lon = lon_mid, lat = lat_mid) %>% 
   mutate(cwd_lue0_fet = ifelse(is.nan(cwd_lue0_fet), NA, cwd_lue0_fet))
+
+save(df_cwd_et0_agg, file = "data/df_cwd_et0_agg.RData")
 ```
 
 Read tenth-degree global file and plot.
@@ -2792,7 +2772,7 @@ gg <- plot_map4(df_cwd_et0_agg,
                 maxval = 6000, 
                 combine = FALSE, 
                 colorscale = viridis::cividis, 
-                legend_title = "(mm)",
+                legend_title = NULL, # "(mm)",
                 hillshade = FALSE,
                 rivers = FALSE,
                 expand_size_y = 0.5,
