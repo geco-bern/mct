@@ -732,17 +732,28 @@ df_biome_sites %>%
 
 Analyse data and model-data agreement for a subset of the data where water table depth observations are available, and set modelled rooting depth to WTD if it exceeds WTD.
 ```{r}
-df_sites_wtd <- df_sites %>% 
+df_wtd <- df %>% 
   dplyr::filter(!is.na(wtd)) %>% 
+  mutate(wtd_limited  = ifelse(zroot_cwdx80 > wtd, TRUE, FALSE)) %>% 
+  mutate(zroot_cwdx80 = ifelse(zroot_cwdx80 > wtd, wtd, zroot_cwdx80))
 
-  mutate(zroot_cwdx80 = ifelse(zroot_cwdx80 > wtd, wtd, zroot_cwdx80)) %>% 
-  
-  # ## and observed rooting depth > wtd removed
-  # mutate(Dr = ifelse(Dr > wtd, NA, Dr)) %>%
-  
+print(paste("Fraction of entries WTD-limited:", sum(df_wtd$wtd_limited, na.rm = TRUE)/nrow(df_wtd)))
+
+df_wtd <- df_wtd %>% 
   dplyr::filter(!is.na(Dr) & !is.na(zroot_cwdx80))
 
-print(paste("Total number of entries:", nrow(df_sites_wtd)))
+df_sites_wtd <- df_wtd %>% 
+  mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) %>% 
+  group_by(sitename) %>% 
+  summarise(Dr = mean(Dr, na.rm = TRUE), zroot_cwdx80 = mean(zroot_cwdx80, na.rm = TRUE), wtd = mean(wtd, na.rm = TRUE)) %>% 
+  left_join(
+    df_wwf_sites %>% 
+      dplyr::select(sitename, biome = BIOME, biome_name = BIOME_NAME),
+    by = "sitename"
+  )
+
+print(paste("Total number of entries:", nrow(df_wtd)))
+print(paste("Total number of sites:", nrow(df_sites_wtd)))
 ```
 
 Plots

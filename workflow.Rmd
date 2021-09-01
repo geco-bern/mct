@@ -1084,9 +1084,9 @@ Problem with missing data for certain gridcells. Solutions with varying `thresh_
 #                        )
 # save(df_rivers, file = "data/df_rivers.RData")
 
-load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
-df_cwdx <- df %>% 
-  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
+# load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
+# df_cwdx <- df %>% 
+#   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 
 # ## spain
 # gg <- df_cwdx %>% 
@@ -1111,7 +1111,7 @@ gg <- df_cwdx %>%
             colorscale = viridis::cividis,
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
@@ -1129,7 +1129,7 @@ gg <- df_cwdx %>%
             colorscale = viridis::cividis,
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
@@ -1146,7 +1146,7 @@ gg <- df_cwdx %>%
             combine = FALSE, 
             colorscale = viridis::cividis, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
@@ -1162,7 +1162,7 @@ gg <- df_cwdx %>%
             spacing = "constant",
             combine = FALSE, 
             colorscale = viridis::cividis, legend_title = "(mm)",
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             expand_size_y = 0.6,
             scale = "medium"
             )
@@ -1424,7 +1424,7 @@ nc_tenthdeg <- read_nc_onefile("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_c
 
 nc_tenthdeg$vars$zroot_cwd80 <- nc_tenthdeg$vars$zroot_cwd80 / 1000   # convert to m
 
-gg <- plot_map3(
+gg <- plot_map4(
   nc_tenthdeg, 
   varnam = "zroot_cwd80", 
   breaks = c(seq(0, 1, by = 0.2), 1.5, 2, 3, 5, 7, 10, 15, 20, 25, Inf), 
