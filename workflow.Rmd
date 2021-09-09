@@ -1128,7 +1128,7 @@ gg <- df_cwdx %>%
             colorscale = viridis::cividis,
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
@@ -1146,7 +1146,7 @@ gg <- df_cwdx %>%
             colorscale = viridis::cividis,
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
@@ -1163,7 +1163,7 @@ gg <- df_cwdx %>%
             combine = FALSE, 
             colorscale = viridis::cividis, legend_title = "(mm)",
             expand_size_y = 0.5,
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             scale = "medium"
             )
 gg$ggmap <- gg$ggmap + 
@@ -1179,7 +1179,7 @@ gg <- df_cwdx %>%
             spacing = "constant",
             combine = FALSE, 
             colorscale = viridis::cividis, legend_title = "(mm)",
-            hillshade = TRUE,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             expand_size_y = 0.6,
             scale = "medium"
             )
