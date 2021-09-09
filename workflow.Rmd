@@ -102,6 +102,60 @@ siteset <- "sj02"
 # siteset <- "rsip"
 ```
 
+## Vegetation mask
+
+Read modis landcover map for year 2011 at 0.05 degrees.
+```{r}
+df_vegmask <- nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.05deg__2011.nc", 
+                       varnam = "urban_and_builtup") %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+  dplyr::select(-time) %>% 
+  left_join(
+    nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.05deg__2011.nc", 
+                       varnam = "snowandice") %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      dplyr::select(-time),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.05deg__2011.nc", 
+                       varnam = "barren_sparsely_vegetated") %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      dplyr::select(-time),
+    by = c("lon", "lat")
+  ) %>% 
+  mutate(nonveg = (urban_and_builtup + snowandice + barren_sparsely_vegetated)/100) %>% 
+  mutate(vegmask = ifelse(nonveg > 0.5, NA, 1))
+
+save(df_vegmask, file = "data/df_vegmask.RData")
+```
+
+Read modis landcover map for year 2011 at 0.1 degrees.
+```{r}
+df_vegmask_tenthdeg <- nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.1deg__2011.nc", 
+                       varnam = "urban_and_builtup") %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+  dplyr::select(-time) %>% 
+  left_join(
+    nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.1deg__2011.nc", 
+                       varnam = "snowandice") %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      dplyr::select(-time),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.1deg__2011.nc", 
+                       varnam = "barren_sparsely_vegetated") %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      dplyr::select(-time),
+    by = c("lon", "lat")
+  ) %>% 
+  mutate(nonveg = (urban_and_builtup + snowandice + barren_sparsely_vegetated)/100) %>% 
+  mutate(vegmask = ifelse(nonveg > 0.5, NA, 1))
+
+save(df_vegmask_tenthdeg, file = "data/df_vegmask_tenthdeg.RData")
+```
+
 ## Meta info
 
 -   Creates data frame with all meta info variables as separate columns.
@@ -315,7 +369,7 @@ gg <- plot_map3(
   nc_halfdeg, 
   varnam = "T_SAND", 
   breaks = seq(0, 100, by = 10), 
-  latmin = -55, latmax = 75,
+  latmin = -60, latmax = 75,
   spacing = "constant",
   colorscale = viridis::magma,
   combine = FALSE
@@ -980,13 +1034,11 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/cwdx200.nc data/cwdx200_tenthdeg
 
 #### Extract
 
+... and collect.
 ```{r}
 source("R/extract_cwdx_byilon_lores.R")
-
-out <- purrr::map(as.list(seq(720)), ~extract_cwdx_byilon_lores(.))
+out <- purrr::map_dfr(as.list(seq(720)), ~extract_cwdx_byilon_lores(.))
 ```
-
-#### Collect
 
 #### Write
 
@@ -997,13 +1049,21 @@ out <- purrr::map(as.list(seq(720)), ~extract_cwdx_byilon_lores(.))
 Read tenth-degree global files and plot.
 
 ```{r}
+load("data/df_vegmask.RData")
+
 ## 80 yr
 nc_tenthdeg <- nc_to_df("data/cwdx80_tenthdeg.nc", varnam = "cwdx80") %>% 
-  mutate(cwdx80 = ifelse(lat > 75, NA, cwdx80))
+  mutate(cwdx80 = ifelse(lat > 75, NA, cwdx80)) %>% 
+  mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
+  left_join(df_vegmask_tenthdeg %>% 
+              mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
+            by = c("lon", "lat")) %>% 
+  mutate(cwdx80 = ifelse(nonveg > 80, NA, cwdx80))
+
 gg <- plot_map4(nc_tenthdeg, 
                 varnam = "cwdx80", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-                latmin = -55, latmax = 80,
+                latmin = -60, latmax = 80,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
@@ -1016,52 +1076,8 @@ gg <- plot_map4(nc_tenthdeg,
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[CWDX80])))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.15))
-ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
 ggsave("fig/map_cwdx80.png", width = 10, height = 5)
-
-# ## 20 yr
-# nc_tenthdeg <- read_nc_onefile("data/cwdx20_tenthdeg.nc", varnam = "cwdx20")
-# gg <- plot_map3(nc_tenthdeg, varnam = "cwdx20", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-#           spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(italic(S)[CWDX20]))
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_cwdx20.pdf", width = 10, height = 6)
-# ggsave("fig/map_cwdx20.png", width = 10, height = 6)
-# 
-# ## 40 yr
-# nc_tenthdeg <- read_nc_onefile("data/cwdx40_tenthdeg.nc", varnam = "cwdx40")
-# gg <- plot_map3(nc_tenthdeg, varnam = "cwdx40", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-#           spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(italic(S)[CWDX40]))
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_cwdx40.pdf", width = 10, height = 6)
-# ggsave("fig/map_cwdx40.png", width = 10, height = 6)
-# 
-# ## 80 yr
-# nc_tenthdeg <- read_nc_onefile("data/cwdx80_tenthdeg.nc", varnam = "cwdx80")
-# gg <- plot_map4(nc_tenthdeg, varnam = "cwdx80", 
-#                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-#                 latmin = -55, latmax = 80,
-#                 spacing = "constant", maxval = 6000, combine = FALSE, 
-#                 colorscale = viridis::cividis, legend_title = "(mm)",
-#                 expand_size_y = 0.5)
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(italic(S)[CWDX80]))
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_cwdx80.pdf", width = 10, height = 6)
-# ggsave("fig/map_cwdx80.png", width = 10, height = 6)
-# 
-# ## 100 yr
-# nc_tenthdeg <- read_nc_onefile("data/cwdx100_tenthdeg.nc", varnam = "cwdx100")
-# gg <- plot_map3(nc_tenthdeg, varnam = "cwdx100", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-#           spacing = "constant", maxval = 6000, combine = FALSE, colorscale = viridis::cividis, legend_title = "(mm)")
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(italic(S)[CWDX100]))
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_cwdx100.pdf", width = 10, height = 6)
-# ggsave("fig/map_cwdx100.png", width = 10, height = 6)
+ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
 ```
 
 #### Regional
@@ -1085,6 +1101,7 @@ Problem with missing data for certain gridcells. Solutions with varying `thresh_
 # save(df_rivers, file = "data/df_rivers.RData")
 
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
+
 df_cwdx <- df %>% 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 
@@ -1238,7 +1255,7 @@ df_whc_agg <- df_whc %>%
 gg1 <- plot_map3(df_whc_agg, 
                 varnam = "whc_1m", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-                latmin = -55, latmax = 80,
+                latmin = -60, latmax = 80,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
@@ -1252,7 +1269,7 @@ gg1 <- plot_map3(df_whc_agg,
 gg2 <- plot_map3(df_whc_agg, 
                 varnam = "whc_2m", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-                latmin = -55, latmax = 80,
+                latmin = -60, latmax = 80,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
@@ -1357,7 +1374,7 @@ gg <- plot_map3(
   nc_quartdeg, 
   varnam = "whc_top", 
   breaks = c(seq(0, 0.4, by = 0.05), 0.8, Inf), 
-  latmin = -55, latmax = 75,
+  latmin = -60, latmax = 75,
   spacing = "constant",
   colorscale = viridis::magma,
   combine = FALSE
@@ -1420,26 +1437,34 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/zroot_cwd80.nc data/zroot_cwd80_
 ```
 
 ```{r}
-nc_tenthdeg <- read_nc_onefile("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_cwd80")
+nc_tenthdeg <- nc_to_df("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_cwd80") %>% 
+  mutate(zroot_cwd80 = ifelse(lat > 75, NA, zroot_cwd80)) %>% 
+  mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
+  left_join(df_vegmask_tenthdeg %>% 
+              mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
+            by = c("lon", "lat")) %>% 
+  mutate(zroot_cwd80 = ifelse(nonveg > 80, NA, zroot_cwd80)) %>% 
+  mutate(zroot_cwd80 = zroot_cwd80 / 1000)
 
-nc_tenthdeg$vars$zroot_cwd80 <- nc_tenthdeg$vars$zroot_cwd80 / 1000   # convert to m
+gg <- plot_map4(nc_tenthdeg, 
+                varnam = "zroot_cwd80", 
+                breaks = c(seq(0, 1, by = 0.2), 1.5, 2, 3, 5, 7, 10, 15, 20, 25, Inf), 
+                latmin = -60, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = FALSE, 
+                colorscale = viridis::magma, 
+                legend_title = "(mm)",
+                hillshade = FALSE,
+                rivers = FALSE,
+                expand_size_y = 0.5,
+                legend_direction = "horizontal")
+gg$ggmap <- gg$ggmap + 
+  labs(title = expression(paste(italic("z")[r])))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.15))
 
-gg <- plot_map3(
-  nc_tenthdeg, 
-  varnam = "zroot_cwd80", 
-  breaks = c(seq(0, 1, by = 0.2), 1.5, 2, 3, 5, 7, 10, 15, 20, 25, Inf), 
-  latmin = -60, latmax = 75,
-  spacing = "constant", 
-  colorscale = viridis::magma,
-  combine = FALSE,
-  legend_title = "(m)",
-  expand_size_y = 0.5
-  )
-gg$ggmap <- gg$ggmap +
-  labs(title = expression(italic(z)[CWDX80]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 6)
-ggsave("fig/map_zroot_cwd80.png", width = 10, height = 6)
+ggsave("fig/map_zroot_cwd80.png", width = 10, height = 5)
+ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
 ```
 
 ### Site-level
@@ -1982,28 +2007,14 @@ save(df_cwd_lue0_agg, file = "data/df_cwd_lue0_agg.Rdata")
 
 Read tenth-degree global file and plot.
 ```{r}
-load("data/df_cwd_lue0_agg.Rdata")
-
-# ## SIF
-# # nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_SIF_tenthdeg.nc", varnam = "cwd_lue0_SIF")
-# gg <- plot_map3(df_cwd_lue0_agg, 
-#                 varnam = "cwd_lue0_SIF", 
-#                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
-#                 spacing = "constant", maxval = 6000, 
-#                 combine = FALSE, 
-#                 colorscale = viridis::cividis, legend_title = "(mm)")
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(paste(italic("S")[dSIF])))
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_cwd_lue0_SIF.pdf", width = 10, height = 6)
-# ggsave("fig/map_cwd_lue0_SIF.png", width = 10, height = 6)
+#load("data/df_cwd_lue0_agg.Rdata")
 
 ## nSIF
 # nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_nSIF_tenthdeg.nc", varnam = "cwd_lue0_nSIF")
 gg <- plot_map4(df_cwd_lue0_agg, 
                 varnam = "cwd_lue0_nSIF", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-                latmin = -55, latmax = 80,
+                latmin = -60, latmax = 80,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
@@ -2023,13 +2034,13 @@ save(gg_fig1b, file = "data/gg_fig1b.Rdata")
 
 # ## lambda_decay_SIF
 # nc_tenthdeg <- read_nc_onefile("data/lambda_decay_SIF_tenthdeg.nc", varnam = "lambda_decay_SIF")
-# plot_map3(nc_tenthdeg, varnam = "lambda_decay_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -55, latmax = 80,
+# plot_map3(nc_tenthdeg, varnam = "lambda_decay_SIF", breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), latmin = -60, latmax = 80,
 #           spacing = "constant", maxval = 6000)
 # ggsave("fig/map_lambda_decay_SIF.pdf", width = 10, height = 6)
 # 
 # ## lambda_decay_nSIF
 # nc_tenthdeg <- read_nc_onefile("data/lambda_decay_nSIF_tenthdeg.nc", varnam = "lambda_decay_nSIF")
-# plot_map3(nc_tenthdeg, varnam = "lambda_decay_nSIF", breaks = -(c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf)), latmin = -55, latmax = 80,
+# plot_map3(nc_tenthdeg, varnam = "lambda_decay_nSIF", breaks = -(c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf)), latmin = -60, latmax = 80,
 #           spacing = "constant", maxval = 6000)
 # ggsave("fig/map_lambda_decay_nSIF.pdf", width = 10, height = 6)
 ```
@@ -2509,7 +2520,8 @@ source("R/plot_map_cwdx_type_irrigation.R")
 gg <- plot_map_cwdx_type_irrigation(
   df_cwd_et0, df_irr,
   name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
-  lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  lonmin = 52, lonmax = 85, latmin = 27, latmax = 45,
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
@@ -2722,6 +2734,10 @@ ggsave("fig/flattening_analysis.png", width = 8, height = 4)
 
 Regrid to 0.1 deg.
 ```{r}
+load("data/df_cwd_et0_3.RData")
+df_cwd_et0 <- df
+rm("df")
+
 ## bin to half-degree gridcells for determining climate forcing
 dlon <- 0.1
 dlat <- 0.1
@@ -2760,14 +2776,19 @@ save(df_cwd_et0_agg, file = "data/df_cwd_et0_agg.RData")
 Read tenth-degree global file and plot.
 
 ```{r}
+#load("data/df_cwd_et0_agg.RData")
+
 df_box <- tibble(
-  long = c(45, 95, 95, 45, 45), lat = c(47.5, 47.5, 25, 25, 47.5), order = 1:5, group = rep(1, 5))
+  # long = c(45, 95, 95, 45, 45), lat = c(47.5, 47.5, 25, 25, 47.5), 
+  long = c(52, 85, 85, 52, 52), lat = c(45, 45, 27, 27, 45), 
+  order = 1:5, group = rep(1, 5)
+  )
 
 ## EF
 gg <- plot_map4(df_cwd_et0_agg, 
                 varnam = "cwd_lue0_fet", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-                latmin = -55, latmax = 80,
+                latmin = -60, latmax = 80,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
@@ -3138,6 +3159,8 @@ save(df_rl_fet, file = "data/df_rl_fet.RData")
 
 Convert to map and plot.
 ```{r}
+load("data/df_rl_agg_fet.RData")
+
 # nc <- df_to_grid(
 #   df_rl_agg, 
 #   varnam = "rp_diag", 
@@ -3244,6 +3267,8 @@ df_rl_nSIF %>%
 
 Convert to map and plot.
 ```{r}
+load("data/df_rl_agg_nSIF.RData")
+
 # nc <- df_to_grid(
 #   df_rl_agg, 
 #   varnam = "rp_diag", 
@@ -3368,6 +3393,7 @@ save(df_rl_agg_test, file = "data/df_rl_agg_test.Rdata")
 Visualisations
 ```{r}
 load("data/df_rl_agg_test.Rdata")
+
 gg_fig4c <- df_rl_agg_test %>% 
   drop_na(gti_bin, rp_diag) %>% 
   ggplot(aes(x = gti_bin, y = rp_diag)) +
@@ -4114,8 +4140,8 @@ plot_grid(gg_fig1a, gg_fig1b, gg_fig1_legend, ncol = 1, labels = c('a', 'b', '')
 ggsave("fig/fig1.png", width = 8, height = 8)
 ggsave("fig/fig1.pdf", width = 8, height = 8)
 
-# bottom_row <- plot_grid(gg_fig4c, gg_fig4d, ncol = 2, labels = c('c', 'd'))
-# plot_grid(gg_fig4a, gg_fig4b, gg_fig4_legend, bottom_row, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2,0.7))
-# ggsave("fig/fig4.png", width = 8, height = 10)
-# ggsave("fig/fig4.pdf", width = 8, height = 10)
+bottom_row <- plot_grid(gg_fig4c, gg_fig4d, ncol = 2, labels = c('c', 'd'))
+plot_grid(gg_fig4a, gg_fig4b, gg_fig4_legend, bottom_row, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2,0.7))
+ggsave("fig/fig4.png", width = 8, height = 10)
+ggsave("fig/fig4.pdf", width = 8, height = 10)
 ```

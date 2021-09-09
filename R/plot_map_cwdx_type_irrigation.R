@@ -187,44 +187,6 @@ plot_map_cwdx_type_irrigation <- function(
 	}
 
 	##---------------------------------------------
-	## map theme
-	##---------------------------------------------
-	theme_map <- theme_grey() +    # theme_minimal()
-	  theme(
-
-	    plot.title = element_text(hjust = 0, face="bold", size = 18),
-
-	    legend.position = "right", # c(0.07, 0.35), #"left"
-	    # legend.key.size = unit(c(5, 1), "mm"),
-	    legend.title=element_text(size=12),
-	    legend.text=element_text(size=10),
-
-	    # axis.line = element_blank(),
-	    # axis.text = element_blank(),
-	    # axis.title = element_blank(),
-
-	    # panel.grid.major = element_blank(),
-	    panel.grid.minor = element_blank()
-	    # plot.margin = unit( c(0, 0, 0, 5) , "mm")
-	  )
-
-	# # define labels
-	# dloncoarse <- (lonmax - lonmin)/6
-	# dlonfine   <- (lonmax - lonmin)/18
-	# dlatcoarse <- (latmax - latmin)/6
-	# dlatfine   <- (latmax - latmin)/18
-	# lat.labels <- seq(latmin, latmax, dlatcoarse)
-	# lat.short  <- seq(latmin, latmax, dlatfine)
-	# lon.labels <- seq(lonmin, lonmax, dloncoarse)
-	# lon.short  <- seq(lonmin, lonmax, dlonfine)
-	#
-	# # a <- sapply( lat.labels, function(x) if (x>0) {bquote(.(x)*degree ~N)} else if (x==0) {bquote(.(x)*degree)} else {bquote(.(-x)*degree ~S)} )
-	# # b <- sapply( lon.labels, function(x) if (x>0) {bquote(.(x)*degree ~E)} else if (x==0) {bquote(.(x)*degree)} else {bquote(.(-x)*degree ~W)})
-	#
-	# a <- sapply( lat.labels, function(x) if (x>0) {parse(text = paste0(x, "*degree ~ N"))} else if (x==0) {parse(text = paste0(x, "*degree"))} else {parse(text = paste0(-x, "*degree ~ S"))} )
-	# b <- sapply( lon.labels, function(x) if (x>0) {parse(text = paste0(x, "*degree ~ E"))} else if (x==0) {parse(text = paste0(x, "*degree"))} else {parse(text = paste0(-x, "*degree ~ W"))} )
-
-	##---------------------------------------------
 	## Create ggplot object
 	##---------------------------------------------
 	ggmap <- ggplot() +
@@ -233,8 +195,8 @@ plot_map_cwdx_type_irrigation <- function(
 	  geom_tile(data = df, aes(x = lon, y = lat, fill = type, color = type)) +     # , show.legend = FALSE
 
 	  ## color scale for type, colors from here: https://github.com/cj-holmes/vhs/blob/main/data-raw/create-palettes.R
-	  scale_fill_manual(name = "Flattening", values = "#eb6133ff", labels = c("TRUE", "FALSE")) +  # magenta: "#be7682ff"; orange: "#eb6133ff", green: "#00902eff"
-	  scale_color_manual(name = "Flattening", values = "#eb6133ff", labels = c("TRUE", "FALSE")) +
+	  scale_fill_manual(name = "Flattening", values = "#be7682ff", labels = c("TRUE", "FALSE")) +  # magenta: "#be7682ff"; orange: "#eb6133ff", green: "#00902eff"
+	  scale_color_manual(name = "Flattening", values = "#be7682ff", labels = c("TRUE", "FALSE")) +
 	  
   	## geoms below will use another color scale
 	  new_scale_fill() +
@@ -250,10 +212,10 @@ plot_map_cwdx_type_irrigation <- function(
 	  new_scale_color() +
 	  
 	  ## third layer: irrigation outline of a polygon created above
-	  geom_path(aes(x = long, y = lat, group = group, color = id), data = df_irr_outline, size = 0.3) +
+	  geom_path(aes(x = long, y = lat, group = group, color = id), data = df_irr_outline, size = 0.5) +
 	  
 	  ## color scale for type, colors from here: https://github.com/cj-holmes/vhs/blob/main/data-raw/create-palettes.R
-	  scale_color_manual(name = "Irrigated", values = "#00902eff", labels = c("Outline", " ")) + # green: "#00902eff", red:  "#dc3b39ff"
+	  scale_color_manual(name = "Irrigated", values = "#dc3b39ff", labels = c("Outline", " ")) + # green: "#00902eff", red:  "#dc3b39ff"
 
 	  scale_x_continuous(expand = c(0,0)) +
 	  scale_y_continuous(expand = c(0,0)) +
@@ -261,7 +223,11 @@ plot_map_cwdx_type_irrigation <- function(
 	  xlab("Longitude (°E)") + ylab("Latitude (°N)") +
 	  coord_sf() +
 	  
-	  theme(axis.title = element_text(size = 10, color = "grey30"))
+	  theme_bw() +
+	  theme(axis.ticks.y.right = element_line(),
+	        axis.ticks.x.top = element_line(),
+	        panel.grid = element_blank(),
+	        axis.title = element_text(size = 10, color = "grey30"))
 
 	## add coast layer
 	if (coast){
