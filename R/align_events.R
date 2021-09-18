@@ -96,7 +96,7 @@ align_events <- function( df, events = NULL, dovars, leng_threshold, before, aft
     df_dday_aggbydday <- df_dday %>%  
       group_by( dday ) %>% 
       summarise_at( vars(one_of(dovars)), funs( median = median( ., na.rm=TRUE), q33( ., na.rm=TRUE), q66( ., na.rm=TRUE) ) ) %>%
-      filter( !is.na( dday ) )
+      dplyr::filter( !is.na( dday ) )
 
   } else {
 

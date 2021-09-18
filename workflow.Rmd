@@ -1049,16 +1049,16 @@ out <- purrr::map_dfr(as.list(seq(720)), ~extract_cwdx_byilon_lores(.))
 Read tenth-degree global files and plot.
 
 ```{r}
-load("data/df_vegmask.RData")
+# load("data/df_vegmask.RData")
 
 ## 80 yr
 nc_tenthdeg <- nc_to_df("data/cwdx80_tenthdeg.nc", varnam = "cwdx80") %>% 
-  mutate(cwdx80 = ifelse(lat > 75, NA, cwdx80)) %>% 
-  mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
-  left_join(df_vegmask_tenthdeg %>% 
-              mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
-            by = c("lon", "lat")) %>% 
-  mutate(cwdx80 = ifelse(nonveg > 80, NA, cwdx80))
+  mutate(cwdx80 = ifelse(lat > 70, NA, cwdx80))
+  # mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
+  # left_join(df_vegmask_tenthdeg %>% 
+  #             mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
+  #           by = c("lon", "lat")) %>% 
+  # mutate(cwdx80 = ifelse(nonveg > 80, NA, cwdx80))
 
 gg <- plot_map4(nc_tenthdeg, 
                 varnam = "cwdx80", 
@@ -1072,12 +1072,15 @@ gg <- plot_map4(nc_tenthdeg,
                 hillshade = FALSE,
                 rivers = FALSE,
                 expand_size_y = 0.5,
-                legend_direction = "horizontal")
+                legend_direction = "vertical")
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[CWDX80])))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.15))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
 ggsave("fig/map_cwdx80.png", width = 10, height = 5)
 ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
+
+gg_fig3a <- gg$ggmap
+gg_fig3a_legend <- gg$gglegend
 ```
 
 #### Regional
@@ -1224,6 +1227,8 @@ ggsave("fig/whc_soil.png", width = 8, height = 4)
 
 Regrid to 0.1 deg.
 ```{r}
+load("data/df_whc.RData")
+
 # source("R/regrid_df.R")
 # df_whc_agg <- regrid_df(df_whc, varnam = "whc_1m", dlon = 0.1, dlat = 0.1)
 
@@ -1438,12 +1443,12 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/zroot_cwd80.nc data/zroot_cwd80_
 
 ```{r}
 nc_tenthdeg <- nc_to_df("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_cwd80") %>% 
-  mutate(zroot_cwd80 = ifelse(lat > 75, NA, zroot_cwd80)) %>% 
-  mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
-  left_join(df_vegmask_tenthdeg %>% 
-              mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
-            by = c("lon", "lat")) %>% 
-  mutate(zroot_cwd80 = ifelse(nonveg > 80, NA, zroot_cwd80)) %>% 
+  mutate(zroot_cwd80 = ifelse(lat > 70, NA, zroot_cwd80)) %>% 
+  # mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
+  # left_join(df_vegmask_tenthdeg %>% 
+  #             mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
+  #           by = c("lon", "lat")) %>% 
+  # mutate(zroot_cwd80 = ifelse(nonveg > 80, NA, zroot_cwd80)) %>% 
   mutate(zroot_cwd80 = zroot_cwd80 / 1000)
 
 gg <- plot_map4(nc_tenthdeg, 
@@ -1451,20 +1456,22 @@ gg <- plot_map4(nc_tenthdeg,
                 breaks = c(seq(0, 1, by = 0.2), 1.5, 2, 3, 5, 7, 10, 15, 20, 25, Inf), 
                 latmin = -60, latmax = 80,
                 spacing = "constant", 
-                maxval = 6000, 
                 combine = FALSE, 
                 colorscale = viridis::magma, 
-                legend_title = "(mm)",
+                legend_title = "(m)",
                 hillshade = FALSE,
                 rivers = FALSE,
                 expand_size_y = 0.5,
-                legend_direction = "horizontal")
+                legend_direction = "vertical")
 gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("z")[r])))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.15))
+  labs(title = expression(paste(italic("z")[CWDX80])))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
 
 ggsave("fig/map_zroot_cwd80.png", width = 10, height = 5)
 ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
+
+gg_fig3b <- gg$ggmap
+gg_fig3b_legend <- gg$gglegend
 ```
 
 ### Site-level
@@ -3188,7 +3195,7 @@ gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[EF]))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.1))
 gg_fig4a <- gg$ggmap
 gg_fig4_legend <- gg$gglegend
-save(gg_fig4a, file = "data/gg_fig4a.Rdata")
+save(gg_fig4a, file = "data/gg_fig5a.Rdata")
 
 ggsave("fig/map_rp_fet.pdf", width = 8, height = 5)
 ggsave("fig/map_rp_fet.pdf", width = 8, height = 5)
@@ -3267,7 +3274,7 @@ df_rl_nSIF %>%
 
 Convert to map and plot.
 ```{r}
-load("data/df_rl_agg_nSIF.RData")
+# load("data/df_rl_agg_nSIF.RData")
 
 # nc <- df_to_grid(
 #   df_rl_agg, 
@@ -3293,7 +3300,7 @@ gg <- plot_map4(df_rl_agg_nSIF,
 gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[SIF]))
 
 gg_fig4b <- gg$ggmap
-save(gg_fig4b, file = "data/gg_fig4b.Rdata")
+save(gg_fig4b, file = "data/gg_fig5b.Rdata")
 
 ggsave("fig/map_rp_nsif.pdf", width = 8, height = 5)
 ggsave("fig/map_rp_nsif.pdf", width = 8, height = 5)
@@ -3394,30 +3401,30 @@ Visualisations
 ```{r}
 load("data/df_rl_agg_test.Rdata")
 
-gg_fig4c <- df_rl_agg_test %>% 
+gg_fig5c <- df_rl_agg_test %>% 
   drop_na(gti_bin, rp_diag) %>% 
   ggplot(aes(x = gti_bin, y = rp_diag)) +
   geom_boxplot(fill = "grey70") +
   theme_classic() +
   labs(x = "GTI", y = "Return period (yr)")
 
-gg_fig4d <- df_rl_agg_test %>% 
+gg_fig5d <- df_rl_agg_test %>% 
   drop_na(fcf_bin, rp_diag) %>% 
   ggplot(aes(x = fcf_bin, y = rp_diag)) +
   geom_boxplot(fill = "grey70") +
   theme_classic() +
   labs(x = "Forest cover fraction", y = "Return period (yr)")
 
-gg_fig4e <- df_rl_agg_test %>% 
+gg_fig5e <- df_rl_agg_test %>% 
   drop_na(ssdth_bin, rp_diag) %>% 
   ggplot(aes(x = ssdth_bin, y = rp_diag)) +
   geom_boxplot(fill = "grey70") +
   theme_classic() +
   labs(x = "Soil and sedimentary deposit thickness", y = "Return period (yr)")
 
-gg_fig4c
-gg_fig4d
-gg_fig4e
+gg_fig5c
+gg_fig5d
+gg_fig5e
 ```
 
 Maps
@@ -4140,8 +4147,21 @@ plot_grid(gg_fig1a, gg_fig1b, gg_fig1_legend, ncol = 1, labels = c('a', 'b', '')
 ggsave("fig/fig1.png", width = 8, height = 8)
 ggsave("fig/fig1.pdf", width = 8, height = 8)
 
-bottom_row <- plot_grid(gg_fig4c, gg_fig4d, ncol = 2, labels = c('c', 'd'))
+load("data/gg_fig5a.Rdata")
+load("data/gg_fig5b.Rdata")
+bottom_row <- plot_grid(gg_fig5c, gg_fig5d, ncol = 2, labels = c('c', 'd'))
 plot_grid(gg_fig4a, gg_fig4b, gg_fig4_legend, bottom_row, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2,0.7))
-ggsave("fig/fig4.png", width = 8, height = 10)
-ggsave("fig/fig4.pdf", width = 8, height = 10)
+ggsave("fig/fig_return_period.png", width = 8, height = 10)
+ggsave("fig/fig_retrun_period.pdf", width = 8, height = 10)
+
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_heights = c(1, 0.12))
+
+ggsave("fig/map_zroot_cwd80.png", width = 10, height = 5)
+ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
+
+## fig 3
+cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, gg_fig3b, gg_fig3b_legend, 
+                   ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
+ggsave("fig/fig3.png", width = 10, height = 8)
+ggsave("fig/fig3.pdf", width = 10, height = 8)
 ```

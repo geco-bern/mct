@@ -582,11 +582,23 @@ df_sites <- df_sites %>%
 
 Plot sites on map
 ```{r}
+library(jcolors)
+nbiomes <- df_sites %>% 
+  drop_na(biome_name) %>%
+  pull(biome_name) %>% 
+  unique() %>% 
+  length()
+
 plot_map_simpl() +
   geom_point(data = df_sites %>% 
+               drop_na(biome_name) %>% 
                separate(sitename, into = c(NA, "lon", "lat"), sep = "_") %>% 
                mutate(lon = as.numeric(lon), lat = as.numeric(lat)), 
-             aes(x = lon, y = lat, color = biome_name))
+             aes(x = lon, y = lat, color = biome_name)) +
+  # scale_color_jcolors(palette = "pal8")
+  # scale_color_brewer(palette = "Paired")
+  scale_colour_manual(values = myjcolors(nbiomes), name = "Biome name")
+
 
 ggsave("fig/sites_rsip.pdf", width = 15, height = 6)
 ggsave("fig/sites_rsip.png", width = 15, height = 6)
@@ -883,6 +895,6 @@ save(gg_rsip_sites_wtd_90, file = "data/gg_rsip_sites_wtd_90.RData")
 ```{r}
 bottom_row <- plot_grid(gg_rsip_sites_10, gg_rsip_sites_90, gg_rsip_sites_wtd_10, gg_rsip_sites_wtd_90, ncol = 4, labels = c('b', 'c', 'd', 'e'))
 plot_grid(gg_fig3a, bottom_row, ncol = 1, labels = c('a', ''), rel_heights = c(0.7, 0.4))
-ggsave("fig/fig3.pdf", width = 12, height = 9)
-ggsave("fig/fig3.png", width = 12, height = 9)
+ggsave("fig/fig4.pdf", width = 12, height = 9)
+ggsave("fig/fig4.png", width = 12, height = 9)
 ```
