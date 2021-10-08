@@ -1,4 +1,4 @@
-calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0_2/", verbose = FALSE){
+calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0_2/", verbose = FALSE, overwrite = FALSE, siteinfo = NULL, do_plot = TRUE){
   
   source("R/calc_cwd_lue0_v2.R")
 
@@ -21,7 +21,7 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
   if (!dir.exists(dirn)) system(paste0("mkdir -p ", dirn))
   path <- paste0(dirn, "/", filn)
   
-  if (!file.exists(path)){
+  if (!file.exists(path) || overwrite){
     
     ## Open file CWDX output
     dirn <- "~/mct/data/df_cwdx/"
@@ -50,6 +50,12 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
     filn <- paste0("EDAY_CERES__ilon_", ilon, ".RData")
     dirn <- "~/data/alexi_tir/data_tidy/"
     load(paste0(dirn, filn)) # loads 'df'
+    
+    ## this is for checks at certain sites
+    if (!is.null(siteinfo)){
+      idx_keep <- which.min(abs(siteinfo$lat - df$lat))
+      df <- df[idx_keep,]
+    }
     
     df <- df %>% 
       
@@ -93,21 +99,22 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
       mutate(data = purrr::map(data, ~calc_fet(.))) %>% 
 
       ## get CWD at fET = 0 (fET = ET/Rn)
-      mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = FALSE, verbose = verbose))) %>% 
+      mutate(out_lue0_fet = purrr::map2(data, data_inst, ~calc_cwd_lue0(.x, .y, nam_lue = "fet", do_plot = do_plot, verbose = verbose))) %>% 
+      
+      ## keep parameters of fits
       mutate(cwd_lue0_fet = purrr::map_dbl(out_lue0_fet, "cwd_lue0")) %>%
       mutate(flue_fet = purrr::map_dbl(out_lue0_fet, "flue")) %>%
       mutate(cwdmax = purrr::map_dbl(out_lue0_fet, "cwdmax")) %>%
       mutate(lambda_decay_fet = purrr::map_dbl(out_lue0_fet, "lambda_decay")) %>%
       mutate(s0_teuling_fet = purrr::map_dbl(out_lue0_fet, "s0_teuling")) %>%
       mutate(type_fet = purrr::map_chr(out_lue0_fet, "type")) %>%
-      mutate(cwd_flattening_fet = purrr::map_dbl(out_lue0_fet, "cwd_flattening")) %>%
+      mutate(cwd_flattening_fet = purrr::map_dbl(out_lue0_fet, "cwd_flattening"))
       # mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
-      dplyr::select(-out_lue0_fet)
 
     if (drop_data){
       ## drop data again
       df <- df %>% 
-        dplyr::select(-data, -data_inst)
+        dplyr::select(-data, -data_inst, -out_lue0_fet)
     }
     
     ## write to file
@@ -116,7 +123,15 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
     
   } else {
     print(paste("File exists already:", path))
-  } 
+  }
+  
   error = 0
-  return(0)
+  
+  if (is.null(siteinfo)){
+    out <- error
+  } else {
+    out <- df
+  }
+  
+  return(out)
 }

@@ -443,7 +443,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
     
   }
 
-  return(list(cwd_lue0      = cwd_lue0, 
+  out <- list(cwd_lue0      = cwd_lue0, 
               is_flattening = is_flattening,
               gg            = gg, 
               flue          = flue, 
@@ -453,6 +453,8 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
               s0_teuling    = s0_teuling,
               type          = type,
               cwd_flattening= cwd_flattening
-              ))
+  )
+  
+  return(out)
 
 }
