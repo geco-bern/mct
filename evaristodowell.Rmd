@@ -1,0 +1,66 @@
+---
+title: "Prevalence of groundwater use (Evaristo & Dowell, 2017 data)"
+author: "Beni"
+date: "11/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(forcats)
+```
+
+Read and aggregate by site
+```{r}
+df <- read_csv("~/data/evaristodowell_groundwateruse/41598_2017_BFsrep44110_MOESM103_ESM.csv") %>% 
+  mutate(idx = paste0("i", 1:n())) %>% 
+  mutate(idx = as.factor(idx)) %>% 
+  rename(lat = LAT, lon = LONG, gw_prev = Mean)
+  
+  # ## own site classification based on unique lon and lat values
+  # mutate(SITE = paste0("i_", as.character(lon), "_", as.character(lat)))
+  
+df_lonlat <- df %>% 
+  dplyr::select(SITE, lon, lat) %>% 
+  distinct()
+
+dfs <- df %>% 
+  
+  group_by(SITE) %>%
+
+  summarise(gw_prev = mean(gw_prev, na.rm = TRUE)) %>% 
+  
+  ## create three classes no gw: <5%, mixed: 5-95%, yes: >95%
+  mutate(gw = ifelse(gw_prev < 5, 
+                     "no",
+                     ifelse(gw_prev < 95,
+                            "mixed", "yes"
+                            )
+                     )
+         ) %>% 
+  
+  ## add lon and lat info back
+  left_join(df_lonlat, by = "SITE")
+```
+
+```{r}
+dfs %>% 
+  mutate(SITE = fct_reorder(SITE, desc(gw_prev))) %>%
+  drop_na(gw_prev) %>% 
+  ggplot(aes(gw_prev, SITE, color = gw)) +
+  geom_point()
+```
+
+Save site-level data
+```{r}
+saveRDS(dfs, file = "data/dfs_evaristodowell.rds")
+```
+
+
+Match grid points from my analysis of "flattening".
+```{r}
+#load("data/df_cwd_et0_3_flattening.RData")  # loads 'df_cwd_et0'
+
+
+```

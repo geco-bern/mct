@@ -82,12 +82,12 @@ df_meandoy <- ddf_obs_dry %>%
     )
   
 # what's wrong with ...
-ddf_obs_dry %>% 
-  filter(sitename == "FR-LBr") %>% 
-  dplyr::select(date, fapar) %>% 
-  View()
-  ggplot(aes(x = date, y = fapar)) +
-  geom_line()
+# ddf_obs_dry %>% 
+#   filter(sitename == "FR-LBr") %>% 
+#   dplyr::select(date, fapar) %>% 
+#   View()
+#   ggplot(aes(x = date, y = fapar)) +
+#   geom_line()
 
 df_meandoy %>% 
   ggplot() +

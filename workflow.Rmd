@@ -2515,6 +2515,11 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
       drop_na() %>% 
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
       rename(irr = aai)
+
+save(df_cwd_et0, file = "data/df_cwd_et0_3_flattening.RData")
+
+## write as netcdf
+write_nc2(df_cwd_et0, varnams = "flat_fet", path = "data/flattening_cwd_et0.nc")
 ```
 
 ### Regional
