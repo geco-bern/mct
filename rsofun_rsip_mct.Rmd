@@ -1,0 +1,105 @@
+---
+title: "rsofun at RSIP sites"
+author: "Beni Stocker"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rsofun)
+library(ingestr)
+library(rbeni)
+```
+
+## Get sites
+
+```{r cars}
+df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
+# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>% 
+  rename(lon = Long, lat = Lat) %>% 
+  rowid_to_column(var = "id") %>% 
+  
+  ## problem: some have a reference error
+  dplyr::filter(lon != "#REF!") %>% 
+  mutate(lon = as.numeric(lon), lat = as.numeric(lat), 
+         Dr = as.numeric(Dr),
+         wtd = as.numeric(Water_Table_Depth_Fan))
+  
+print(paste("Total number of entries:", nrow(df)))
+```
+
+Add model results.
+```{r}
+df <- extract_nc(df %>% dplyr::select(id, lon, lat), "data/zroot_cwd80.nc") %>% 
+  unnest(data) %>% 
+  rename(zroot_cwdx80 = V1) %>% 
+  mutate(zroot_cwdx80 = zroot_cwdx80 / 1000) %>% 
+  right_join(df, by = c("lon", "lat", "id"))
+```
+
+1705 distinct sites based on lon and lat info.
+```{r}
+df_sites <- df %>% 
+  mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) %>% 
+  group_by(sitename) %>% 
+  summarise(Dr = mean(Dr, na.rm = TRUE), zroot_cwdx80 = mean(zroot_cwdx80, na.rm = TRUE), wtd = mean(wtd, na.rm = TRUE))
+
+## add WWF biome info
+df_wwf_sites <- ingest(
+  df %>% 
+    distinct(lon, lat) %>% 
+    mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))),
+  source = "wwf",
+  dir = "~/data/biomes/wwf_ecoregions/official/",
+  settings = list(layer = "wwf_terr_ecos")
+  )%>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  unnest(data)
+
+df_sites <- df_sites %>% 
+  left_join(
+    df_wwf_sites %>% 
+      dplyr::select(sitename, biome = BIOME, biome_name = BIOME_NAME),
+    by = "sitename"
+  )
+
+df_sites <- df_sites %>% 
+  separate(sitename, c("prefix", "lon", "lat"), sep = "_") %>% 
+  dplyr::select(-prefix) %>% 
+  mutate(sitename = paste0("i_", 1:nrow(.))) %>% 
+  mutate(lon = as.numeric(lon), lat = as.numeric(lat)) %>%
+  mutate(
+    year_start = 1989,
+    year_end = 2018
+  )
+
+# add elevation data
+if(grepl('eu-', Sys.info()['nodename'])){
+  r <- raster::raster("~/data/etopo/ETOPO1_Bed_g_geotiff.tif")
+}
+
+# grab elev data
+s <- st_as_sf(
+  df,
+  coords = c("lon","lat"),
+  crs = 4326)
+df$elv <- raster::extract(r, s)
+df <- df %>%
+  mutate(
+    elv = ifelse(elv < 0, 0, elv)
+  )
+
+write_csv(df_sites, file = "data/df_sites_rsip.csv")  
+```
+
+## Get forcing data
+
+Use `submit_forcing_rsip.sh` to run `rscript_forcing_rsip.R`. This saves files in subdirectory `"./data/forcing_rsip/"`.
+
+
+## Run rsofun
