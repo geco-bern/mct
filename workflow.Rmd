@@ -2664,31 +2664,58 @@ nc <- df_to_grid(df_cwd_et0 %>% mutate(s0_teuling_fet = remove_outliers(s0_teuli
 write_nc2(nc, varnams = "s0_teuling_fet", lon = df_cwd_et0$lon %>% unique() %>% sort(), lat = df_cwd_et0$lat %>% unique() %>% sort(), path = "data/s0_teuling_fet.nc", make_zdim = FALSE)
 
 ## write as netcdf
-lon_orig <- df_cwd_et0$lon %>% unique() %>% sort()
+load("data/df_cwd_et0_3_flattening.RData")
+
+nc <- df_to_grid(df_cwd_et0, varnam = "flat_fet", lonnam = "lon", latnam = "lat")
+image(nc)
+write_nc2(nc, 
+          varnams = "flat_fet", 
+          lon = df_cwd_et0$lon %>% unique() %>% sort() %>% round(digits = 3), 
+          lat = df_cwd_et0$lat %>% unique() %>% sort() %>% round(digits = 3), 
+          path = "data/flat_fet.nc", 
+          make_zdim = FALSE
+          )
+raster("data/flat_fet.nc")
+
+lon_orig <- df_cwd_et0$lon %>% unique() %>% sort() %>% round(digits = 3)
 lon <- seq(min(lon_orig), max(lon_orig), by = 0.05)
 
-lat_orig <- df_cwd_et0$lat %>% unique() %>% sort()
+lat_orig <- df_cwd_et0$lat %>% unique() %>% sort() %>% round(digits = 3)
 lat <- seq(min(lat_orig), max(lat_orig), by = 0.05)
 
 df_tmp <- expand.grid(lon, lat) %>% 
   as_tibble() %>% 
   setNames(c("lon", "lat")) %>% 
+  mutate(lon = as.factor(lon),
+         lat = as.factor(lat)) %>% 
   left_join(
     df_cwd_et0 %>% 
       mutate(lon = round(lon, digits = 3),
-             lat = round(lat, digits = 3)),
+             lat = round(lat, digits = 3)) %>% 
+      mutate(lon = as.factor(lon),
+             lat = as.factor(lat)),
     by = c("lon", "lat")
-  )
+  ) %>% 
+  mutate(lon = as.numeric(lon),
+         lat = as.numeric(lat))
 
+nc2 <- df_to_grid(df_tmp, varnam = "flat_fet", lonnam = "lon", latnam = "lat")
+image(nc2)
 
-nc <- df_to_grid(df_tmp, varnam = "flat_fet", lonnam = "lon", latnam = "lat")
-write_nc2(nc, 
+write_nc2(nc2, 
           varnams = "flat_fet", 
-          lon = lon, 
-          lat = lat, 
+          lon = df_tmp$lon %>% unique() %>% sort(), 
+          lat = df_tmp$lat %>% unique() %>% sort(), 
           path = "data/flat_fet.nc", 
           make_zdim = FALSE
           )
+
+## test
+image(nc)
+
+rasta <- raster::raster("data/flat_fet.nc")
+library(rasterVis)
+rasterVis::levelplot(rasta)
 ```
 
 

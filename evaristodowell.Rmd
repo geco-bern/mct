@@ -66,9 +66,6 @@ load("data/df_cwd_et0_3_flattening.RData")
 distance <- sqrt(rowSums((df_cwd_et0[, c("lon", "lat", "flat_fet")] - do.call(rbind, replicate(nrow(df_cwd_et0[, c("lon", "lat", "flat_fet")]), dfs[1, c("lon", "lat")], simplify = FALSE)))**2))
 
 #load("data/df_cwd_et0_3_flattening.RData")  # loads 'df_cwd_et0'
-rasta <- raster::raster("data/flat_fet.nc")
-library(rasterVis)
-rasterVis::levelplot(rasta)
 
 dfs_flat <- raster::extract(
     rasta,
