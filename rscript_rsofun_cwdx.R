@@ -23,4 +23,5 @@ use_whc <- ifelse(args[2] == "9999", NA, as.numeric(args[2]))
 
 out <- run_rsofun_cwdx_by_chunk(as.character(args[1]), use_whc = use_whc)
 filename <- file.path(path, paste0("out_rsofun_cwdx_whcobs_",as.character(args[1]),".rds"))
+print(paste("saving", filename, "..."))
 saveRDS(out, filename)

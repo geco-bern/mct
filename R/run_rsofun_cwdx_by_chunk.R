@@ -25,8 +25,8 @@ run_rsofun_cwdx_by_chunk <- function(ichunk, use_whc = NA){
 	                                         ef = transp / pet))) %>% 
 	  
   	## get S_CWDX80, get CWD time series and events
-	  # ungroup() %>% 
-	  # slice(1) %>% 
+	  # ungroup() %>%
+	  # slice(1:2) %>%
 	  mutate(gumbi = purrr::map(data, ~get_plantwhc_mct_bysite(., 
 	                                         varname_wbal = "wbal", 
 	                                         varname_date = "date" ))) %>% 
