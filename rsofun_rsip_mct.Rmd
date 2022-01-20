@@ -101,5 +101,94 @@ write_csv(df_sites, file = "data/df_sites_rsip.csv")
 
 Use `submit_forcing_rsip.sh` to run `rscript_forcing_rsip.R`. This saves files in subdirectory `"./data/forcing_rsip/"`.
 
-
 ## Run rsofun
+
+Do this with branch `mct` where liquid water infiltration into the soil is written to output.
+```{r}
+source("R/process_pmodel.R")
+df_forcing <- readRDS("./data/forcing_rsip/pmodel_drivers_1.rds")
+
+df_output <- process_pmodel(
+  "./data/forcing_rsip/pmodel_drivers_1.rds",
+  agg = FALSE)
+```
+
+
+## Diagnose S0
+
+```{r}
+## AET/PET vs. time
+df_output <- df_output %>% 
+  dplyr::filter(sitename == "i_1") %>% 
+  rename(aet = transp) %>% 
+  mutate(ef = aet / pet)
+
+df_output %>% 
+  ggplot(aes(date, ef)) + 
+  geom_line()
+
+## AET/PET vs. wcont
+df_output %>% 
+  ggplot(aes(wscal, ef)) + 
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  geom_vline(xintercept = 0, linetype = "dotted")
+```
+Get CWD time series. Infiltration is `infilt`. 
+```{r}
+library(segmented)
+source("R/get_plantwhc_mct_bysite.R")
+source("R/mct2.R")
+source("R/calc_cwd_lue0_v2.R")
+
+list_output <- df_output %>%
+  group_by(sitename) %>%
+  group_split() %>% 
+  purrr::map(., ~mutate(., 
+                        wbal = infilt - transp,
+                        ef = transp / pet))
+
+##------------------------------------------
+## apply mct function to get CWD
+##------------------------------------------
+out_mct <- mct(list_output[[1]], 
+               varname_wbal = "wbal", 
+               varname_date = "date" 
+               )
+
+out_mct$df %>% 
+  ggplot(aes(deficit, ef)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = df_forcing$site_info[[1]]$whc) +
+  geom_hline(yintercept = 0, linetype = "dotted")
+```
+
+```{r}
+##------------------------------------------
+## fit extreme value statistics  
+##------------------------------------------
+gumbi <- get_plantwhc_mct_bysite(list_output[[1]] %>% 
+                                   dplyr::select(-date_start, -date_end),   
+                                 varname_wbal = "wbal", 
+                                 varname_date = "date" 
+                                 )
+
+use_return_period <- 80
+```
+
+```{r}
+out <- calc_cwd_lue0(out_mct$df, 
+              out_mct$inst, 
+              "ef", 
+              do_plot = TRUE, 
+              verbose = TRUE
+              )
+
+out$gg +
+  geom_vline(xintercept = df_forcing$site_info[[1]]$whc) +
+  geom_vline(xintercept = gumbi$df_return %>% 
+                            filter(return_period == use_return_period) %>% 
+                            pull(return_level),
+             color = "royalblue"
+             )
+```

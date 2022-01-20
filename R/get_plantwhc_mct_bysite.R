@@ -26,14 +26,16 @@ get_plantwhc_mct_bysite <- function( df,
       ##--------------------------------
       ## Get events of consecutive water deficit and accumulated deficit
       ##--------------------------------
-      out_mct <- mct(df, varname_wbal = varname_wbal, varname_date = varname_date, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
+      if (is.null(out_mct)){
+        out_mct <- mct(df, varname_wbal = varname_wbal, varname_date = varname_date, thresh_terminate = thresh_terminate, thresh_drop = thresh_drop )
+      }
       
       if (nrow(out_mct$inst)>0){
         ##--------------------------------
         ## get annual maximum CWD
         ##--------------------------------
         df <- df %>% 
-          mutate(year = lubridate::year(time))
+          mutate(year = lubridate::year(!!rlang::sym(varname_date)))
         
         out_mct$inst <- out_mct$inst %>% 
           ungroup() %>% 
@@ -91,7 +93,7 @@ get_plantwhc_mct_bysite <- function( df,
               if (class(evd_gev) != "try-error" && class(evd_gumbel) != "try-error"){
                 
                 ## is GEV-fit besser als Gumbel? Gumbel ist gute Annahme da p nicht signifikant
-                df_test_fevd <- lr.test(evd_gumbel, evd_gev) %>% 
+                df_test_fevd <- extRemes::lr.test(evd_gumbel, evd_gev) %>% 
                   broom::tidy()
                 pval <- df_test_fevd %>% 
                   pull(p.value)
