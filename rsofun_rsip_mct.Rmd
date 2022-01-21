@@ -103,10 +103,56 @@ Use `submit_forcing_rsip.sh` to run `rscript_forcing_rsip.R`. This saves files i
 
 ## Test
 
-
+Use `submit_rsofun_cwdx.sh` to run `rscript_rsofun_cwdx.R` for different S_0 (WHC) and diagnose it following the S_dEF method. This writes files into the directory `"./data/out_rsofun_cwdx/"`. 
 
 ```{r}
-source("R/run_rsofun_cwdx_by_chunk.R")
-out <- run_rsofun_cwdx_by_chunk(1, use_whc = NA)
+# ichunk <- 1
+# use_whc <- 100
+
+read_myfile <- function(ichunk, use_whc){
+  path <- "./data/out_rsofun_cwdx/"
+  filename <- file.path(path, paste0("out_rsofun_cwdx_whc_", as.character(use_whc), "_ichunk_", as.character(ichunk), ".rds"))
+  if (file.exists(filename)){
+    df <- readRDS(filename) %>% 
+      dplyr::select(sitename, whc, s_def, s_cwdx80)
+    return(df)
+  } else {
+    return(tibble())
+  }
+}
+
+df <- purrr::map_dfr(
+  as.list(seq(50)),
+  ~read_myfile(., 100)
+  ) %>% 
+  mutate(setup = "whc_100") %>% 
+  bind_rows(
+    purrr::map_dfr(
+      as.list(seq(50)),
+      ~read_myfile(., 200)
+      ) %>% 
+      mutate(setup = "whc_200")
+  ) %>% 
+  bind_rows(
+    purrr::map_dfr(
+      as.list(seq(50)),
+      ~read_myfile(., "NA")
+      ) %>% 
+      mutate(setup = "whc_NA")
+  )
+
+saveRDS(df, file = "data/df_test_cwdx_rsofun.rds")
+
+df %>% 
+  dplyr::filter(setup == "whc_NA") %>% 
+  analyse_modobs2("whc", "s_def", type = "hex")
+
+gg <- df %>% 
+  dplyr::filter(setup == "whc_NA" & !is.nan(s_cwdx80) & !is.infinite(s_cwdx80) & s_cwdx80 < 1e4) %>%
+  mutate(s_cwdx80 = remove_outliers(s_cwdx80)) %>% 
+  analyse_modobs2("whc", "s_cwdx80", type = "hex")
+
+gg$gg + xlim(0, 2000) + ylim(0, 2000)
 ```
+
 

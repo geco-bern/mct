@@ -18,15 +18,18 @@ fi
 
 for ((n=1;n<=${njobs};n++)); do
    echo "Submitting pixel $n ..."
-   bsub -W 72:00 -u $USER -J "test whc obs chunk_${n}" -R "rusage[mem=48000]" "Rscript --vanilla ./rscript_rsofun_cwdx.R $n 9999"
+   # bsub -W 72:00 -u $USER -J "test whc obs chunk_${n}" -R "rusage[mem=48000]" "Rscript --vanilla ./rscript_rsofun_cwdx.R $n 9999"
+   Rscript --vanilla ./rscript_rsofun_cwdx.R $n 9999
 done
 
 for ((n=1;n<=${njobs};n++)); do
    echo "Submitting pixel $n ..."
-   bsub -W 72:00 -u $USER -J "test whc 100 chunk_${n}" -R "rusage[mem=48000]" "Rscript --vanilla ./rscript_rsofun_cwdx.R $n 100"
+   # bsub -W 72:00 -u $USER -J "test whc 200 chunk_${n}" -R "rusage[mem=48000]" "Rscript --vanilla ./rscript_rsofun_cwdx.R $n 200"
+   Rscript --vanilla ./rscript_rsofun_cwdx.R $n 200
 done
 
 for ((n=1;n<=${njobs};n++)); do
    echo "Submitting pixel $n ..."
-   bsub -W 72:00 -u $USER -J "test whc 200 chunk_${n}" -R "rusage[mem=48000]" "Rscript --vanilla ./rscript_rsofun_cwdx.R $n 200"
+   # bsub -W 72:00 -u $USER -J "test whc 100 chunk_${n}" -R "rusage[mem=48000]" "Rscript --vanilla ./rscript_rsofun_cwdx.R $n 100"
+   Rscript --vanilla ./rscript_rsofun_cwdx.R $n 100
 done

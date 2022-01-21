@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 args <- commandArgs(trailingOnly=TRUE)
+# args <- c(1, 200)
 
 # set output path
 path <- "./data/out_rsofun_cwdx/"
@@ -20,7 +21,21 @@ source("R/run_rsofun_cwdx_by_chunk.R")
 
 use_whc <- ifelse(args[2] == "9999", NA, as.numeric(args[2]))
 
-out <- run_rsofun_cwdx_by_chunk(as.character(args[1]), use_whc = use_whc)
 filename <- file.path(path, paste0("out_rsofun_cwdx_whc_", as.character(use_whc), "_ichunk_", as.character(args[1]), ".rds"))
-print(paste("saving", filename, "..."))
-saveRDS(out, filename)
+
+if (!file.exists(filename)){
+	out <- run_rsofun_cwdx_by_chunk(as.character(args[1]), use_whc = use_whc)
+	print(paste("saving", filename, "..."))
+	saveRDS(out, filename)	
+} else {
+  print(paste("file exists already:", filename, "."))
+}
+
+# memory intensive, purge memory
+gc()
+
+# out %>% 
+#   ggplot(aes(x = whc, y = s_def)) +
+#   geom_boxplot() +
+#   geom_jitter() +
+#   theme_classic()
