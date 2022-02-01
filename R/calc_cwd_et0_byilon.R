@@ -1,4 +1,4 @@
-calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0_2/", verbose = FALSE, overwrite = FALSE, siteinfo = NULL, do_plot = TRUE){
+calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cwd_et0_2/", verbose = FALSE, overwrite = FALSE, siteinfo = NULL, use_lat = NULL, do_plot = TRUE){
   
   source("R/calc_cwd_lue0_v2.R")
 
@@ -56,6 +56,10 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
       idx_keep <- which.min(abs(siteinfo$lat - df$lat))
       df <- df[idx_keep,]
     }
+    if (!is.null(use_lat)){
+      idx_keep <- which.min(abs(use_lat - df$lat))
+      df <- df[idx_keep,]
+    }
     
     df <- df %>% 
       
@@ -108,8 +112,8 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
       mutate(lambda_decay_fet = purrr::map_dbl(out_lue0_fet, "lambda_decay")) %>%
       mutate(s0_teuling_fet = purrr::map_dbl(out_lue0_fet, "s0_teuling")) %>%
       mutate(type_fet = purrr::map_chr(out_lue0_fet, "type")) %>%
-      mutate(cwd_flattening_fet = purrr::map_dbl(out_lue0_fet, "cwd_flattening"))
-      # mutate(gg_fet = purrr::map(out_lue0_fet, "gg")) %>%
+      mutate(cwd_flattening_fet = purrr::map_dbl(out_lue0_fet, "cwd_flattening")) %>% 
+      mutate(gg_fet = purrr::map(out_lue0_fet, "gg"))
 
     if (drop_data){
       ## drop data again
@@ -127,7 +131,7 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "~/mct/data/df_cw
   
   error = 0
   
-  if (is.null(siteinfo)){
+  if (is.null(siteinfo) && is.null(use_lat)){
     out <- error
   } else {
     out <- df

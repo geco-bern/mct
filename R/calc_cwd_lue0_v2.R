@@ -70,7 +70,7 @@ calc_cwd_lue0 <- function(df, inst, nam_lue, do_plot = FALSE, verbose = FALSE){
       return(out)
     }
     list_lm_selg <- purrr::map(as.list(c(1,2)),
-                              ~try(segmented(linmod, seg.Z = ~ cwd_mid, npsi=., silent=TRUE)))
+                              ~try(segmented::segmented(linmod, seg.Z = ~ cwd_mid, npsi=., silent=TRUE)))
     for (i in 2:1){
       list_lm_selg[[i+1]] <- list_lm_selg[[i]]
     }
