@@ -14,13 +14,14 @@ library(tidyverse)
 library(rsofun)
 library(ingestr)
 library(rbeni)
+library(cowplot)
 ```
 
 ## Get sites
 
 ```{r cars}
-df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
-# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>% 
+# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
+df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>%
   rename(lon = Long, lat = Lat) %>% 
   rowid_to_column(var = "id") %>% 
   
@@ -33,21 +34,14 @@ df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%   
 print(paste("Total number of entries:", nrow(df)))
 ```
 
-Add model results.
-```{r}
-df <- extract_nc(df %>% dplyr::select(id, lon, lat), "data/zroot_cwd80.nc") %>% 
-  unnest(data) %>% 
-  rename(zroot_cwdx80 = V1) %>% 
-  mutate(zroot_cwdx80 = zroot_cwdx80 / 1000) %>% 
-  right_join(df, by = c("lon", "lat", "id"))
-```
+### Aggregate
 
 1705 distinct sites based on lon and lat info.
 ```{r}
 df_sites <- df %>% 
   mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) %>% 
   group_by(sitename) %>% 
-  summarise(Dr = mean(Dr, na.rm = TRUE), zroot_cwdx80 = mean(zroot_cwdx80, na.rm = TRUE), wtd = mean(wtd, na.rm = TRUE))
+  summarise(Dr = mean(Dr, na.rm = TRUE), wtd = mean(wtd, na.rm = TRUE))
 
 ## add WWF biome info
 df_wwf_sites <- ingest(
@@ -77,25 +71,41 @@ df_sites <- df_sites %>%
     year_start = 1989,
     year_end = 2018
   )
-
-# add elevation data
-if(grepl('eu-', Sys.info()['nodename'])){
-  r <- raster::raster("~/data/etopo/ETOPO1_Bed_g_geotiff.tif")
-}
-
-# grab elev data
-s <- st_as_sf(
-  df,
-  coords = c("lon","lat"),
-  crs = 4326)
-df$elv <- raster::extract(r, s)
-df <- df %>%
-  mutate(
-    elv = ifelse(elv < 0, 0, elv)
-  )
-
-write_csv(df_sites, file = "data/df_sites_rsip.csv")  
 ```
+
+### Add model results.
+```{r}
+df_sites <- extract_nc(df_sites %>% dplyr::select(sitename, lon, lat), "data/zroot_cwd80.nc") %>% 
+  unnest(data) %>% 
+  rename(zroot_cwdx80 = V1) %>% 
+  mutate(zroot_cwdx80 = zroot_cwdx80 / 1000) %>% 
+  right_join(df_sites, by = c("lon", "lat", "sitename"))
+```
+
+<!-- ### Add elevation data -->
+
+<!-- ```{r} -->
+<!-- if(grepl('eu-', Sys.info()['nodename'])){ -->
+<!--   r <- raster::raster("~/data/etopo/ETOPO1_Bed_g_geotiff.tif") -->
+<!-- } -->
+
+<!-- # grab elev data -->
+<!-- s <- st_as_sf( -->
+<!--   df, -->
+<!--   coords = c("lon","lat"), -->
+<!--   crs = 4326) -->
+<!-- df$elv <- raster::extract(r, s) -->
+<!-- df <- df %>% -->
+<!--   mutate( -->
+<!--     elv = ifelse(elv < 0, 0, elv) -->
+<!--   ) -->
+
+### Write to file
+
+```{r}
+write_csv(df_sites, file = "data/df_sites_rsip.csv")
+```
+
 
 ## Get forcing data
 
@@ -104,6 +114,8 @@ Use `submit_forcing_rsip.sh` to run `rscript_forcing_rsip.R`. This saves files i
 ## Test
 
 Use `submit_rsofun_cwdx.sh` to run `rscript_rsofun_cwdx.R` for different S_0 (WHC) and diagnose it following the S_dEF method. This writes files into the directory `"./data/out_rsofun_cwdx/"`. 
+
+### Get data
 
 ```{r}
 # ichunk <- 1
@@ -142,17 +154,93 @@ df <- purrr::map_dfr(
   )
 
 saveRDS(df, file = "data/df_test_cwdx_rsofun.rds")
+```
 
-df %>% 
+### Scatterplots
+
+```{r}
+df <- readRDS("data/df_test_cwdx_rsofun.rds")
+
+# out2 <- df %>% 
+#   dplyr::filter(setup == "whc_NA" & !is.nan(s_cwdx80) & !is.infinite(s_cwdx80) & s_cwdx80 < 1e4) %>%
+#   mutate(s_cwdx80 = remove_outliers(s_cwdx80)) %>% 
+#   analyse_modobs2("whc", "s_cwdx80", type = "hex")
+# 
+# out2$gg <- out2$gg + xlim(0, 2000) + ylim(0, 2000)
+
+out <- df %>% 
   dplyr::filter(setup == "whc_NA") %>% 
-  analyse_modobs2("whc", "s_def", type = "hex")
+  analyse_modobs2("whc", "s_def", shortsubtitle = TRUE) 
+gg1 <- out$gg +
+  labs(x = expression("Prescribed" ~ "S"[0] ~ "(mm)"), y = expression("Diagnosed" ~ "S"[0] ~ "(mm)"))
 
-gg <- df %>% 
-  dplyr::filter(setup == "whc_NA" & !is.nan(s_cwdx80) & !is.infinite(s_cwdx80) & s_cwdx80 < 1e4) %>%
-  mutate(s_cwdx80 = remove_outliers(s_cwdx80)) %>% 
-  analyse_modobs2("whc", "s_cwdx80", type = "hex")
+gg2 <- df %>% 
+  dplyr::filter(setup != "whc_NA") %>% 
+  ggplot(aes(as.factor(whc), s_def)) +
+  geom_violin(draw_quantiles = 0.5, fill = "grey70") +
+  labs(x = expression("Prescribed" ~ "S"[0] ~ "(mm)"), y = expression("Diagnosed" ~ "S"[0] ~ "(mm)")) +
+  geom_hline(yintercept = c(100, 200), linetype = "dotted") +
+  theme_classic()
 
-gg$gg + xlim(0, 2000) + ylim(0, 2000)
+toprow <- cowplot::plot_grid(gg2, gg1, ncol = 2, rel_widths = c(1, 1), labels = c('a', 'b'))
+```
+
+### By biome
+
+```{r}
+df_sites <- read_csv("data/df_sites_rsip.csv")
+
+tmp <- df %>% 
+  left_join(df_sites, by = "sitename")
+
+## boxplot
+gg3 <- tmp %>% 
+  dplyr::filter(!(biome_name %in% c(NA))) %>%
+  dplyr::filter(setup != "whc_NA") %>% 
+  ggplot(aes(x = biome_name, y = s_def, fill = as.factor(setup))) +
+  geom_boxplot(outlier.shape = NA, position=position_dodge(0)) +
+  scale_fill_manual(values = c("#E69F00", "#56B4E9"), labels = c("100", "200"), name = "Prescribed" ~ "S"[0] ~ "(mm)") +
+  labs(x = expression("Biome"), y = expression("Diagnosed" ~ "S"[0] ~ "(mm)")) +
+  geom_hline(yintercept = c(100, 200), linetype = "dotted") +
+  theme_classic() +
+  coord_flip()
+
+cowplot::plot_grid(toprow, gg3, nrow = 2, rel_heights = c(1, 1.5), labels = c('', 'c'))
+ggsave("fig/plot_rsofun_rsip.pdf", width = 10, height = 8)
+ggsave("fig/plot_rsofun_rsip.png", width = 10, height = 8)
+```
+
+
+### ridge plot
+```{r}
+library(ggridges)
+
+gg4 <- df %>% 
+  dplyr::filter(!(biome_name %in% biome_exclude)) %>%
+  filter(setup == "whc_NA") %>% 
+  rename(obs = whc, mod = s_def) %>% 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "s0") %>% 
+  dplyr::filter(!is.na(biome_name)) %>% 
+  dplyr::filter(biome_name!="Mangroves") %>%   
+  ggplot(aes(x = s0, y = biome_name, color = source, point_color = source, fill = source)) +
+  geom_density_ridges(
+    jittered_points = TRUE, scale = .95, rel_min_height = .01,
+    point_shape = "|", point_size = 1.5, size = 0.25,
+    position = position_points_jitter(height = 0)
+  ) +
+  scale_y_discrete(expand = c(0, 0), name = "") +
+  scale_x_continuous(expand = c(0, 0), name = expression("S"[0] ~ "(mm)"), limits = c(-100, 300)) +
+  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c("Diagnosed", "Prescribed"), name = "") +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  coord_cartesian(clip = "off") +
+  guides(fill = guide_legend(
+    override.aes = list(
+      fill = c("#D55E00A0", "#0072B2A0"),
+      color = NA, point_color = NA)
+    )
+  ) +
+  theme_ridges(center = TRUE)
 ```
 
 
