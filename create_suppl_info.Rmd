@@ -1,0 +1,106 @@
+---
+title: "Create Supplementary Information"
+author: "Beni Stocker"
+date: "2/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rbeni)
+```
+
+## Testing $S_0$ diagnosing
+
+As testing sites, use sites from the rooting depth dataset (RSIP).
+
+```{r cars}
+df_sites <- read_csv("data/df_sites_rsip.csv")
+```
+
+Extract information of S0 diagnostic for given locations.
+
+Sample 30 sites out of the 1705.
+```{r}
+set.seed(1982)
+use_biomes <- df_sites %>% 
+  group_by(biome) %>% 
+  summarise(n = n()) %>% 
+  dplyr::filter(n >=5 & !is.na(biome)) %>% 
+  pull(biome)
+
+df_sites_sampled <- df_sites %>% 
+  dplyr::filter(biome %in% use_biomes) %>% 
+  group_by(biome) %>% 
+  group_split() %>% 
+  purrr::map(~sample_n(., 3)) %>% 
+  bind_rows()
+```
+
+Plot sites on map
+```{r}
+library(jcolors)
+nbiomes <- df_sites_sampled %>% 
+  drop_na(biome_name) %>%
+  pull(biome_name) %>% 
+  unique() %>% 
+  length()
+
+plot_map_simpl() +
+  geom_point(data = df_sites_sampled,
+             aes(x = lon, y = lat, color = biome_name)) +
+  # scale_color_jcolors(palette = "pal8")
+  # scale_color_brewer(palette = "Paired")
+  scale_colour_manual(values = myjcolors(nbiomes), name = "Biome name")
+```
+
+Determine all chunks (latitudinal bands)
+```{r}
+get_ilon <- function(lon){
+  lon_hires <- seq(-179.975, 179.975, by = 0.05)
+  ilon <- which.min(abs(lon - lon_hires))
+  return(ilon)  
+}
+
+df_sites_sampled <- df_sites_sampled %>% 
+  mutate(ilon = purrr::map_dbl(lon, ~get_ilon(.)))
+```
+
+Get all data for chunks.
+```{r}
+source("R/calc_cwd_et0_byilon.R")
+system("mkdir -p ~/mct/data/df_cwd_et0_3")
+filn <- "data/df_test_cwd_et0.rds"
+
+if (!file.exists(filn)){
+  df <- df_sites_sampled %>% 
+    slice(1) %>% 
+    mutate(out = purrr::map2(ilon, 
+                             lat, 
+                             ~calc_cwd_et0_byilon(.x, 
+                                                  drop_data = FALSE, 
+                                                  dirn = "~/mct/data/df_cwd_et0_3/", 
+                                                  verbose = FALSE, 
+                                                  overwrite = TRUE, 
+                                                  siteinfo = NULL, 
+                                                  do_plot = TRUE, 
+                                                  use_lat = .y
+                                                  )))
+  
+  saveRDS(df, file = filn)
+} else {
+  df <- readRDS(filn)
+}
+```
+
+Visualise
+```{r}
+## s_def diagnostic
+df$out[[1]]$gg_fet
+
+## water balance time series
+df$out[[1]]$data[[1]] %>% 
+  ggplot(aes(time, bal)) + 
+  geom_line()
+```

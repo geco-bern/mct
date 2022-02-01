@@ -578,6 +578,11 @@ df_sites <- df_sites %>%
       dplyr::select(sitename, biome = BIOME, biome_name = BIOME_NAME),
     by = "sitename"
   )
+
+df_sites %>%
+  separate(sitename, into = c(NA, "lon", "lat"), sep = "_") %>% 
+  mutate(lon = as.numeric(lon), lat = as.numeric(lat)) %>% 
+  write_csv(file = "data/df_sites_rsip.csv")
 ```
 
 Plot sites on map
@@ -889,6 +894,109 @@ gg_rsip_sites_wtd_90 <- out$gg + labs(title = "90% quantile, WTD limited",
 gg_rsip_sites_wtd_90
 save(gg_rsip_sites_wtd_90, file = "data/gg_rsip_sites_wtd_90.RData")
 ```
+
+## Trait gradient analysis
+
+Add site mean to full data
+```{r}
+df2 <- df_sites %>% 
+  dplyr::select(sitename, Dr_sitemean = Dr, zroot_cwdx80_sitemean = zroot_cwdx80) %>% 
+  right_join(
+    df %>% 
+      mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))), 
+    by = "sitename"
+    )
+```
+
+Use data only for species that appear in at least N sites.
+```{r}
+use_species <- df2 %>%
+  filter(Species != "NA") %>% 
+  mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) %>% 
+  dplyr::select(sitename, Species) %>% 
+  distinct() %>% 
+  group_by(Species) %>% 
+  summarise(n = n()) %>% 
+  dplyr::filter(n >= 5) %>% 
+  pull(Species)
+```
+
+Use data only for sites where at least M species are present.
+```{r}
+use_sites <- df2 %>% 
+  dplyr::select(sitename, Species) %>% 
+  distinct() %>% 
+  group_by(sitename) %>% 
+  summarise(n = n()) %>% 
+  dplyr::filter(n >= 5) %>% 
+  pull(sitename)
+```
+
+subset data to keep only those filtered above and for which at least five points per species remain. 51 species at the end, 402 data points.
+```{r}
+use_species2 <- df2 %>% 
+  dplyr::filter(Species %in% use_species & sitename %in% use_sites) %>% 
+  group_by(Species) %>% 
+  summarise(n = n()) %>% 
+  dplyr::filter(n >= 5) %>% 
+  pull(Species)
+
+df3 <- df2 %>% 
+  dplyr::filter(Species %in% use_species & sitename %in% use_sites & Species %in% use_species2)
+```
+
+
+Plot.
+```{r eval=FALSE}
+df3 %>% 
+  ggplot(aes(x = Dr_sitemean, y = Dr)) +  # , color = Species
+  geom_point()
+```
+
+Plot just the lines
+```{r}
+df3 %>% 
+  group_by(Species) %>% 
+  ggplot(aes(x = Dr_sitemean, y = Dr, group = Species, color = Family)) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.5, alpha = 0.2) +
+  geom_abline(intercept=0, slope=1, linetype="dotted") +
+  theme_classic()
+  # geom_point(alpha = 0.3)
+
+ggsave("fig/tga_rsip.png", width = 8, height = 4)
+```
+
+
+Fit linear regressions by species.
+```{r}
+df_tga <- df3 %>% 
+  dplyr::filter(Species %in% use_species & sitename %in% use_sites) %>% 
+  group_by(Species) %>% 
+  nest() %>% 
+  mutate(linmod_n = purrr::map(data, ~lm(Dr ~ Dr_sitemean, data = .))) %>% 
+  mutate(slope_n = purrr::map_dbl(linmod_n, ~coef(.)[2])) %>% 
+  left_join(df3 %>% 
+              dplyr::select(Species, Family) %>% 
+              distinct(), 
+            by = "Species")
+
+df_tga %>% 
+  ggplot() +
+  geom_histogram(aes(slope_n, ..density..), fill = "royalblue", binwidth = 0.4, alpha = 0.5) +
+  geom_density(aes(slope_n, ..density..), color = "royalblue") +
+  xlim(-2,3)
+
+df_tga %>% 
+  group_by(Family) %>% 
+  summarise(slope_n = mean(slope_n)) %>% 
+  mutate(Family = forcats::fct_reorder(Family, slope_n)) %>% 
+  drop_na() %>% 
+  ggplot(aes(Family, slope_n)) +
+  geom_bar(stat = "identity") +
+  coord_flip()
+```
+
+
 
 ## Publication figures
 

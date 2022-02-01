@@ -142,6 +142,7 @@ df <- purrr::map_dfr(
   )
 
 saveRDS(df, file = "data/df_test_cwdx_rsofun.rds")
+df <- readRDS("data/df_test_cwdx_rsofun.rds")
 
 df %>% 
   dplyr::filter(setup == "whc_NA") %>% 
