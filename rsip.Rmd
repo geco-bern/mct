@@ -897,18 +897,97 @@ save(gg_rsip_sites_wtd_90, file = "data/gg_rsip_sites_wtd_90.RData")
 
 ## Trait gradient analysis
 
+First, keep only trees, shrubs, and semi-shrubs, and remove the significant effect of shoot height. Note that 3230 data points have missing Hs. The filtering here reduces the dataset to 2287 entries.
+```{r}
+df2 <- df %>% 
+  mutate(Hs = as.numeric(Hs)) %>% 
+  filter(Hs > 0 & Dr > 0) %>% 
+  filter(Growth_form %in% c("Tree", "Semi-shrub", "Shrub"))
+
+df2 %>% 
+  ggplot(aes(Hs, Dr)) +
+  geom_point(alpha = 0.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  geom_smooth(method = "lm")
+```
+
+```{r}
+linmod <- lm(log(Dr) ~ log(Hs), 
+             data = df2, 
+             na.action = "na.omit")
+```
+
+```{r}
+plot(linmod)
+hist(linmod$residuals)
+```
+Consider residuals for the TGA.
+```{r}
+df2 <- df2 %>% 
+  mutate(Dr_res = linmod$residuals)
+```
+
+
+<!-- Consider Hs-normalised values -->
+<!-- ```{r} -->
+<!-- df %>%  -->
+<!--   mutate(Dr_norm = Dr / Hs^linmod$coefficients["log(Hs)"]) %>%  -->
+<!--   ggplot(aes(Hs, Dr_norm)) + -->
+<!--   geom_point(alpha = 0.5) + -->
+<!--   geom_smooth(method = "lm") -->
+
+<!-- df %>%  -->
+<!--   ggplot(aes(Hs, Dr)) + -->
+<!--   geom_point(alpha = 0.5) + -->
+<!--   geom_smooth(method = "lm") -->
+<!-- ``` -->
+
+Aggregate to sites.
+```{r}
+df_sites2 <- df2 %>% 
+  mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) %>% 
+  group_by(sitename) %>% 
+  summarise(Dr = mean(Dr, na.rm = TRUE),
+            Dr_res = mean(Dr_res, na.rm = TRUE))
+
+## add WWF biome info
+df_wwf_sites2 <- ingest(
+  df2 %>% 
+    distinct(lon, lat) %>% 
+    mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))),
+  source = "wwf",
+  dir = "~/data/biomes/wwf_ecoregions/official/",
+  settings = list(layer = "wwf_terr_ecos")
+  )%>% 
+  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  unnest(data)
+
+df_sites2 <- df_sites2 %>% 
+  left_join(
+    df_wwf_sites2 %>% 
+      dplyr::select(sitename, biome = BIOME, biome_name = BIOME_NAME),
+    by = "sitename"
+  )
+
+df_sites2 %>%
+  separate(sitename, into = c(NA, "lon", "lat"), sep = "_") %>% 
+  mutate(lon = as.numeric(lon), lat = as.numeric(lat)) %>% 
+  write_csv(file = "data/df_sites_rsip_tga.csv")
+```
+
 Add site mean to full data
 ```{r}
-df2 <- df_sites %>% 
-  dplyr::select(sitename, Dr_sitemean = Dr, zroot_cwdx80_sitemean = zroot_cwdx80) %>% 
+df2 <- df_sites2 %>% 
+  dplyr::select(sitename, Dr_sitemean = Dr, Dr_res_sitemean = Dr_res) %>% 
   right_join(
-    df %>% 
+    df2 %>% 
       mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))), 
     by = "sitename"
     )
 ```
 
-Use data only for species that appear in at least N sites.
+Use data only for species that appear in at least 3 sites => 72 species.
 ```{r}
 use_species <- df2 %>%
   filter(Species != "NA") %>% 
@@ -917,32 +996,28 @@ use_species <- df2 %>%
   distinct() %>% 
   group_by(Species) %>% 
   summarise(n = n()) %>% 
-  dplyr::filter(n >= 5) %>% 
+  dplyr::filter(n >= 3) %>% 
   pull(Species)
 ```
 
-Use data only for sites where at least M species are present.
+Use data only for sites where at least 3 species are present => 148 sites.
 ```{r}
 use_sites <- df2 %>% 
   dplyr::select(sitename, Species) %>% 
   distinct() %>% 
   group_by(sitename) %>% 
   summarise(n = n()) %>% 
-  dplyr::filter(n >= 5) %>% 
+  dplyr::filter(n >= 3) %>% 
   pull(sitename)
 ```
 
-subset data to keep only those filtered above and for which at least five points per species remain. 51 species at the end, 402 data points.
+Apply these two criteria. This leaves 286 data points.
 ```{r}
-use_species2 <- df2 %>% 
-  dplyr::filter(Species %in% use_species & sitename %in% use_sites) %>% 
-  group_by(Species) %>% 
-  summarise(n = n()) %>% 
-  dplyr::filter(n >= 5) %>% 
-  pull(Species)
-
 df3 <- df2 %>% 
-  dplyr::filter(Species %in% use_species & sitename %in% use_sites & Species %in% use_species2)
+  dplyr::filter(Species %in% use_species & sitename %in% use_sites)
+  # dplyr::filter(Species %in% use_species2)
+
+saveRDS(df3, file = "data/df_tga.rds")
 ```
 
 
@@ -950,7 +1025,13 @@ Plot.
 ```{r eval=FALSE}
 df3 %>% 
   ggplot(aes(x = Dr_sitemean, y = Dr)) +  # , color = Species
-  geom_point()
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dotted")
+
+df3 %>% 
+  ggplot(aes(x = Dr_res_sitemean, y = Dr_res)) +  # , color = Species
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dotted")
 ```
 
 Plot just the lines
@@ -963,18 +1044,31 @@ df3 %>%
   theme_classic()
   # geom_point(alpha = 0.3)
 
+df3 %>% 
+  group_by(Species) %>% 
+  ggplot(aes(x = Dr_res_sitemean, y = Dr_res, group = Species, color = Species)) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.5, alpha = 0.2) +
+  geom_abline(intercept=0, slope=1, linetype="dotted") +
+  theme_classic() +
+  geom_point(alpha = 0.3)
+
 ggsave("fig/tga_rsip.png", width = 8, height = 4)
 ```
 
 
-Fit linear regressions by species.
+Fit linear regressions by species for Dr (not residual).
 ```{r}
+get_width <- function(df){
+  df %>% pull(Dr) %>% range() %>% diff()
+}
+
 df_tga <- df3 %>% 
   dplyr::filter(Species %in% use_species & sitename %in% use_sites) %>% 
   group_by(Species) %>% 
   nest() %>% 
-  mutate(linmod_n = purrr::map(data, ~lm(Dr ~ Dr_sitemean, data = .))) %>% 
-  mutate(slope_n = purrr::map_dbl(linmod_n, ~coef(.)[2])) %>% 
+  mutate(linmod = purrr::map(data, ~lm(Dr ~ Dr_sitemean, data = .)),
+         width = purrr::map_dbl(data, ~get_width(.))) %>% 
+  mutate(slope = purrr::map_dbl(linmod, ~coef(.)[2])) %>% 
   left_join(df3 %>% 
               dplyr::select(Species, Family) %>% 
               distinct(), 
@@ -982,17 +1076,90 @@ df_tga <- df3 %>%
 
 df_tga %>% 
   ggplot() +
-  geom_histogram(aes(slope_n, ..density..), fill = "royalblue", binwidth = 0.4, alpha = 0.5) +
-  geom_density(aes(slope_n, ..density..), color = "royalblue") +
+  geom_histogram(aes(slope, ..density..), fill = "royalblue", binwidth = 0.4, alpha = 0.5) +
+  geom_density(aes(slope, ..density..), color = "royalblue") +
   xlim(-2,3)
 
 df_tga %>% 
+  ggplot(aes(width, slope)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 1, linetype = "dotted")
+
+linmod2 <- lm(slope ~ width, data = df_tga)
+summary(linmod2)
+
+df_tga %>% 
   group_by(Family) %>% 
-  summarise(slope_n = mean(slope_n)) %>% 
-  mutate(Family = forcats::fct_reorder(Family, slope_n)) %>% 
+  summarise(slope = mean(slope)) %>% 
+  mutate(Family = forcats::fct_reorder(Family, slope)) %>% 
   drop_na() %>% 
-  ggplot(aes(Family, slope_n)) +
+  ggplot(aes(Family, slope)) +
   geom_bar(stat = "identity") +
+  coord_flip()
+```
+
+Fit linear regressions by species for `Dr_res` (residual of Dr from model log(Dr) ~ log(Hs)).
+```{r}
+get_width_res <- function(df){
+  df %>% pull(Dr_res) %>% range() %>% diff()
+}
+
+df_tga_res <- df3 %>% 
+  dplyr::filter(Species %in% use_species & sitename %in% use_sites) %>% 
+  group_by(Species) %>% 
+  nest() %>% 
+  mutate(linmod = purrr::map(data, ~lm(Dr_res ~ Dr_res_sitemean, data = .)),
+         width = purrr::map_dbl(data, ~get_width_res(.))) %>% 
+  mutate(slope = purrr::map_dbl(linmod, ~coef(.)[2])) %>% 
+  left_join(df3 %>% 
+              dplyr::select(Species, Family) %>% 
+              distinct(), 
+            by = "Species") %>% 
+  
+  ## remove outlier slope
+  filter(slope < 30)
+
+df_tga_res %>% 
+  ggplot() +
+  geom_histogram(aes(slope, ..density..), fill = "royalblue", binwidth = 0.4, alpha = 0.5) +
+  geom_density(aes(slope, ..density..), color = "royalblue") +
+  xlim(-2,3)
+
+
+df_tga_res %>% 
+  ggplot(aes(width, slope)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 1, linetype = "dotted")
+
+df_tga_res %>% 
+  ggplot(aes(width, abs(slope))) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 1, linetype = "dotted")
+
+linmod2 <- lm(slope ~ width, data = df_tga_res)
+summary(linmod2)
+
+## species-level
+df_tga_res %>% 
+  drop_na() %>% 
+  ggplot(aes(forcats::fct_reorder(Species, slope), slope)) +
+  geom_bar(stat = "identity") +
+  geom_hline(yintercept = 1.0, linetype = "dotted") +
+  coord_flip()
+
+## family level
+df_tga_res %>% 
+  group_by(Family) %>% 
+  summarise(slope = mean(slope), n = n()) %>% 
+  mutate(family_n = paste0(Family, " (", as.character(n), ")")) %>% 
+  mutate(family_n = forcats::fct_reorder(family_n, slope)) %>% 
+  drop_na() %>% 
+  ggplot(aes(family_n, slope)) +
+  geom_bar(stat = "identity") +
+  geom_hline(yintercept = 1.0, linetype = "dotted") +
   coord_flip()
 ```
 
