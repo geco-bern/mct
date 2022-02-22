@@ -104,3 +104,91 @@ df$out[[1]]$data[[1]] %>%
   ggplot(aes(time, bal)) + 
   geom_line()
 ```
+
+## Magnitudes of EF
+
+Read FLUXNET2015 data
+```{r}
+library(ingestr)
+ddf_fluxnet <- ingest(
+  siteinfo  = siteinfo_fluxnet2015,
+  source    = "fluxnet",
+  getvars   = list(netrad = "NETRAD", et = "LE_F_MDS"),
+  dir       = "~/data/FLUXNET-2015_Tier1/20191024/DD/",  # adjust this with your local path
+  settings  = list(
+    getswc       = FALSE,
+    filter_ntdt  = FALSE,
+    remove_neg   = FALSE,
+    threshold_LE = 0.8
+    ),
+  timescale = "d",
+  verbose = TRUE
+  )
+
+## take 95% quantile of EF by site
+tmp <- ddf_fluxnet %>% 
+  mutate(data = purrr::map(data, ~mutate(., ef = remove_outliers(et/netrad)))) %>% 
+  unnest(data) %>% 
+  group_by(sitename) %>% 
+  summarise(ef_q95 = quantile(ef, probs = 0.90, na.rm = TRUE))
+
+tmp %>% 
+  ggplot(aes(ef_q95, ..count..)) +
+  geom_histogram() + 
+  theme_classic() +
+  labs(x = "Maximum evaporative fraction (unitless)", y = "Count") +
+  xlim(0, 2) +
+  geom_vline(xintercept = 1.0, linetype = "dotted")
+ggsave("fig/max_ef_fluxnet2015.pdf", width = 6, height = 4)
+ggsave("fig/max_ef_fluxnet2015.png", width = 6, height = 4)
+```
+
+
+## CWD demo
+
+```{r}
+source("R/test_cwd_tseries.R")
+# load("~/mct/data/df_cwdx/df_cwdx_ilon_5000.RData")
+
+idxc <- 1
+idxa <- 500
+idxb <- 300 # 100
+
+gg1 <- test_cwd_tseries(
+  df$out_mct[[idxa]]$mct, 
+  sitename = NA, 
+  filter_years = NA, 
+  title = paste0(as.character(df$lon[idxa]), "°E, ", as.character(df$lat[idxa]), "°N")
+  )
+
+gg2 <- test_cwd_tseries(
+  df$out_mct[[idxb]]$mct, 
+  sitename = NA, 
+  filter_years = NA, 
+  title = paste0(as.character(df$lon[idxb]), "°E, ", as.character(df$lat[idxb]), "°N")
+  )
+
+gg3 <- test_cwd_tseries(
+  df$out_mct[[idxc]]$mct, 
+  sitename = NA, 
+  filter_years = NA, 
+  title = paste0(as.character(df$lon[idxc]), "°E, ", as.character(df$lat[idxc]), "°N")
+  )
+
+df_sites <- tibble(
+  sitename = c("a", "b", "c"),
+  lon = c(df$lon[idxa], df$lon[idxb], df$lon[idxc]),
+  lat = c(df$lat[idxa], df$lat[idxb], df$lat[idxc])
+)
+
+library(rbeni)
+library(ggrepel)
+
+gg0 <- plot_map_simpl() +
+  geom_text(data = df_sites, aes(lon, lat, label = sitename), color = "red")
+
+cowplot::plot_grid(gg0, gg1, gg2, gg3, labels = c("", "a", "b", "c"), nrow = 2)
+ggsave("fig/cwd_tseries.pdf", width = 12, height = 7)
+ggsave("fig/cwd_tseries.png", width = 12, height = 7)
+```
+
