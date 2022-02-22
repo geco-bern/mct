@@ -15,6 +15,7 @@ library(rsofun)
 library(ingestr)
 library(rbeni)
 library(cowplot)
+library(ggridges)
 ```
 
 ## Get sites
@@ -109,11 +110,11 @@ write_csv(df_sites, file = "data/df_sites_rsip.csv")
 
 ## Get forcing data
 
-Use `submit_forcing_rsip.sh` to run `rscript_forcing_rsip.R`. This saves files in subdirectory `"./data/forcing_rsip/"`.
+Use `submit_forcing_rsip.sh` to run `rscript_forcing_rsip.R`. Thid saves files in subdirectory `"./data/forcing_rsip/"`.
 
 ## Test
 
-Use `submit_rsofun_cwdx.sh` to run `rscript_rsofun_cwdx.R` for different S_0 (WHC) and diagnose it following the S_dEF method. This writes files into the directory `"./data/out_rsofun_cwdx/"`. 
+Use `submit_rsofun_cwdx.sh` to run `rscript_rsofun_cwdx.R` for different S_0 (WHC) and diagnose it following the S_dEF method. This runs `run_rsofun_cwdx_by_chunk.R` and saves files in subdirectory `"./data/out_rsofun_cwdx/"`. 
 
 ### Get data
 
@@ -212,9 +213,8 @@ ggsave("fig/plot_rsofun_rsip.png", width = 10, height = 8)
 
 
 ### ridge plot
-```{r}
-library(ggridges)
 
+```{r}
 gg4 <- df %>% 
   dplyr::filter(!(biome_name %in% biome_exclude)) %>%
   filter(setup == "whc_NA") %>% 

@@ -96,13 +96,128 @@ if (!file.exists(filn)){
 
 Visualise
 ```{r}
-## s_def diagnostic
-df$out[[1]]$gg_fet
+# myplot <- function(n, df){
+#   print(n)  
+#   df$out[[n]]$gg_fet
+# }
+# purrr::map(as.list(seq(36)), ~myplot(., df))
 
-## water balance time series
-df$out[[1]]$data[[1]] %>% 
-  ggplot(aes(time, bal)) + 
-  geom_line()
+## example for no decline
+gg1 <- df$out[[2]]$gg_fet[[1]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()
+
+## example for S0 diagnosed (9, 34, 21)
+gg2 <- df$out[[34]]$gg_fet[[1]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()
+
+gg3 <- df$out[[21]]$gg_fet[[1]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()
+
+## example for flattening
+gg4 <- df$out[[31]]$gg_fet[[1]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()
+
+cowplot::plot_grid(gg1, gg4, gg2, gg3, nrow = 2, labels = c('a', 'b', 'c', 'd'))
+ggsave("fig/plot_test_s0_diag.pdf", width = 12, height = 8)
+ggsave("fig/plot_test_s0_diag.png", width = 12, height = 8)
+```
+
+Visualise
+```{r}
+tmp <- df %>% 
+  select(-lon, -lat) %>% 
+  unnest(out)
+  mutate(gg = purrr::map(out, ~pull(slice(., 1), gg_fet)),
+         cwd_lue0_fet = purrr::map_dbl(out, ~pull(., cwd_lue0_fet)))
+  
+## example for no decline
+gg1 <- tmp$gg_fet[[2]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()
+
+## example for S0 diagnosed (9, 34, 21)
+gg2 <- tmp$gg_fet[[32]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()
+
+gg3 <- tmp$gg_fet[[21]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()  
+  
+## example for flattening
+gg4 <- tmp$gg_fet[[29]] +
+  labs(title = NULL, y = "EF (unitless)") +
+  theme_classic()  
+
+cowplot::plot_grid(gg1, gg4, gg2, gg3, nrow = 2, labels = c('a', 'b', 'c', 'd'))
+
+## retain selected
+tmp2 <- tmp %>% 
+  slice(c(2, 32, 21, 29))
+
+# ## s_def diagnostic
+# df$out[[1]]$gg_fet
+# 
+# ## water balance time series
+# df$out[[1]]$data[[1]] %>% 
+#   ggplot(aes(time, bal)) + 
+#   geom_line()
+# 
+# df$out[[1]]$data[[1]] %>% 
+#   ggplot(aes(deficit, fet)) + 
+#   geom_point()
+# 
+# df$out[[1]]$data[[1]] %>% 
+#   ggplot(aes(NR, et)) + 
+#   geom_point() +
+#   geom_smooth(method = "lm")
+```
+
+Plot the same from the model outputs.
+```{r}
+# ## determine chunk used for the four sites in tmp2
+# df_sites_ichunk <- read_csv("data/df_sites_rsip.csv") %>%
+#   mutate(idx = 1:n()) %>%
+#   mutate(chunk = rep(1:as.integer(50),
+#                      each = (nrow(.)/as.integer(50)), len = nrow(.)))
+# 
+# tmp2 <- tmp2 %>% 
+#   left_join(
+#     df_sites_ichunk %>% 
+#       select(lon, lat, Dr, chunk)
+#   )
+
+read_myfile <- function(ichunk, use_whc){
+  path <- "./data/out_rsofun_cwdx/"
+  filename <- file.path(path, paste0("out_rsofun_cwdx_whc_", as.character(use_whc), "_ichunk_", as.character(ichunk), ".rds"))
+  if (file.exists(filename)){
+    df <- readRDS(filename)
+    return(df)
+  } else {
+    return(tibble())
+  }
+}
+
+set.seed(1982)
+df_rsofun <- purrr::map_dfr(
+      as.list(sample(seq(50), 3)),
+      ~read_myfile(., "200")
+      ) %>% 
+      mutate(setup = "whc_200")
+
+# ## example of S0 detected
+# df_rsofun$out_cwd_lue0[[20]]$gg +
+#   geom_vline(xintercept = df_rsofun$whc[20])
+
+```
+
+```{r}
+purrr::map(seq(1:30), ~{print(df_rsofun$out_cwd_lue0[[.]]$gg)})
+
 ```
 
 ## Magnitudes of EF
