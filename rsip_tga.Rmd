@@ -29,8 +29,8 @@ Use `gsheet::gsheet2tbl`
 
 Read the data.
 ```{r}
-df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
-# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>% 
+# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
+df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>%
   rename(lon = Long, lat = Lat) %>% 
   rowid_to_column(var = "id") %>% 
   
@@ -224,6 +224,8 @@ saveRDS(df6, file = "data/df_tga.rds")
 
 Plot.
 ```{r eval=FALSE}
+df6 <- readRDS("data/df_tga.rds")
+
 df6 %>% 
   ggplot(aes(x = Dr_res_sitemean, y = Dr_res)) +  # , color = Species
   geom_point() +
@@ -239,8 +241,8 @@ gg1 <- df6 %>%
   geom_abline(intercept=0, slope=1, linetype="dotted") +
   theme_classic() +
   geom_point(alpha = 0.3) +
-  labs(x = expression("Site mean" ~ italic("z")[r] ~ "(m)"),
-       y = expression(italic("z")[r] ~ "(m)")) +
+  labs(x = expression("Site mean ln" ~ italic("z")[r] ~ "(unitless)"),
+       y = expression("ln" ~ italic("z")[r] ~ "(unitless)")) +
   theme(legend.title = element_blank())
 
 gg1
@@ -363,8 +365,8 @@ df_tga_res %>%
 ## Publication figures
 
 ```{r}
-bottom_row <- plot_grid(gg2, gg3, ncol = 4, labels = c('b', 'c'), rel_widths = c(0.3, 0.7))
-plot_grid(gg1, bottom_row, ncol = 1, labels = c('a', ''))
+# bottom_row <- plot_grid(gg2, gg3, ncol = 4, labels = c('b', 'c'), rel_widths = c(0.3, 0.7))
+# plot_grid(gg1, bottom_row, ncol = 1, labels = c('a', ''))
 
 top_row <- plot_grid(gg1, gg2, ncol = 2, labels = c('a', 'b'), rel_widths = c(0.7, 0.3))
 plot_grid(top_row, gg3, nrow = 2, labels = c('', 'c'), rel_heights = c(1, 1.5) )

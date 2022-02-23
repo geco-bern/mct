@@ -9,9 +9,10 @@ Code of this repository is published under a GPL v3 license.
 ## Important files
 
 - `workflow.Rmd`: Outlines all steps for the global analysis. Implements plotting of published figures. Computation-heavy step are implemented for cluster computing (using files `rscript_*.R` and `submit_*.sh`).
-- `rsip.Rmd`: Implements all steps for comparison of global rooting depth estimates against observations, and additional analyses of observations (trait gradient analysis, etc.)
+- `rsip.Rmd`: Implements all steps for comparison of global rooting depth estimates against observations, and additional analyses of observations.
 - `eval_et.Rmd`: Implements the evaluation of different remote sensing-based ET products against observations from FLUXNET.
 - `rsofun_rsip_mct.Rmd`: Additional rsofun (SPLASH) simulations at RSIP site locations and visualisations, to test method for diagnosing S0.
+- `rsip_tga.Rmd`: Trait gradient analysis on rooting depth data
 - `create_suppl_info.Rmd`: Additional visualisations of method for diagnosing S0. 
 
 ## Key analysis steps:
