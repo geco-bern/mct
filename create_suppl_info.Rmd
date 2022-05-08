@@ -307,3 +307,142 @@ ggsave("fig/cwd_tseries.pdf", width = 12, height = 7)
 ggsave("fig/cwd_tseries.png", width = 12, height = 7)
 ```
 
+## S0 versus CTI 
+
+How does S0 vary along topographic gradients? Select limited region (not too different climate) and plot S0 distribution (boxplot) along CTI bins.
+```{r}
+# load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
+# 
+# df_cwdx <- df %>% 
+#   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
+
+## combine S_cwdxXX and GTI into one big data frame
+df_cwdx <- df %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+  left_join(
+    nc_to_df("~/data/gti_marthews/ga2_0_05deg_median.nc", varnam = "gti") %>%
+      drop_na() %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      rename(gti_q50 = gti),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    nc_to_df("~/data/gti_marthews/ga2_0_05deg_q10.nc", varnam = "gti") %>%
+      drop_na() %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      rename(gti_q10 = gti),
+    by = c("lon", "lat")
+  ) %>% 
+  left_join(
+    nc_to_df("~/data/gti_marthews/ga2_0_05deg_q90.nc", varnam = "gti") %>%
+      drop_na() %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      rename(gti_q90 = gti),
+    by = c("lon", "lat")
+  ) %>% 
+  mutate(gti_q10 = ifelse(gti_q10 < 0, NA, gti_q10),
+         gti_q50 = ifelse(gti_q50 < 0, NA, gti_q50),
+         gti_q90 = ifelse(gti_q90 < 0, NA, gti_q90))
+```
+
+Example for Central Asia.
+
+### CWDX80
+```{r}
+## central asia
+gg <- df_cwdx %>% 
+  plot_map4(varnam = "cwdx80", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+            spacing = "constant",
+            combine = TRUE, 
+            colorscale = "batlowK", legend_title = "(mm)",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+gg
+```
+
+### GTI
+```{r}
+## central asia
+df_cwdx %>% 
+  plot_map4(varnam = "gti_q10", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = 0:15, 
+            spacing = "constant",
+            combine = TRUE, 
+            colorscale = "batlowK", legend_title = "",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+df_cwdx %>% 
+  plot_map4(varnam = "gti_q50", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = 0:15, 
+            spacing = "constant",
+            combine = TRUE, 
+            colorscale = "batlowK", legend_title = "",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+df_cwdx %>% 
+  plot_map4(varnam = "gti_q90", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = 0:15, 
+            spacing = "constant",
+            combine = TRUE, 
+            colorscale = "batlowK", legend_title = "",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+```
+
+
+```{r}
+gti_breaks <- 0:15
+
+df_cwdx <- df_cwdx %>%
+  ungroup() %>%
+  mutate(igti_q10 = cut(gti_q10,
+                    breaks = gti_breaks),
+         igti_q50 = cut(gti_q50,
+                    breaks = gti_breaks),
+         igti_q90 = cut(gti_q90,
+                    breaks = gti_breaks))
+  # mutate(gti_lower = as.numeric( sub("\\((.+),.*", "\\1", igti)),
+  #        gti_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", igti) )) %>%
+  # mutate(gti_mid = (gti_lower + gti_upper)/2) %>% 
+  # group_by(igti) %>% 
+  # summarise(cwdx80 = mean(cwdx80, na.rm = TRUE))
+```  
+
+Around Iran
+```{r}
+df_cwdx %>% 
+  filter(lon > 50 & lon < 60 & lat > 30 & lat < 35 & !is.na(igti_q10)) %>%
+  ggplot(aes(igti_q10, cwdx80)) +
+  geom_boxplot(outlier.shape = NA) +
+  ylim(0, 700)
+
+df_cwdx %>% 
+  filter(lon > 50 & lon < 60 & lat > 30 & lat < 35 & !is.na(igti_q90)) %>%
+  ggplot(aes(igti_q90, cwdx80)) +
+  geom_boxplot(outlier.shape = NA) +
+  ylim(0, 700)
+```
+
+Around N India
+```{r}
+df_cwdx %>% 
+  filter(lon > 75 & lon < 85 & lat > 25 & lat < 35 & !is.na(igti_q10)) %>%
+  ggplot(aes(igti_q10, cwdx80)) +
+  geom_boxplot(outlier.shape = NA) +
+  ylim(0, 700)
+
+df_cwdx %>% 
+  filter(lon > 75 & lon < 85 & lat > 25 & lat < 35 & !is.na(igti_q90)) %>%
+  ggplot(aes(igti_q90, cwdx80)) +
+  geom_boxplot(outlier.shape = NA) +
+  ylim(0, 700)
+```

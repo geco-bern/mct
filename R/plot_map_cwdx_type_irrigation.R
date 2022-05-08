@@ -166,8 +166,12 @@ plot_map_cwdx_type_irrigation <- function(
 
 	} else if (class(colorscale)=="character"){
 
-	  colorscale <- colorRampPalette( colorscale )( nbin )
-
+	  if (colorscale == "batlowK"){
+	    colorscale <- scico::scico(nbin, palette = colorscale, direction = -1)
+	  } else {
+	    colorscale <- colorRampPalette( colorscale )( nbin )
+	  }
+	  
 	} else if (class(colorscale)=="palette"){
 
 	  ## nothing to do in this case
@@ -195,8 +199,8 @@ plot_map_cwdx_type_irrigation <- function(
 	  geom_tile(data = df, aes(x = lon, y = lat, fill = type, color = type)) +     # , show.legend = FALSE
 
 	  ## color scale for type, colors from here: https://github.com/cj-holmes/vhs/blob/main/data-raw/create-palettes.R
-	  scale_fill_manual(name = "Flattening", values = "#be7682ff", labels = c("TRUE", "FALSE")) +  # magenta: "#be7682ff"; orange: "#eb6133ff", green: "#00902eff"
-	  scale_color_manual(name = "Flattening", values = "#be7682ff", labels = c("TRUE", "FALSE")) +
+	  scale_fill_manual(name = "Flattening", values = "royalblue", labels = c("TRUE", "FALSE")) +  # mauve: "#be7682ff"; orange: "#eb6133ff", green: "#00902eff"
+	  scale_color_manual(name = "Flattening", values = "royalblue", labels = c("TRUE", "FALSE")) +
 	  
   	## geoms below will use another color scale
 	  new_scale_fill() +

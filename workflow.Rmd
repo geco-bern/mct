@@ -124,8 +124,16 @@ df_vegmask <- nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDA
       dplyr::select(-time),
     by = c("lon", "lat")
   ) %>% 
-  mutate(nonveg = (urban_and_builtup + snowandice + barren_sparsely_vegetated)/100) %>% 
-  mutate(vegmask = ifelse(nonveg > 0.5, NA, 1))
+  left_join(
+    nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.05deg__2011.nc", 
+                       varnam = "water") %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      dplyr::select(-time),
+    by = c("lon", "lat")
+  ) %>% 
+  # mutate(nonveg = (urban_and_builtup + snowandice + water + barren_sparsely_vegetated)/100) %>% 
+  mutate(nonveg = (urban_and_builtup + snowandice + water)/100) %>% 
+  mutate(vegmask = ifelse(nonveg > 0.99, NA, 1))
 
 save(df_vegmask, file = "data/df_vegmask.RData")
 ```
@@ -150,8 +158,16 @@ df_vegmask_tenthdeg <- nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landco
       dplyr::select(-time),
     by = c("lon", "lat")
   ) %>% 
-  mutate(nonveg = (urban_and_builtup + snowandice + barren_sparsely_vegetated)/100) %>% 
-  mutate(vegmask = ifelse(nonveg > 0.5, NA, 1))
+  left_join(
+    nc_to_df("~/data/modis_monthly-evi/zmaw_data/modis_landcover__LPDAAC__v5.1__0.1deg__2011.nc", 
+                       varnam = "water") %>% 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+      dplyr::select(-time),
+    by = c("lon", "lat")
+  ) %>% 
+  # mutate(nonveg = (urban_and_builtup + snowandice + water + barren_sparsely_vegetated)/100) %>% 
+  mutate(nonveg = (urban_and_builtup + snowandice + water)/100) %>% 
+  mutate(vegmask = ifelse(nonveg > 0.99, NA, 1))
 
 save(df_vegmask_tenthdeg, file = "data/df_vegmask_tenthdeg.RData")
 ```
@@ -1051,14 +1067,16 @@ Read tenth-degree global files and plot.
 ```{r}
 # load("data/df_vegmask.RData")
 
+load("data/df_vegmask_tenthdeg.RData")  # loads df_vegmask_tenthdeg
+
 ## 80 yr
 nc_tenthdeg <- nc_to_df("data/cwdx80_tenthdeg.nc", varnam = "cwdx80") %>% 
-  mutate(cwdx80 = ifelse(lat > 70, NA, cwdx80))
-  # mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
-  # left_join(df_vegmask_tenthdeg %>% 
-  #             mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
-  #           by = c("lon", "lat")) %>% 
-  # mutate(cwdx80 = ifelse(nonveg > 80, NA, cwdx80))
+  mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>%
+  left_join(df_vegmask_tenthdeg %>%
+              mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)),
+            by = c("lon", "lat")) %>%
+  mutate(cwdx80 = ifelse(nonveg > 99, NA, cwdx80)) %>% 
+  mutate(cwdx80 = ifelse(lat > 74, NA, cwdx80))
 
 gg <- plot_map4(nc_tenthdeg, 
                 varnam = "cwdx80", 
@@ -1067,7 +1085,7 @@ gg <- plot_map4(nc_tenthdeg,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
-                colorscale = viridis::cividis, 
+                colorscale = "batlowK", 
                 legend_title = "(mm)",
                 hillshade = FALSE,
                 rivers = FALSE,
@@ -1108,13 +1126,20 @@ load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwd
 df_cwdx <- df %>% 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 
+## apply vegetation mask
+# load("data/df_vegmask.RData") # loads df_vegmask
+df_cwdx <- df_cwdx %>%
+  left_join(df_vegmask %>% dplyr::select(lon, lat, vegmask),
+            by = c("lon", "lat")) %>%
+  mutate(cwdx80 = cwdx80 * vegmask)
+
 # ## spain
 # gg <- df_cwdx %>% 
 #   dplyr::filter(lon > -10 & lon < 5 & lat > 35 & lat < 45) %>% 
 #   plot_map4(varnam = "cwdx80", lonmin = -10, lonmax = 5, latmin = 35, latmax = 45, 
 #             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
 #             spacing = "constant",
-#             colorscale = viridis::cividis)
+#             colorscale = "batlowK")
 # 
 # ## italy
 # gg <- df_cwdx %>% 
@@ -1128,7 +1153,7 @@ gg <- df_cwdx %>%
             lonmin = -10, lonmax = 25, latmin = 35, latmax = 55, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant", 
-            colorscale = viridis::cividis,
+            colorscale = "batlowK",
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
             hillshade = TRUE, rivers = TRUE, lakes = TRUE,
@@ -1146,7 +1171,7 @@ gg <- df_cwdx %>%
             lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant", 
-            colorscale = viridis::cividis,
+            colorscale = "batlowK",
             combine = FALSE, legend_title = "(mm)",
             expand_size_y = 0.5,
             hillshade = TRUE, rivers = TRUE, lakes = TRUE,
@@ -1164,7 +1189,7 @@ gg <- df_cwdx %>%
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
-            colorscale = viridis::cividis, legend_title = "(mm)",
+            colorscale = "batlowK", legend_title = "(mm)",
             expand_size_y = 0.5,
             hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             scale = "medium"
@@ -1181,7 +1206,7 @@ gg <- df_cwdx %>%
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
-            colorscale = viridis::cividis, legend_title = "(mm)",
+            colorscale = "batlowK", legend_title = "(mm)",
             hillshade = TRUE, rivers = TRUE, lakes = TRUE,
             expand_size_y = 0.6,
             scale = "medium"
@@ -1264,7 +1289,7 @@ gg1 <- plot_map3(df_whc_agg,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
-                colorscale = viridis::cividis, 
+                colorscale = "batlowK", 
                 legend_title = "(mm)",
                 expand_size_y = 0.5)
 
@@ -1278,7 +1303,7 @@ gg2 <- plot_map3(df_whc_agg,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
-                colorscale = viridis::cividis, 
+                colorscale = "batlowK", 
                 legend_title = "(mm)",
                 expand_size_y = 0.5)
 
@@ -1442,13 +1467,15 @@ system("cdo remapbil,gridfile_tenthdeg.txt data/zroot_cwd80.nc data/zroot_cwd80_
 ```
 
 ```{r}
+load("data/df_vegmask_tenthdeg.RData")  # loads df_vegmask_tenthdeg
+
 nc_tenthdeg <- nc_to_df("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_cwd80") %>% 
-  mutate(zroot_cwd80 = ifelse(lat > 70, NA, zroot_cwd80)) %>% 
-  # mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>% 
-  # left_join(df_vegmask_tenthdeg %>% 
-  #             mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)), 
-  #           by = c("lon", "lat")) %>% 
-  # mutate(zroot_cwd80 = ifelse(nonveg > 80, NA, zroot_cwd80)) %>% 
+  mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) %>%
+  left_join(df_vegmask_tenthdeg %>%
+              mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)),
+            by = c("lon", "lat")) %>%
+  mutate(zroot_cwd80 = ifelse(nonveg > 99, NA, zroot_cwd80)) %>%
+  mutate(zroot_cwd80 = ifelse(lat > 74, NA, zroot_cwd80)) %>%
   mutate(zroot_cwd80 = zroot_cwd80 / 1000)
 
 gg <- plot_map4(nc_tenthdeg, 
@@ -1457,7 +1484,7 @@ gg <- plot_map4(nc_tenthdeg,
                 latmin = -60, latmax = 80,
                 spacing = "constant", 
                 combine = FALSE, 
-                colorscale = viridis::magma, 
+                colorscale = "tokyo", 
                 legend_title = "(m)",
                 hillshade = FALSE,
                 rivers = FALSE,
@@ -1831,7 +1858,7 @@ gg <- df_cwd_lue0 %>%
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf),
             spacing = "constant",
             combine = FALSE,
-            colorscale = viridis::cividis,
+            colorscale = "batlowK",
             legend_title = "(mm)",
             hillshade = TRUE,
             rivers = TRUE,
@@ -1849,7 +1876,7 @@ ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
 #             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
 #             spacing = "constant",
 #             combine = FALSE, 
-#             colorscale = viridis::cividis
+#             colorscale = "batlowK"
 #             )
 # gg$ggmap <- gg$ggmap + 
 #   labs(title = expression(paste(italic("S")[0-Teuling]))) +
@@ -1866,7 +1893,7 @@ gg <- plot_map_cwdx_type_irrigation(
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis, 
+  colorscale = "batlowK", 
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
@@ -1887,7 +1914,7 @@ gg <- plot_map_cwdx_type_irrigation(
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis, 
+  colorscale = "batlowK", 
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
@@ -1908,7 +1935,7 @@ gg <- plot_map_cwdx_type_irrigation(
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis, 
+  colorscale = "batlowK", 
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
@@ -1975,6 +2002,12 @@ ggsave("fig/map_cwd_lue0_types_lue0_europe.png", width = 8, height = 6)
 Regrid to 0.1 deg.
 
 ```{r}
+## add vegetation mask (fraction of non-vegetated)
+# load("data/df_vegmask.RData") # loads df_vegmask
+df_cwd_lue0 <- df_cwd_lue0 %>%
+  left_join(df_vegmask %>% dplyr::select(lon, lat, nonveg),
+            by = c("lon", "lat"))
+
 ## bin to half-degree gridcells for determining climate forcing
 dlon <- 0.1
 dlat <- 0.1
@@ -2003,7 +2036,9 @@ df_cwd_lue0 <- df_cwd_lue0 %>%
 
 df_cwd_lue0_agg <- df_cwd_lue0 %>% 
   group_by(lon_mid, lat_mid) %>% 
-  summarise(cwd_lue0_SIF = mean(cwd_lue0_SIF, na.rm = TRUE), cwd_lue0_nSIF = mean(cwd_lue0_nSIF, na.rm = TRUE)) %>% 
+  summarise(cwd_lue0_SIF = mean(cwd_lue0_SIF, na.rm = TRUE), 
+            cwd_lue0_nSIF = mean(cwd_lue0_nSIF, na.rm = TRUE),
+            nonveg = mean(nonveg, na.rm = TRUE)) %>% 
   rename(lon = lon_mid, lat = lat_mid) %>% 
   mutate(cwd_lue0_SIF = ifelse(is.nan(cwd_lue0_SIF), NA, cwd_lue0_SIF),
          cwd_lue0_nSIF = ifelse(is.nan(cwd_lue0_nSIF), NA, cwd_lue0_nSIF))
@@ -2014,7 +2049,12 @@ save(df_cwd_lue0_agg, file = "data/df_cwd_lue0_agg.Rdata")
 
 Read tenth-degree global file and plot.
 ```{r}
-#load("data/df_cwd_lue0_agg.Rdata")
+load("data/df_cwd_lue0_agg.Rdata")
+
+# apply vegetation mask
+df_cwd_lue0_agg <- df_cwd_lue0_agg %>% 
+  mutate(cwd_lue0_nSIF = ifelse(nonveg > 0.99, NA, cwd_lue0_nSIF)) %>% 
+  mutate(cwd_lue0_nSIF = ifelse(lat > 74, NA, cwd_lue0_nSIF))  # values higher north are implausible
 
 ## nSIF
 # nc_tenthdeg <- read_nc_onefile("data/cwd_lue0_nSIF_tenthdeg.nc", varnam = "cwd_lue0_nSIF")
@@ -2025,7 +2065,7 @@ gg <- plot_map4(df_cwd_lue0_agg,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
-                colorscale = viridis::cividis, 
+                colorscale = "batlowK", 
                 legend_title = "(mm)",
                 legend_direction = "horizontal"
                 )
@@ -2148,7 +2188,7 @@ plot(!(lon_all %in% lon_avl), type = "l")
 
 <!--             combine = FALSE, -->
 
-<!--             colorscale = viridis::cividis -->
+<!--             colorscale = "batlowK" -->
 
 <!--             ) -->
 
@@ -2516,25 +2556,44 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
       rename(irr = aai)
 
+save(df_irr, file = "data/df_irr.RData")
 save(df_cwd_et0, file = "data/df_cwd_et0_3_flattening.RData")
 ```
 
 ### Regional
 
 ```{r}
-load("data/df_rivers.RData")
+# load("data/df_cwd_et0_3_flattening.RData")
+# load("data/df_rivers.RData")
 source("R/plot_map_cwdx_type_irrigation.R")
 
+# ## apply vegetation mask
+# load("data/df_vegmask.RData") # loads df_vegmask
+# df_cwd_et0 <- df_cwd_et0 %>% 
+#   left_join(df_vegmask %>% dplyr::select(lon, lat, vegmask),
+#             by = c("lon", "lat")) %>% 
+#   mutate(cwd_lue0_fet = cwd_lue0_fet * vegmask)
+
+# tmp %>%
+#   plot_map4(varnam = "vegmask", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+#             spacing = "constant",
+#             combine = TRUE, 
+#             colorscale = "batlowK", legend_title = "(mm)",
+#             expand_size_y = 0.5,
+#             hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+#             scale = "medium"
+#             )
+  
 ## central asia, multi layer map
 gg <- plot_map_cwdx_type_irrigation(
   df_cwd_et0, df_irr,
   name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
-  # lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-  lonmin = 52, lonmax = 85, latmin = 27, latmax = 45,
+  lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+  # lonmin = 52, lonmax = 85, latmin = 27, latmax = 45,
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis, 
+  colorscale = "batlowK", 
   legend_title = "(mm)", 
   hillshade = TRUE,
   rivers = TRUE,
@@ -2553,40 +2612,40 @@ ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
 gg_fig1c <- gg
 save(gg_fig1c, file = "data/gg_fig1c.Rdata")
 
-## central asia EF only S_dEF
-gg <- plot_map4(df_cwd_et0,
-            varnam = "cwd_lue0_fet", 
-            lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-            # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
-            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-            spacing = "constant",
-            combine = FALSE, 
-            colorscale = viridis::cividis, 
-            legend_title = "(mm)", 
-            hillshade = TRUE,
-            rivers = TRUE,
-            scale = "medium"
-            )
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("S")[dEF])))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
-
-
-## central asia S0-Teuling
-gg <- df_cwd_et0 %>% 
-  plot_map3(varnam = "s0_teuling_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-            spacing = "constant",
-            combine = FALSE, 
-            colorscale = viridis::cividis
-            )
-gg$ggmap <- gg$ggmap + 
-  labs(title = expression(paste(italic("S")[0-Teuling]))) +
-  geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_s0_teuling_fet_casia2.pdf", width = 10, height = 6)
-ggsave("fig/map_s0_teuling_fet_casia2.png", width = 10, height = 6)
+# ## central asia EF only S_dEF
+# gg <- plot_map4(df_cwd_et0,
+#             varnam = "cwd_lue0_fet", 
+#             lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
+#             # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
+#             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+#             spacing = "constant",
+#             combine = FALSE, 
+#             colorscale = "batlowK", 
+#             legend_title = "(mm)", 
+#             hillshade = TRUE,
+#             rivers = TRUE,
+#             scale = "medium"
+#             )
+# gg$ggmap <- gg$ggmap + 
+#   labs(title = expression(paste(italic("S")[dEF])))
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
+# 
+# 
+# ## central asia S0-Teuling
+# gg <- df_cwd_et0 %>% 
+#   plot_map3(varnam = "s0_teuling_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+#             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+#             spacing = "constant",
+#             combine = FALSE, 
+#             colorscale = "batlowK"
+#             )
+# gg$ggmap <- gg$ggmap + 
+#   labs(title = expression(paste(italic("S")[0-Teuling]))) +
+#   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# ggsave("fig/map_s0_teuling_fet_casia2.pdf", width = 10, height = 6)
+# ggsave("fig/map_s0_teuling_fet_casia2.png", width = 10, height = 6)
 
 
 ## Western USA, multi layer map
@@ -2597,7 +2656,7 @@ gg <- plot_map_cwdx_type_irrigation(
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis, 
+  colorscale = "batlowK", 
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
@@ -2618,7 +2677,7 @@ gg <- plot_map_cwdx_type_irrigation(
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis, 
+  colorscale = "batlowK", 
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
@@ -2639,7 +2698,7 @@ gg <- plot_map_cwdx_type_irrigation(
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis, 
+  colorscale = "batlowK", 
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
@@ -2737,12 +2796,13 @@ df_tmp <- df_cwd_et0 %>%
   left_join(df_irr %>% 
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)), 
     by = c("lon", "lat")) %>% 
-  left_join(df_lc, by = c("lon", "lat"))
-  # left_join(
-  #   nc_to_df("~/data/gti_marthews/ga2_0_05deg.nc", varnam = "gti") %>% 
-  #     drop_na() %>% 
-  #     rename(gti = myvar) %>% 
-  #     mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)))
+  left_join(df_lc, by = c("lon", "lat")) %>% 
+  left_join(
+    nc_to_df("~/data/gti_marthews/ga2_0_05deg_median.nc", varnam = "gti") %>%
+      drop_na() %>%
+      rename(gti = myvar) %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)),
+    by = c("lon", "lat"))
 
 plot_map3(df_tmp, varnam = "landcover")
 
@@ -2799,6 +2859,12 @@ load("data/df_cwd_et0_3.RData")
 df_cwd_et0 <- df
 rm("df")
 
+## add vegetation mask (fraction of non-vegetated)
+# load("data/df_vegmask.RData") # loads df_vegmask
+df_cwd_et0 <- df_cwd_et0 %>%
+  left_join(df_vegmask %>% dplyr::select(lon, lat, nonveg),
+            by = c("lon", "lat"))
+
 ## bin to half-degree gridcells for determining climate forcing
 dlon <- 0.1
 dlat <- 0.1
@@ -2827,7 +2893,8 @@ df_cwd_et0 <- df_cwd_et0 %>%
 
 df_cwd_et0_agg <- df_cwd_et0 %>% 
   group_by(lon_mid, lat_mid) %>% 
-  summarise(cwd_lue0_fet = mean(cwd_lue0_fet, na.rm = TRUE)) %>% 
+  summarise(cwd_lue0_fet = mean(cwd_lue0_fet, na.rm = TRUE),
+            nonveg = mean(nonveg, na.rm = TRUE)) %>% 
   rename(lon = lon_mid, lat = lat_mid) %>% 
   mutate(cwd_lue0_fet = ifelse(is.nan(cwd_lue0_fet), NA, cwd_lue0_fet))
 
@@ -2837,14 +2904,19 @@ save(df_cwd_et0_agg, file = "data/df_cwd_et0_agg.RData")
 Read tenth-degree global file and plot.
 
 ```{r}
-#load("data/df_cwd_et0_agg.RData")
+load("data/df_cwd_et0_agg.RData")
 
 df_box <- tibble(
-  # long = c(45, 95, 95, 45, 45), lat = c(47.5, 47.5, 25, 25, 47.5), 
-  long = c(52, 85, 85, 52, 52), lat = c(45, 45, 27, 27, 45), 
+  long = c(45, 95, 95, 45, 45), lat = c(47.5, 47.5, 25, 25, 47.5),
+  # long = c(52, 85, 85, 52, 52), lat = c(45, 45, 27, 27, 45), 
   order = 1:5, group = rep(1, 5)
   )
 
+## apply vegetation mask
+df_cwd_et0_agg <- df_cwd_et0_agg %>% 
+  mutate(cwd_lue0_fet = ifelse(nonveg > 0.99, NA, cwd_lue0_fet)) %>% 
+  mutate(cwd_lue0_fet = ifelse(lat > 74, NA, cwd_lue0_fet))  # implausible values higher north
+  
 ## EF
 gg <- plot_map4(df_cwd_et0_agg, 
                 varnam = "cwd_lue0_fet", 
@@ -2853,7 +2925,7 @@ gg <- plot_map4(df_cwd_et0_agg,
                 spacing = "constant", 
                 maxval = 6000, 
                 combine = FALSE, 
-                colorscale = viridis::cividis, 
+                colorscale = "batlowK", 
                 legend_title = NULL, # "(mm)",
                 hillshade = FALSE,
                 rivers = FALSE,
