@@ -1065,8 +1065,6 @@ out <- purrr::map_dfr(as.list(seq(720)), ~extract_cwdx_byilon_lores(.))
 Read tenth-degree global files and plot.
 
 ```{r}
-# load("data/df_vegmask.RData")
-
 load("data/df_vegmask_tenthdeg.RData")  # loads df_vegmask_tenthdeg
 
 ## 80 yr
@@ -1093,9 +1091,9 @@ gg <- plot_map4(nc_tenthdeg,
                 legend_direction = "vertical")
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[CWDX80])))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
-ggsave("fig/map_cwdx80.png", width = 10, height = 5)
-ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
+# ggsave("fig/map_cwdx80.png", width = 10, height = 5)
+# ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
 
 gg_fig3a <- gg$ggmap
 gg_fig3a_legend <- gg$gglegend
@@ -1217,7 +1215,26 @@ cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ggsave("fig/map_cwdx80_amazon.pdf", width = 9, height = 6)
 ggsave("fig/map_cwdx80_amazon.png", width = 9, height = 6)
 ```
+#### Distribution of CWDX
 
+```{r}
+load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
+load("data/df_vegmask.RData") # loads df_vegmask
+df_cwdx <- df %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+  left_join(df_vegmask %>% dplyr::select(lon, lat, vegmask),
+            by = c("lon", "lat")) %>%
+  mutate(cwdx80 = cwdx80 * vegmask)
+
+gg_hist_cwdx80 <- df_cwdx %>% 
+  filter(cwdx80 < 1200) %>% 
+  ggplot(aes(x = cwdx80)) +
+  # geom_density()
+  geom_histogram(binwidth = 20) +
+  xlim(0, 1200) +
+  theme_classic() +
+  labs(x = expression(italic(S)[CWDX80] ~ "(mm)"), y = "Count")
+```
 
 ## WHC vs. CWDX
 
@@ -1492,13 +1509,28 @@ gg <- plot_map4(nc_tenthdeg,
                 legend_direction = "vertical")
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("z")[CWDX80])))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
 
-ggsave("fig/map_zroot_cwd80.png", width = 10, height = 5)
-ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
+# ggsave("fig/map_zroot_cwd80.png", width = 10, height = 5)
+# ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
 
 gg_fig3b <- gg$ggmap
 gg_fig3b_legend <- gg$gglegend
+```
+
+#### Distribution of values
+```{r}
+load("data/df_zroot80.RData") # loads df
+
+gg_hist_zr <- df %>% 
+  # filter(zroot_cwd80 < 25000) %>%
+  ggplot(aes(x = zroot_cwd80/1000)) +
+  # geom_density()
+  geom_histogram(binwidth = 0.5) +
+  xlim(0, 30) + ylim(0, 1e6) +
+  theme_classic() +
+  labs(x = expression(italic(z)[CWDX80] ~ "(m)"), y = "Count")
+gg_hist_zr
 ```
 
 ### Site-level
@@ -2602,7 +2634,17 @@ gg <- plot_map_cwdx_type_irrigation(
   irr_cutoff = 0.3
   )
 gg$ggmap <- gg$ggmap +
-  labs(title = expression(paste(italic("S")[dEF])))
+  labs(title = expression(paste(italic("S")[dEF]))) +
+  # mountains
+  annotate(geom = "text", x = 50.5, y = 32, label = "M", fontface = 2, color = "green") +
+  annotate(geom = "text", x = 79.5, y = 36, label = "M", fontface = 2, color = "green") +
+  annotate(geom = "text", x = 65, y = 34, label = "M", fontface = 2, color = "green") +
+  # delta
+  annotate(geom = "text", x = 49, y = 45.5, label = "D", fontface = 2, color = "green") +
+  # river
+  annotate(geom = "text", x = 63.3, y = 31.1, label = "R", fontface = 2, color = "green") +
+  annotate(geom = "text", x = 66, y = 43.5, label = "R", fontface = 2, color = "green")
+
 gg <- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
 gg
 ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
@@ -4318,8 +4360,16 @@ ggsave("fig/map_zroot_cwd80.png", width = 10, height = 5)
 ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
 
 ## fig 3
-cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, gg_fig3b, gg_fig3b_legend, 
+# top <- cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, 
+#                           gg_fig3b, gg_fig3b_legend, 
+#                           ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
+# bottom <- cowplot::plot_grid(gg_hist_cwdx80, gg_hist_zr,
+#                              ncol = 2, labels = c('c', 'd'))
+# cowplot::plot_grid(top, bottom, nrow = 2, rel_heights = c(1, 0.3))
+
+cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, 
+                   gg_fig3b, gg_fig3b_legend, 
                    ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
-ggsave("fig/fig3.png", width = 10, height = 8)
-ggsave("fig/fig3.pdf", width = 10, height = 8)
+ggsave("fig/fig3.png", width = 10, height = 8) # height = 11 when including the histograms
+ggsave("fig/fig3.pdf", width = 10, height = 8) # height = 11 when including the histograms
 ```

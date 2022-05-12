@@ -311,10 +311,10 @@ ggsave("fig/cwd_tseries.png", width = 12, height = 7)
 
 How does S0 vary along topographic gradients? Select limited region (not too different climate) and plot S0 distribution (boxplot) along CTI bins.
 ```{r}
-# load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
-# 
-# df_cwdx <- df %>% 
-#   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
+load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
+
+df_cwdx <- df %>%
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3))
 
 ## combine S_cwdxXX and GTI into one big data frame
 df_cwdx <- df %>% 
@@ -345,60 +345,16 @@ df_cwdx <- df %>%
          gti_q90 = ifelse(gti_q90 < 0, NA, gti_q90))
 ```
 
-Example for Central Asia.
-
-### CWDX80
 ```{r}
-## central asia
-gg <- df_cwdx %>% 
-  plot_map4(varnam = "cwdx80", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-            spacing = "constant",
-            combine = TRUE, 
-            colorscale = "batlowK", legend_title = "(mm)",
-            expand_size_y = 0.5,
-            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
-            scale = "medium"
-            )
-gg
+load("data/df_vegmask.RData")  # loads df_vegmask
+
+df_cwdx <- df_cwdx %>%
+  left_join(df_vegmask,
+            by = c("lon", "lat")) %>%
+  mutate(cwdx80 = ifelse(nonveg > 99, NA, cwdx80))
 ```
-
-### GTI
-```{r}
-## central asia
-df_cwdx %>% 
-  plot_map4(varnam = "gti_q10", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = 0:15, 
-            spacing = "constant",
-            combine = TRUE, 
-            colorscale = "batlowK", legend_title = "",
-            expand_size_y = 0.5,
-            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
-            scale = "medium"
-            )
-df_cwdx %>% 
-  plot_map4(varnam = "gti_q50", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = 0:15, 
-            spacing = "constant",
-            combine = TRUE, 
-            colorscale = "batlowK", legend_title = "",
-            expand_size_y = 0.5,
-            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
-            scale = "medium"
-            )
-df_cwdx %>% 
-  plot_map4(varnam = "gti_q90", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-            breaks = 0:15, 
-            spacing = "constant",
-            combine = TRUE, 
-            colorscale = "batlowK", legend_title = "",
-            expand_size_y = 0.5,
-            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
-            scale = "medium"
-            )
-```
-
-
+    
+S0 in CTI bins
 ```{r}
 gti_breaks <- 0:15
 
@@ -410,39 +366,195 @@ df_cwdx <- df_cwdx %>%
                     breaks = gti_breaks),
          igti_q90 = cut(gti_q90,
                     breaks = gti_breaks))
-  # mutate(gti_lower = as.numeric( sub("\\((.+),.*", "\\1", igti)),
-  #        gti_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", igti) )) %>%
-  # mutate(gti_mid = (gti_lower + gti_upper)/2) %>% 
-  # group_by(igti) %>% 
-  # summarise(cwdx80 = mean(cwdx80, na.rm = TRUE))
 ```  
 
-Around Iran
+### Central asia
+    
 ```{r}
-df_cwdx %>% 
-  filter(lon > 50 & lon < 60 & lat > 30 & lat < 35 & !is.na(igti_q10)) %>%
-  ggplot(aes(igti_q10, cwdx80)) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 700)
+df_box1 <- tibble(
+  long = c(50, 65, 65, 50, 50), lat = c(26, 26, 35, 35, 26),
+  order = 1:5, group = rep(1, 5)
+  )
 
-df_cwdx %>% 
-  filter(lon > 50 & lon < 60 & lat > 30 & lat < 35 & !is.na(igti_q90)) %>%
-  ggplot(aes(igti_q90, cwdx80)) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 700)
+df_box2 <- tibble(
+  long = c(76, 84, 84, 76, 76), lat = c(26, 26, 31, 31, 26),
+  order = 1:5, group = rep(1, 5)
+  )
+
+## central asia
+gg_cwdx <- df_cwdx %>% 
+  plot_map4(varnam = "cwdx80", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = "batlowK", legend_title = "(mm)",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+
+## add red box for zoom
+gg_cwdx$ggmap <- gg_cwdx$ggmap + 
+  labs(title = expression(paste(italic("S")[CWDX80]))) +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box1, size = 0.5, color = "red") +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
+
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ```
 
-Around N India
+Plot CTI
 ```{r}
-df_cwdx %>% 
-  filter(lon > 75 & lon < 85 & lat > 25 & lat < 35 & !is.na(igti_q10)) %>%
-  ggplot(aes(igti_q10, cwdx80)) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 700)
-
-df_cwdx %>% 
-  filter(lon > 75 & lon < 85 & lat > 25 & lat < 35 & !is.na(igti_q90)) %>%
-  ggplot(aes(igti_q90, cwdx80)) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 700)
+## central asia
+gg_cti <- df_cwdx %>% 
+  plot_map4(varnam = "gti_q90", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = 0:15, 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = "batlowK", legend_title = "(unitless)",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+gg_cti$ggmap <- gg_cti$ggmap + 
+  labs(title = "CTI, 90% quantile") + 
+  geom_path(aes(x = long, y = lat, group = group), data = df_box1, size = 0.5, color = "red") +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
 ```
+
+Red box: `long = c(50, 65, 65, 50, 50), lat = c(26, 26, 35, 35, 26)`
+```{r}
+gg_boxplot <- df_cwdx %>% 
+  filter(lon > 50 & lon < 65 & lat > 26 & lat < 35 & !is.na(igti_q90)) %>%
+  ggplot(aes(igti_q90, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 700) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "Red box")
+
+gg_boxplot
+```
+
+Blue box: `long = c(76, 84, 84, 76, 76), lat = c(26, 26, 31, 31, 26)`
+```{r}
+gg_boxplot2 <- df_cwdx %>% 
+  filter(lon > 76 & lon < 84 & lat > 26 & lat < 31 & !is.na(igti_q90)) %>%
+  ggplot(aes(igti_q90, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 700) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "Blue box")
+
+gg_boxplot2
+```
+
+Publication figure
+```{r}
+top <- cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend, 
+                   gg_cti$ggmap, gg_cti$gglegend,
+                   ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
+btm <- cowplot::plot_grid(gg_boxplot, gg_boxplot2,
+                          ncol = 2, labels = c('c', 'd'))
+cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(2, 0.4))
+ggsave("fig/fig_topography_casia.png", width = 10, height = 12)
+```
+
+### Western USA
+    
+```{r}
+df_box1 <- tibble(
+  long = c(-113, -119, -119, -113, -113), lat = c(38, 38, 42, 42, 38),
+  order = 1:5, group = rep(1, 5)
+  )
+
+df_box2 <- tibble(
+  long = c(-118, -120.5, -120.5, -118, -118), lat = c(35, 35, 37, 37, 35),
+  order = 1:5, group = rep(1, 5)
+  )
+
+## central asia
+gg_cwdx <- df_cwdx %>% 
+  plot_map4(varnam = "cwdx80", 
+            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47,
+            breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = "batlowK", legend_title = "(mm)",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+
+## add red box for zoom
+gg_cwdx$ggmap <- gg_cwdx$ggmap + 
+  labs(title = expression(paste(italic("S")[CWDX80]))) +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box1, size = 0.5, color = "red") +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
+
+# cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+```
+
+Plot CTI
+```{r}
+## central asia
+gg_cti <- df_cwdx %>% 
+  plot_map4(varnam = "gti_q90", 
+            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47,
+            breaks = 0:15, 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = "batlowK", legend_title = "(unitless)",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+gg_cti$ggmap <- gg_cti$ggmap + 
+  labs(title = "CTI, 90% quantile") + 
+  geom_path(aes(x = long, y = lat, group = group), data = df_box1, size = 0.5, color = "red") +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
+```
+
+Red box 
+```{r}
+gg_boxplot <- df_cwdx %>% 
+  filter(lon > -119 & lon < -113 & lat > 38 & lat < 42 & !is.na(igti_q90)) %>%
+  ggplot(aes(igti_q90, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 300) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin")
+
+gg_boxplot
+```
+
+Blue box `long = c(-118, -120.5, -120.5, -118, -118), lat = c(35, 35, 37, 37, 35),`
+```{r}
+gg_boxplot2 <- df_cwdx %>% 
+  filter(lon > -120.5 & lon < -118 & lat > 35 & lat < 37 & !is.na(igti_q90)) %>%
+  ggplot(aes(igti_q90, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 300) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin")
+
+gg_boxplot2
+```
+
+
+Publication figure
+```{r}
+top <- cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend, 
+                   gg_cti$ggmap, gg_cti$gglegend,
+                   ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
+btm <- cowplot::plot_grid(gg_boxplot, gg_boxplot2,
+                          ncol = 2, labels = c('c', 'd'))
+cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(2, 0.4))
+ggsave("fig/fig_topography_wusa.png", width = 10, height = 12)
+```
+
+
+<!-- Publication figure -->
+<!-- ```{r} -->
+<!-- cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend, gg_cti$ggmap, gg_cti$gglegend, gg_boxplot, -->
+<!--                    ncol = 2, rel_widths = c(1, 0.12), rel_heights = c(1, 1, 0.4), labels = c('a', '', 'b', '', 'c', '')) -->
+<!-- ggsave("fig/fig_topography_wusa.png", width = 10, height = 12) -->
+<!-- ``` -->
