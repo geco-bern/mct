@@ -991,6 +991,27 @@ for (i in 3:8){
 }
 ```
 
+#### Distribution of values
+
+```{r}
+df_cwdx %>% 
+  ggplot(aes(x = cwdx80, ..density..)) +
+  geom_histogram() +
+  xlim(0, 2500)
+
+gt <- df_cwdx %>% 
+  filter(cwdx80 > 300) %>% 
+  pull(cwdx80) %>% 
+  length()
+
+all <- df_cwdx %>% 
+  filter(!is.na(cwdx80)) %>% 
+  pull(cwdx80) %>% 
+  length()
+
+gt/all
+```
+
 #### Write NetCDF
 
 ```{r}
@@ -2518,6 +2539,15 @@ df_irr <- nc_to_df("~/data/irrigation/gmia_v5_aai_pct_0_05deg.nc", varnam = "aai
 
 save(df_cwd_et0, file = "data/df_cwd_et0_3_flattening.RData")
 ```
+### Distribution of values
+
+```{r}
+df_cwd_et0 %>% 
+  ggplot(aes(x = cwd_lue0_fet, ..density..)) +
+  geom_histogram() +
+  xlim(0, 2500)
+```
+
 
 ### Regional
 
@@ -3239,14 +3269,14 @@ gg <- plot_map4(df_rl_agg_fet,
                 maxval = 6000, 
                 combine = FALSE, 
                 colorscale = viridis::magma, 
-                legend_title = "(yr)",
+                legend_title = "",
                 hillshade = FALSE,
                 rivers = FALSE,
                 expand_size_y = 0.5,
                 legend_direction = "horizontal"
                 )
 gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[EF]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.1))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.2))
 gg_fig4a <- gg$ggmap
 gg_fig4_legend <- gg$gglegend
 save(gg_fig4a, file = "data/gg_fig5a.Rdata")
@@ -3328,7 +3358,7 @@ df_rl_nSIF %>%
 
 Convert to map and plot.
 ```{r}
-# load("data/df_rl_agg_nSIF.RData")
+load("data/df_rl_agg_nSIF.RData")
 
 # nc <- df_to_grid(
 #   df_rl_agg, 
@@ -3460,7 +3490,7 @@ gg_fig5c <- df_rl_agg_test %>%
   ggplot(aes(x = gti_bin, y = rp_diag)) +
   geom_boxplot(fill = "grey70") +
   theme_classic() +
-  labs(x = "GTI", y = "Return period (yr)")
+  labs(x = "CTI", y = "Return period (yr)")
 
 gg_fig5d <- df_rl_agg_test %>% 
   drop_na(fcf_bin, rp_diag) %>% 
@@ -4225,9 +4255,9 @@ dfs$data[[1]]$out_lue0_fet[[1]]$gg + labs(subtitle = dfs$siteinfo[[1]]$sitename)
 ## Publication figures
 
 ```{r}
-# load("data/gg_fig1a.Rdata")
-# load("data/gg_fig1c.Rdata")
-# load("data/gg_fig1b.Rdata")
+load("data/gg_fig1a.Rdata")
+load("data/gg_fig1c.Rdata")
+load("data/gg_fig1b.Rdata")
 
 plot_grid(gg_fig1a, gg_fig1b, gg_fig1_legend, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2))
 ggsave("fig/fig1.png", width = 8, height = 8)
@@ -4236,9 +4266,9 @@ ggsave("fig/fig1.pdf", width = 8, height = 8)
 load("data/gg_fig5a.Rdata")
 load("data/gg_fig5b.Rdata")
 bottom_row <- plot_grid(gg_fig5c, gg_fig5d, ncol = 2, labels = c('c', 'd'))
-plot_grid(gg_fig4a, gg_fig4b, gg_fig4_legend, bottom_row, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2,0.7))
-ggsave("fig/fig_return_period.png", width = 8, height = 10)
-ggsave("fig/fig_retrun_period.pdf", width = 8, height = 10)
+plot_grid(gg_fig4a, gg_fig4b, gg_fig4_legend, bottom_row, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.25,0.7))
+ggsave("fig/fig_return_period.png", width = 8, height = 11)
+ggsave("fig/fig_return_period.pdf", width = 8, height = 11)
 
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_heights = c(1, 0.12))
 
