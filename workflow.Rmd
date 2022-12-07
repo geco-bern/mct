@@ -1114,6 +1114,7 @@ gg <- plot_map4(nc_tenthdeg,
                 )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[CWDX80])))
+
 # cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
 # ggsave("fig/map_cwdx80.png", width = 10, height = 5)
 # ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
@@ -1148,7 +1149,7 @@ df_cwdx <- df |>
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 
 ## apply vegetation mask
-# load("data/df_vegmask.RData") # loads df_vegmask
+load("data/df_vegmask.RData") # loads df_vegmask
 df_cwdx <- df_cwdx |>
   left_join(df_vegmask |> dplyr::select(lon, lat, vegmask),
             by = c("lon", "lat")) |>
@@ -1182,7 +1183,7 @@ gg <- df_cwdx |>
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
 ggsave("fig/map_cwdx80_europe.pdf", width = 8, height = 6)
 ggsave("fig/map_cwdx80_europe.png", width = 8, height = 6)
 
@@ -1200,7 +1201,7 @@ gg <- df_cwdx |>
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
 ggsave("fig/map_cwdx80_wusa.pdf", width = 10, height = 6)
 ggsave("fig/map_cwdx80_wusa.png", width = 10, height = 6)
 
@@ -1217,7 +1218,7 @@ gg <- df_cwdx |>
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
 ggsave("fig/map_cwdx80_casia.pdf", width = 9, height = 5)
 ggsave("fig/map_cwdx80_casia.png", width = 9, height = 5)
 
@@ -1235,7 +1236,7 @@ gg <- df_cwdx |>
             )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80])) 
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
 ggsave("fig/map_cwdx80_amazon.pdf", width = 9, height = 6)
 ggsave("fig/map_cwdx80_amazon.png", width = 9, height = 6)
 ```
@@ -1293,8 +1294,6 @@ ggsave("fig/whc_soil.png", width = 8, height = 4)
 
 Regrid to 0.1 deg.
 ```{r}
-# load("data/df_whc.RData")
-
 # source("R/regrid_df.R")
 # df_whc_agg <- regrid_df(df_whc, varnam = "whc_1m", dlon = 0.1, dlat = 0.1)
 
@@ -1333,10 +1332,11 @@ gg1 <- plot_map4(df_whc_agg,
                 latmin = -60, latmax = 80,
                 spacing = "constant", 
                 maxval = 6000, 
-                combine = FALSE, 
+                combine = TRUE, 
                 colorscale = "batlowK", 
                 legend_title = "(mm)",
-                expand_size_y = 0.5)
+                expand_size_y = 0.5,
+                ocean = TRUE)
 
 # ggsave("fig/map_whc_1m.pdf", width = 10, height = 5)
 # ggsave("fig/map_whc_1m.png", width = 10, height = 5)
@@ -1347,17 +1347,18 @@ gg2 <- plot_map4(df_whc_agg,
                 latmin = -60, latmax = 80,
                 spacing = "constant", 
                 maxval = 6000, 
-                combine = FALSE, 
+                combine = TRUE, 
                 colorscale = "batlowK", 
                 legend_title = "(mm)",
-                expand_size_y = 0.5)
+                expand_size_y = 0.5,
+                ocean = TRUE)
 
 # ggsave("fig/map_whc_2m.pdf", width = 10, height = 5)
 # ggsave("fig/map_whc_2m.png", width = 10, height = 5)
 
-# plot_grid(gg1, gg2, ncol = 1, labels = c('a', 'b'), rel_widths = c(1,1))
-# ggsave("fig/map_whc_1m_2m.pdf", width = 10, height = 8)
-# ggsave("fig/map_whc_1m_2m.png", width = 10, height = 8)
+plot_grid(gg1, gg2, ncol = 1, labels = c('a', 'b'))
+ggsave("fig/map_whc_1m_2m.pdf", width = 10, height = 9)
+ggsave("fig/map_whc_1m_2m.png", width = 10, height = 9)
 ```
 
 ### Deep water access
@@ -1420,46 +1421,51 @@ df <- df |>
 
 df_agg <- df |> 
   group_by(lon_mid, lat_mid) |> 
-  summarise(deeper_1m = mean(deeper_1m, na.rm = TRUE), deeper_2m = mean(deeper_2m, na.rm = TRUE)) |> 
-  mutate(deeper_1m = ifelse(deeper_1m < 0.5, 0, 1), deeper_2m = ifelse(deeper_2m < 0.5, 0, 1)) |> 
+  summarise(deeper_1m = mean(deeper_1m, na.rm = TRUE), 
+            deeper_2m = mean(deeper_2m, na.rm = TRUE)) |> 
+  mutate(deeper_1m = ifelse(deeper_1m < 0.5, FALSE, TRUE), 
+         deeper_2m = ifelse(deeper_2m < 0.5, FALSE, TRUE)) |> 
   rename(lon = lon_mid, lat = lat_mid)
 ```
 
 ```{r}
 gg3 <- plot_map4(df_agg, 
                 varnam = "deeper_1m", 
-                breaks = c(0, 0.5, 1), 
+                # breaks = c(TRUE, FALSE), 
                 latmin = -60, latmax = 80,
-                spacing = "constant", 
-                maxval = 6000, 
-                combine = FALSE, 
-                colorscale = viridis::cividis, 
-                legend_title = "",
-                expand_size_y = 0.5)
+                # spacing = "constant", 
+                # maxval = 6000, 
+                # combine = TRUE, 
+                # colorscale = viridis::cividis, 
+                # legend_title = "",
+                # expand_size_y = 0.5,
+                ocean = TRUE,
+                is_boolean = TRUE
+                )
 
 # ggsave("fig/map_whc_1m.pdf", width = 10, height = 5)
 # ggsave("fig/map_whc_1m.png", width = 10, height = 5)
 
 gg4 <- plot_map4(df_agg, 
                 varnam = "deeper_2m", 
-                breaks = c(0, 0.5, 1), 
+                # breaks = c(TRUE, FALSE), 
                 latmin = -60, latmax = 80,
-                spacing = "constant", 
-                maxval = 6000, 
-                combine = FALSE, 
-                colorscale = viridis::cividis, 
-                legend_title = "",
-                expand_size_y = 0.5)
+                # spacing = "constant", 
+                # maxval = 6000, 
+                # combine = TRUE, 
+                # colorscale = viridis::cividis, 
+                # legend_title = "",
+                # expand_size_y = 0.5,
+                ocean = TRUE,
+                is_boolean = TRUE
+                )
 
 # ggsave("fig/map_whc_2m.pdf", width = 10, height = 5)
 # ggsave("fig/map_whc_2m.png", width = 10, height = 5)
 
-plot_grid(gg1$ggmap, gg2$ggmap, gg2$gglegend, 
-          gg3$ggmap, gg4$ggmap, gg4$gglegend,
-          ncol = 3, labels = c('a', 'b', '', 'c', 'd', ''),
-          rel_widths = c(1, 1, 0.12))
-ggsave("fig/map_whc_1m_2m_deeper.png", width = 10, height = 5)
-ggsave("fig/map_whc_1m_2m_deeper.pdf", width = 10, height = 5)
+plot_grid(gg3$ggmap, gg4$ggmap, ncol = 1, labels = c('a', 'b'))
+ggsave("fig/map_whc_1m_2m_deeper.png", width = 10, height = 9)
+ggsave("fig/map_whc_1m_2m_deeper.pdf", width = 10, height = 9)
 ```
 
 ## Rooting depth
@@ -1630,10 +1636,11 @@ gg <- plot_map4(nc_tenthdeg,
                 latmin = -60, latmax = 80,
                 spacing = "constant", 
                 combine = FALSE, 
-                colorscale = "tokyo", 
+                colorscale = "lapaz", 
                 legend_title = "(m)",
                 hillshade = FALSE,
                 rivers = FALSE,
+                ocean = TRUE,
                 expand_size_y = 0.5,
                 legend_direction = "vertical")
 gg$ggmap <- gg$ggmap + 
@@ -2210,11 +2217,11 @@ save(df_cwd_lue0_agg, file = "data/df_cwd_lue0_agg.Rdata")
 
 Read tenth-degree global file and plot.
 ```{r}
-# load("data/df_cwd_lue0_agg.Rdata")
+load("data/df_cwd_lue0_agg.Rdata")
 
 # apply vegetation mask
 df_cwd_lue0_agg <- df_cwd_lue0_agg |> 
-  mutate(cwd_lue0_nSIF = ifelse(nonveg > 0.99, NA, cwd_lue0_nSIF)) |> 
+  # mutate(cwd_lue0_nSIF = ifelse(nonveg > 0.99, NA, cwd_lue0_nSIF)) |> 
   mutate(cwd_lue0_nSIF = ifelse(lat > 74, NA, cwd_lue0_nSIF))  # values higher north are implausible
 
 ## nSIF
@@ -2746,16 +2753,6 @@ source("R/plot_map_cwdx_type_irrigation.R")
 #             by = c("lon", "lat")) |> 
 #   mutate(cwd_lue0_fet = cwd_lue0_fet * vegmask)
 
-# tmp |>
-#   plot_map4(varnam = "vegmask", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-#             spacing = "constant",
-#             combine = TRUE, 
-#             colorscale = "batlowK", legend_title = "(mm)",
-#             expand_size_y = 0.5,
-#             hillshade = TRUE, rivers = TRUE, lakes = TRUE,
-#             scale = 50
-#             )
-  
 ## central asia, multi layer map
 gg <- plot_map_cwdx_type_irrigation(
   df_cwd_et0, 
@@ -2766,10 +2763,11 @@ gg <- plot_map_cwdx_type_irrigation(
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = viridis::cividis,  # "batlowK", 
+  colorscale = "batlowK", 
   legend_title = "(mm)", 
   hillshade = TRUE,
   rivers = TRUE,
+  ocean = FALSE,
   scale = "medium",
   expand_size_y = 0.7,
   irr_cutoff = 0.3
@@ -2795,42 +2793,6 @@ ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
 gg_fig1c <- gg
 save(gg_fig1c, file = "data/gg_fig1c.Rdata")
 
-# ## central asia EF only S_dEF
-# gg <- plot_map4(df_cwd_et0,
-#             varnam = "cwd_lue0_fet", 
-#             lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
-#             # lonmin = 60, lonmax = 70, latmin = 35, latmax = 42, 
-#             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-#             spacing = "constant",
-#             combine = FALSE, 
-#             colorscale = "batlowK", 
-#             legend_title = "(mm)", 
-#             hillshade = TRUE,
-#             rivers = TRUE,
-#             scale = 50
-#             )
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(paste(italic("S")[dEF])))
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_cwd_lue0_fet0_casia2.pdf", width = 10, height = 6)
-# 
-# 
-# ## central asia S0-Teuling
-# gg <- df_cwd_et0 |> 
-#   plot_map3(varnam = "s0_teuling_fet", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
-#             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
-#             spacing = "constant",
-#             combine = FALSE, 
-#             colorscale = "batlowK"
-#             )
-# gg$ggmap <- gg$ggmap + 
-#   labs(title = expression(paste(italic("S")[0-Teuling]))) +
-#   geom_path(data = df_rivers, aes(x = long, y = lat, group = group), color = "dodgerblue")
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-# ggsave("fig/map_s0_teuling_fet_casia2.pdf", width = 10, height = 6)
-# ggsave("fig/map_s0_teuling_fet_casia2.png", width = 10, height = 6)
-
-
 ## Western USA, multi layer map
 gg <- plot_map_cwdx_type_irrigation(
   df_cwd_et0, df_irr,
@@ -2843,7 +2805,7 @@ gg <- plot_map_cwdx_type_irrigation(
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
-  scale = 50,
+  scale = "medium",
   expand_size_y = 0.4,
   irr_cutoff = 0.3
   )
@@ -2864,7 +2826,7 @@ gg <- plot_map_cwdx_type_irrigation(
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
-  scale = 50,
+  scale = "medium",
   expand_size_y = 0.4,
   irr_cutoff = 0.3
   )
@@ -3086,7 +3048,7 @@ save(df_cwd_et0_agg, file = "data/df_cwd_et0_agg.RData")
 Read tenth-degree global file and plot.
 
 ```{r}
-# load("data/df_cwd_et0_agg.RData")
+load("data/df_cwd_et0_agg.RData")
 
 df_box <- tibble(
   long = c(45, 95, 95, 45, 45), lat = c(47.5, 47.5, 25, 25, 47.5),
@@ -3497,6 +3459,7 @@ gg <- plot_map4(df_rl_agg_fet,
                 legend_title = "",
                 hillshade = FALSE,
                 rivers = FALSE,
+                ocean = TRUE,
                 expand_size_y = 0.5,
                 legend_direction = "horizontal"
                 )
@@ -3507,7 +3470,7 @@ gg_fig4_legend <- gg$gglegend
 save(gg_fig4a, file = "data/gg_fig5a.Rdata")
 
 ggsave("fig/map_rp_fet.pdf", width = 8, height = 5)
-ggsave("fig/map_rp_fet.pdf", width = 8, height = 5)
+ggsave("fig/map_rp_fet.png", width = 8, height = 5)
 ```
 
 ### SIF
@@ -3605,6 +3568,7 @@ gg <- plot_map4(df_rl_agg_nSIF,
                 legend_title = "(yr)",
                 hillshade = FALSE,
                 rivers = FALSE,
+                ocean = TRUE,
                 expand_size_y = 0.5)
 gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[SIF]))
 
@@ -4522,7 +4486,7 @@ ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
 
 cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, 
                    gg_fig3b, gg_fig3b_legend, 
-                   ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
+                   ncol = 2, rel_widths = c(1, 0.1), labels = c('a', '', 'b', ''))
 ggsave("fig/fig3.png", width = 10, height = 8) # height = 11 when including the histograms
 ggsave("fig/fig3.pdf", width = 10, height = 8) # height = 11 when including the histograms
 ```

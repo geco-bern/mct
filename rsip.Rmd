@@ -231,28 +231,20 @@ df <- extract_nc(df %>% dplyr::select(id, lon, lat), "data/zroot_cwd80.nc") %>%
 ## Plots
 
 ```{r}
-## boxplot
-df %>% 
-  rename(obs = Dr, mod = zroot_cwdx80) %>% 
-  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
-  ggplot(aes(x = biome_name, y = -zroot, fill = source)) +
-  geom_boxplot() +
-  # geom_violin() +
-  # geom_bar(stat = "summary", fun.ymax = "max", position=position_dodge()) +
-  theme(axis.text.x = element_text(angle=90, hjust=1)) +
-  ylim(-20,0)
+## old color scheme
+# col_mod <- "#D55E0050"
+# col_obs <- "#0072B250"
+#   
+# col_mod_solid <- "#D55E00"
+# col_obs_solid <- "#0072B2"
 
-ggsave("fig/zroot_biomes_rsip_boxplot_modobs.pdf", height = 10, width = 10)
-
-## barplot: quantile - THIS LOOKS ACTUALLY VERY NICE FOR THE 5% QUANTILE!!!
-df %>% 
-  rename(obs = Dr, mod = zroot_cwdx80) %>% 
-  pivot_longer(cols = c(obs, mod), names_to = "source", values_to = "zroot") %>% 
-  ggplot(aes(x = biome_name, fill = source)) +
-  stat_summary_bin(aes(y = -zroot), fun.y = "quantile", fun.args = c(probs = 0.05), geom = "bar", position=position_dodge()) +
-  theme(axis.text.x = element_text(angle=90, hjust=1))
-
-ggsave("fig/zroot_biomes_rsip_barplot_modobs.pdf", height = 10, width = 10)
+library(vhs)
+cols <- vhs("maxell_gu")
+col_mod <- add_alpha(cols[2], 0.6)
+col_obs <- add_alpha(cols[3], 0.6)
+  
+col_mod_solid <- cols[2]
+col_obs_solid <- cols[3]
 
 ## ridge plot
 biome_exclude <- df %>% 
@@ -275,13 +267,13 @@ gg <- df %>%
   ) +
   scale_y_discrete(expand = c(0, 0), name = "") +
   scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
-  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
-  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
-  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_fill_manual(values = c(col_mod, col_obs), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
+  scale_color_manual(values = c(col_mod_solid, col_obs_solid), guide = "none") +
+  scale_discrete_manual("point_color", values = c(col_mod_solid, col_obs_solid), guide = "none") +
   coord_cartesian(clip = "off") +
   guides(fill = guide_legend(
     override.aes = list(
-      fill = c("#D55E00A0", "#0072B2A0"),
+      fill = c(col_mod_solid, col_obs_solid),
       color = NA, point_color = NA)
     )
   ) +
@@ -457,9 +449,9 @@ gg <- df_wtd %>%
   ) +
   scale_y_discrete(expand = c(0, 0), name = "") +
   scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
-  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
-  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
-  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_fill_manual(values = c(col_mod, col_obs), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
+  scale_color_manual(values = c(col_mod_solid, col_obs_solid), guide = "none") +
+  scale_discrete_manual("point_color", values = c(col_mod_solid, col_obs_solid), guide = "none") +
   coord_cartesian(clip = "off") +
   guides(fill = guide_legend(
     override.aes = list(
@@ -655,13 +647,13 @@ gg <- df_sites %>%
   ) +
   scale_y_discrete(expand = c(0, 0), name = "") +
   scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
-  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
-  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
-  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_fill_manual(values = c(col_mod, col_obs), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
+  scale_color_manual(values = c(col_mod_solid, col_obs_solid), guide = "none") +
+  scale_discrete_manual("point_color", values = c(col_mod_solid, col_obs_solid), guide = "none") +
   coord_cartesian(clip = "off") +
   guides(fill = guide_legend(
     override.aes = list(
-      fill = c("#D55E00A0", "#0072B2A0"),
+      fill = c(col_mod_solid, col_obs_solid),
       color = NA, point_color = NA)
     )
   ) +
@@ -692,7 +684,8 @@ df_biome_sites <- df_sites %>%
             )
 
 out <- df_biome_sites %>% 
-  analyse_modobs2("q10_zroot_cwdx80", "q10_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q10_zroot_cwdx80", "q10_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_10 <- out$gg + labs(title = "10% quantile",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -700,7 +693,8 @@ gg_rsip_sites_10
 save(gg_rsip_sites_10, file = "data/gg_rsip_sites_10.RData")
 
 out <- df_biome_sites %>% 
-  analyse_modobs2("q25_zroot_cwdx80", "q25_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q25_zroot_cwdx80", "q25_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_25 <- out$gg + labs(title = "25% quantile",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -708,7 +702,8 @@ gg_rsip_sites_25
 save(gg_rsip_sites_25, file = "data/gg_rsip_sites_25.RData")
 
 out <- df_biome_sites %>% 
-  analyse_modobs2("q50_zroot_cwdx80", "q50_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q50_zroot_cwdx80", "q50_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_50 <- out$gg + labs(title = "50% quantile",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -717,7 +712,8 @@ save(gg_rsip_sites_50, file = "data/gg_rsip_sites_50.RData")
 ggsave("fig/modobs_zroot_q90_rsip_sites.pdf", width = 6, height = 5)
 
 out <- df_biome_sites %>% 
-  analyse_modobs2("q75_zroot_cwdx80", "q75_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q75_zroot_cwdx80", "q75_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_75 <- out$gg + labs(title = "75% quantile",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -725,7 +721,8 @@ gg_rsip_sites_75
 save(gg_rsip_sites_75, file = "data/gg_rsip_sites_75.RData")
 
 out <- df_biome_sites %>% 
-  analyse_modobs2("q90_zroot_cwdx80", "q90_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q90_zroot_cwdx80", "q90_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_90 <- out$gg + labs(title = "90% quantile",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -817,9 +814,9 @@ df_sites_wtd %>%
   ) +
   scale_y_discrete(expand = c(0, 0), name = "") +
   scale_x_continuous(expand = c(0, 0), name = "Rooting depth (m)", limits = c(-5, 30)) +
-  scale_fill_manual(values = c("#D55E0050", "#0072B250"), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
-  scale_color_manual(values = c("#D55E00", "#0072B2"), guide = "none") +
-  scale_discrete_manual("point_color", values = c("#D55E00", "#0072B2"), guide = "none") +
+  scale_fill_manual(values = c(col_mod, col_obs), labels = c(expression(italic(z)[CWDX80]), "Observed"), name = "") +
+  scale_color_manual(values = c(col_mod_solid, col_obs_solid), guide = "none") +
+  scale_discrete_manual("point_color", values = c(col_mod_solid, col_obs_solid), guide = "none") +
   coord_cartesian(clip = "off") +
   guides(fill = guide_legend(
     override.aes = list(
@@ -852,7 +849,8 @@ df_biome_sites_wtd <- df_sites_wtd %>%
             )
 
 out <- df_biome_sites_wtd %>% 
-  analyse_modobs2("q10_zroot_cwdx80", "q10_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q10_zroot_cwdx80", "q10_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_wtd_10 <- out$gg + labs(title = "10% quantile, WTD limited",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -860,7 +858,8 @@ gg_rsip_sites_wtd_10
 save(gg_rsip_sites_wtd_10, file = "data/gg_rsip_sites_wtd_10.RData")
 
 out <- df_biome_sites_wtd %>% 
-  analyse_modobs2("q25_zroot_cwdx80", "q25_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q25_zroot_cwdx80", "q25_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_wtd_25 <- out$gg + labs(title = "25% quantile, WTD limited",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -868,7 +867,8 @@ gg_rsip_sites_wtd_25
 save(gg_rsip_sites_wtd_25, file = "data/gg_rsip_sites_wtd_25.RData")
 
 out <- df_biome_sites_wtd %>% 
-  analyse_modobs2("q50_zroot_cwdx80", "q50_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q50_zroot_cwdx80", "q50_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_wtd_50 <- out$gg + labs(title = "50% quantile, WTD limited",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -877,7 +877,8 @@ save(gg_rsip_sites_wtd_50, file = "data/gg_rsip_sites_wtd_50.RData")
 ggsave("fig/modobs_zroot_q90_rsip_sites_wtd.pdf", width = 6, height = 5)
 
 out <- df_biome_sites_wtd %>% 
-  analyse_modobs2("q75_zroot_cwdx80", "q75_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q75_zroot_cwdx80", "q75_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_wtd_75 <- out$gg + labs(title = "75% quantile, WTD limited",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))
@@ -885,7 +886,8 @@ gg_rsip_sites_wtd_75
 save(gg_rsip_sites_wtd_75, file = "data/gg_rsip_sites_wtd_75.RData")
 
 out <- df_biome_sites_wtd %>% 
-  analyse_modobs2("q90_zroot_cwdx80", "q90_zroot_obs", shortsubtitle = TRUE)
+  analyse_modobs2("q90_zroot_cwdx80", "q90_zroot_obs", 
+                  shortsubtitle = TRUE, rsquared = FALSE)
 gg_rsip_sites_wtd_90 <- out$gg + labs(title = "90% quantile, WTD limited",
               x = expression(italic(z)[CWDX80] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[r] ~ " (m)"))

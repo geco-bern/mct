@@ -28,6 +28,8 @@
 #' NaturalEarth layers for 110, 50, 10 m are used for low, medium, and high resolution (scale) layers, respectively. Defaults to \code{"low"}.
 #' @param countries A logical specifying whether to display country borders (the \code{ne_50m_admin_0_countries} layer from NaturalEarth). Defaults to \code{FALSE}.
 #' @param states A logical specifying whether to display sub-country administrative borders (e.g. US states) (the \code{ne_50m_admin_1_states_provinces} layer from NaturalEarth). Defaults to \code{FALSE}.
+#' @param ocean A logical specifying whether to display the ocean layer from NaturalEarth). Defaults to \code{FALSE}.
+#' @param dir_ne A character string specifying where to download Naturalearth layers. Once downloaded, they can be quickly loaded. Defaults to \code{"~/data/naturalearth/"}.
 #' @param make_discrete A logical scpecifying whether data layer is to be made discrete for plotting with colors
 #' of discrete bins. Defaults to \code{TRUE}.
 #' @param combine A boolean specifying whether the map and the colorscale should be combined using cowplot.
@@ -46,7 +48,8 @@ plot_map_cwdx_type_irrigation <- function(
   maxval = NA, breaks = NA, lonmin = -180, lonmax = 180, latmin = -90, latmax = 90,
   nbin = 10, legend_title = waiver(), colorscale = viridis::viridis, do_reproj = FALSE,
   hillshade = FALSE, rivers = FALSE, lakes = FALSE, coast = TRUE, countries = FALSE, 
-  states = FALSE, scale = "low", make_discrete = TRUE,
+  states = FALSE, ocean = FALSE,  dir_ne = "~/data/naturalearth/",
+  scale = "low", make_discrete = TRUE,
   plot_title = waiver(), plot_subtitle = waiver(), combine = TRUE, varnam = NULL, irr_cutoff = 0.25, ...){
 
   library(rnaturalearth)
@@ -59,6 +62,8 @@ plot_map_cwdx_type_irrigation <- function(
 
   ## following https://downwithtime.wordpress.com/2013/12/04/naturalearthdata-and-r-in-ggplot2/
 
+	domain <- c(xmin = lonmin, xmax = lonmax, ymin = latmin, ymax = latmax)
+
   ## read geo data
   res <- ifelse(scale == "low", "110", ifelse(scale == "medium", "50", ifelse(scale == "high", "10", NA)))
   if (!exists("raster_shade") && hillshade) raster_shade   <- raster::stack(paste0("~/data/naturalearth/SR_50M/SR_50M.tif"))
@@ -67,6 +72,35 @@ plot_map_cwdx_type_irrigation <- function(
   if (!exists("layer_coast") && coast) layer_coast         <- readOGR(paste0("~/data/naturalearth/ne_", res, "m_coastline/ne_", res, "m_coastline.shp"), paste0("ne_", res, "m_coastline"))
 	if (!exists("layer_country") && countries) layer_country <- readOGR(paste0("~/data/naturalearth/ne_", res, "m_countryline/ne_", res, "m_admin_0_countries.shp"), paste0("ne_", res, "m_admin_0_countries"))
 	if (!exists("layer_states") && states) layer_states      <- readOGR(paste0("~/data/naturalearth/ne_", res, "m_admin_1_states_provinces/ne_", res, "m_admin_1_states_provinces.shp"), paste0("ne_", res, "m_admin_1_states_provinces"))
+
+	# download ocean
+	if (ocean){
+		if (length(list.files(path = dir_ne,
+													pattern = paste0("ne_", as.character(scale), "m_ocean"))
+													) == 0){
+			layer_ocean <- rnaturalearth::ne_download(
+			  scale = scale,
+			  type = "ocean",
+			  category = "physical",
+			  returnclass = "sf",
+			  destdir = dir_ne
+			  )
+		} else {
+			layer_ocean <- rnaturalearth::ne_load(
+			  scale = scale,
+			  type = "ocean",
+			  category = "physical",
+			  returnclass = "sf",
+			  destdir = dir_ne
+			  )
+		}
+
+		## reduce to domain
+		layer_ocean <- st_crop(layer_ocean, domain)
+		# layer_ocean <- layer_ocean |>
+		# 	st_buffer(0) |>
+		#   st_intersection(bb)
+	}
 
 	##---------------------------------------------
 	## object: is data frame
@@ -209,7 +243,7 @@ plot_map_cwdx_type_irrigation <- function(
 	  ## second layer: CWDX
 	  geom_tile(data = df, aes(x = lon, y = lat, fill = cwdxcut, color = cwdxcut), show.legend = FALSE, na.value = "transparent") +   # 
 
-    scale_fill_manual(values = colorscale, na.value = "transparent") +
+    scale_fill_manual( values = colorscale, na.value = "transparent") +
     scale_color_manual(values = colorscale, na.value = "transparent") +
 	  
 	  ## geoms below will use another color scale
@@ -266,8 +300,16 @@ plot_map_cwdx_type_irrigation <- function(
 	## add hillshade layer
 	if (hillshade){
 	  ggmap <- ggmap +
-	    geom_tile(data = df_hs, aes(x = x, y = y, alpha = SR_50M), show.legend = FALSE) +
+	    geom_raster(data = df_hs, aes(x = x, y = y, alpha = SR_50M), show.legend = FALSE) +
 	    scale_alpha(range=c(0.5, 0))
+	}
+
+	## add ocean
+	if (ocean){
+	  ggmap <- ggmap +
+		  geom_sf(data = layer_ocean,
+		          color = NA,
+		          fill = "azure3")
 	}
 
 	gglegend <- plot_discrete_cbar(

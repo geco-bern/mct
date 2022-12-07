@@ -409,7 +409,7 @@ df_box2 <- tibble(
 ## central asia
 gg_cwdx <- df_cwdx |> 
   drop_na(cwdx80) |> 
-  plot_map4(varnam = "cwdx80", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+  plot_map4(varnam = "cwdx80", lonmin = 45, lonmax = 95, latmin = 25, latmax = 42.5, 
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
@@ -434,7 +434,7 @@ Map CTI
 ## central asia
 gg_cti <- df_cwdx |> 
   drop_na(gti_q90) |> 
-  plot_map4(varnam = "gti_q90", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+  plot_map4(varnam = "gti_q90", lonmin = 45, lonmax = 95, latmin = 25, latmax = 42.5, 
             breaks = 0:15, 
             spacing = "constant",
             combine = FALSE, 
@@ -453,7 +453,7 @@ Map Elevation
 ```{r}
 ## central asia
 gg_elv <- df_cwdx %>% 
-  plot_map4(varnam = "elv", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+  plot_map4(varnam = "elv", lonmin = 45, lonmax = 95, latmin = 25, latmax = 42.5, 
             breaks = seq(0, 8.500, by = 0.500), 
             spacing = "constant",
             combine = FALSE, 
@@ -477,7 +477,7 @@ n_fun <- function(x){
                     label = length(x)))
 }
 
-gg_boxplot <- df_cwdx |> 
+gg_boxplot1_cwdx_casia <- df_cwdx |> 
   filter(lon > 50 & lon < 65 & lat > 26 & lat < 35 & !is.na(igti_q90)) |>
   ggplot(aes(igti_q90, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
@@ -488,10 +488,15 @@ gg_boxplot <- df_cwdx |>
 
 gg_boxplot1_cwdx_casia
 
+n_fun <- function(x){
+  return(data.frame(y = 600,
+                    label = length(x)))
+}
 gg_boxplot1_elv_casia <- df_cwdx %>% 
   filter(lon > 50 & lon < 65 & lat > 26 & lat < 35 & !is.na(ielv)) %>%
   ggplot(aes(ielv, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  stat_summary(fun.data = n_fun, geom = "text", hjust = 0.5, size = 2.5) +
   ylim(0, 600) +
   theme_classic() +
   labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Red box")
@@ -501,6 +506,10 @@ gg_boxplot1_elv_casia
 
 Blue box: `long = c(76, 84, 84, 76, 76), lat = c(26, 26, 31, 31, 26)`
 ```{r}
+n_fun <- function(x){
+  return(data.frame(y = 750,
+                    label = length(x)))
+}
 gg_boxplot2_cwdx_casia <- df_cwdx %>% 
   filter(lon > 76 & lon < 84 & lat > 26 & lat < 31 & !is.na(igti_q90)) %>%
   ggplot(aes(igti_q90, cwdx80)) +
@@ -512,10 +521,15 @@ gg_boxplot2_cwdx_casia <- df_cwdx %>%
 
 gg_boxplot2_cwdx_casia
 
+n_fun <- function(x){
+  return(data.frame(y = 600,
+                    label = length(x)))
+}
 gg_boxplot2_elv_casia <- df_cwdx %>% 
   filter(lon > 76 & lon < 84 & lat > 26 & lat < 31 & !is.na(ielv)) %>%
   ggplot(aes(ielv, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  stat_summary(fun.data = n_fun, geom = "text", hjust = 0.5, size = 2.5) +
   ylim(0, 600) +
   theme_classic() +
   labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Blue box")
@@ -532,9 +546,9 @@ top <- cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend,
 btm <- cowplot::plot_grid(gg_boxplot1_cwdx_casia, gg_boxplot2_cwdx_casia,
                           gg_boxplot1_elv_casia, gg_boxplot2_elv_casia,
                           ncol = 2, labels = c('d', 'e', 'f', 'g'))
-cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(3, 0.85))
-ggsave("fig/fig_topography_casia.png", width = 10, height = 19)
-ggsave("fig/fig_topography_casia.pdf", width = 10, height = 19)
+cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(2.5, 0.85))
+ggsave("fig/fig_topography_casia.pdf", width = 10, height = 16)
+ggsave("fig/fig_topography_casia.png", width = 10, height = 16)
 ```
 
 ### Western USA
@@ -554,7 +568,7 @@ df_box2 <- tibble(
 gg_cwdx <- df_cwdx |> 
   drop_na(cwdx80) |> 
   plot_map4(varnam = "cwdx80", 
-            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47,
+            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 44,
             breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
             spacing = "constant",
             combine = FALSE, 
@@ -579,7 +593,7 @@ Plot CTI
 gg_cti <- df_cwdx |> 
   drop_na(gti_q90) |> 
   plot_map4(varnam = "gti_q90", 
-            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47,
+            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 44,
             breaks = 0:15, 
             spacing = "constant",
             combine = FALSE, 
@@ -599,7 +613,7 @@ Map Elevation
 ## central asia
 gg_elv <- df_cwdx %>% 
   plot_map4(varnam = "elv", 
-            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47,
+            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 44,
             breaks = seq(0, 4.000, by = 0.200), 
             spacing = "constant",
             combine = FALSE, 
@@ -644,7 +658,7 @@ gg_boxplot1_elv_wusa <- df_cwdx %>%
   ggplot(aes(ielv, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
   stat_summary(fun.data = n_fun, geom = "text", hjust = 0.5, size = 2.5) +
-  ylim(0, 600) +
+  ylim(0, 620) +
   theme_classic() +
   labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Red box")
 
@@ -677,7 +691,7 @@ gg_boxplot2_elv_wusa <- df_cwdx %>%
   ggplot(aes(ielv, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
   stat_summary(fun.data = n_fun, geom = "text", hjust = 0.5, size = 2.5) +
-  ylim(0, 600) +
+  ylim(0, 620) +
   theme_classic() +
   labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Blue box")
 
@@ -694,9 +708,9 @@ top <- cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend,
 btm <- cowplot::plot_grid(gg_boxplot1_cwdx_wusa, gg_boxplot2_cwdx_wusa,
                           gg_boxplot1_elv_wusa, gg_boxplot2_elv_wusa,
                           ncol = 2, labels = c('d', 'e', 'f', 'g'))
-cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(3, 0.85))
-ggsave("fig/fig_topography_wusa.png", width = 10, height = 19)
-ggsave("fig/fig_topography_wusa.pdf", width = 10, height = 19)
+cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(2.5, 0.85))
+ggsave("fig/fig_topography_wusa.png", width = 10, height = 16)
+ggsave("fig/fig_topography_wusa.pdf", width = 10, height = 16)
 ```
 
 
