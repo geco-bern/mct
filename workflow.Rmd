@@ -1953,7 +1953,7 @@ gg <- plot_map_cwdx_type_irrigation(
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
-  scale = 50,
+  scale = "medium",
   expand_size_y = 0.4,
   irr_cutoff = 0.3
   )
@@ -2628,8 +2628,8 @@ df_cwd_et0 |>
 ### Regional
 
 ```{r}
-# load("data/df_cwd_et0_3_flattening.RData")
-# load("data/df_rivers.RData")
+load("data/df_cwd_et0_3_flattening.RData")
+load("data/df_rivers.RData")
 source("R/plot_map_cwdx_type_irrigation.R")
 
 # ## apply vegetation mask
@@ -2662,7 +2662,7 @@ gg <- plot_map_cwdx_type_irrigation(
   legend_title = "(mm)", 
   hillshade = TRUE,
   rivers = TRUE,
-  scale = 50,
+  scale = "medium",
   expand_size_y = 0.7,
   irr_cutoff = 0.3
   )
