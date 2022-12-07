@@ -1093,8 +1093,8 @@ nc_tenthdeg <- nc_to_df("data/cwdx80_tenthdeg.nc", varnam = "cwdx80") |>
   mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) |>
   left_join(df_vegmask_tenthdeg |>
               mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)),
-            by = c("lon", "lat")) %>%
-  mutate(cwdx80 = ifelse(nonveg > 99, NA, cwdx80)) %>% 
+            by = c("lon", "lat")) |>
+  mutate(cwdx80 = ifelse(nonveg > 99, NA, cwdx80)) |> 
   mutate(cwdx80 = ifelse(lat > 74, NA, cwdx80))
 
 gg <- plot_map4(nc_tenthdeg, 
@@ -1364,37 +1364,37 @@ gg2 <- plot_map4(df_whc_agg,
 
 ```{r}
 load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
-df_cwdx <- df %>% 
+df_cwdx <- df |> 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 rm("df")
 load("data/df_vegmask.RData") # loads df_vegmask
 
-df <- df_whc %>% 
-  dplyr::select(lon, lat, whc_1m, whc_2m) %>% 
+df <- df_whc |> 
+  dplyr::select(lon, lat, whc_1m, whc_2m) |> 
   left_join(
     df_cwdx,
     by = c("lon", "lat")
-  ) %>%
-  left_join(df_vegmask %>% 
+  ) |>
+  left_join(df_vegmask |> 
               dplyr::select(lon, lat, nonveg),
-            by = c("lon", "lat")) %>% 
-  mutate(area = rbeni::calc_area(lat, dx = 0.05, dy = 0.05)) %>% 
+            by = c("lon", "lat")) |> 
+  mutate(area = rbeni::calc_area(lat, dx = 0.05, dy = 0.05)) |> 
   mutate(deeper_2m = ifelse(cwdx80 > whc_2m, 1, 0),
-         deeper_1m = ifelse(cwdx80 > whc_1m, 1, 0)) %>% 
+         deeper_1m = ifelse(cwdx80 > whc_1m, 1, 0)) |> 
   mutate(vegetated = ifelse(nonveg < 0.99, 1, 0))
 
 ## fraction of vegetated earth surface where plants have access to deep (>2 m) water
-sum_deeper_1m <- df %>% 
-  mutate(tmp = area * vegetated * deeper_1m) %>% 
-  summarise(tmp = sum(tmp, na.rm = TRUE)) %>% 
+sum_deeper_1m <- df |> 
+  mutate(tmp = area * vegetated * deeper_1m) |> 
+  summarise(tmp = sum(tmp, na.rm = TRUE)) |> 
   pull(tmp)
-sum_deeper_2m <- df %>% 
-  mutate(tmp = area * vegetated * deeper_2m) %>% 
-  summarise(tmp = sum(tmp, na.rm = TRUE)) %>% 
+sum_deeper_2m <- df |> 
+  mutate(tmp = area * vegetated * deeper_2m) |> 
+  summarise(tmp = sum(tmp, na.rm = TRUE)) |> 
   pull(tmp)
-sum_vegetated <- df %>% 
-    mutate(tmp = area * vegetated) %>% 
-    summarise(tmp = sum(tmp, na.rm = TRUE)) %>% 
+sum_vegetated <- df |> 
+    mutate(tmp = area * vegetated) |> 
+    summarise(tmp = sum(tmp, na.rm = TRUE)) |> 
     pull(tmp)
 sum_deeper_1m / sum_vegetated
 sum_deeper_2m / sum_vegetated
@@ -1402,26 +1402,26 @@ sum_deeper_2m / sum_vegetated
 
 Plot where deeper
 ```{r}
-df <- df %>%
-  ungroup() %>%
+df <- df |>
+  ungroup() |>
   mutate(ilon = cut(lon,
                     breaks = lon_breaks),
          ilat = cut(lat,
-                    breaks = lat_breaks)) %>%
+                    breaks = lat_breaks)) |>
   mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
          lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
          lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
-         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )) %>%
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )) |>
   mutate(lon_mid = (lon_lower + lon_upper)/2,
-         lat_mid = (lat_lower + lat_upper)/2) %>%
+         lat_mid = (lat_lower + lat_upper)/2) |>
   
   ## create cell name to associate with climate input
   dplyr::select(-ilon, -ilat, -lon_lower, -lon_upper, -lat_lower, -lat_upper)
 
-df_agg <- df %>% 
-  group_by(lon_mid, lat_mid) %>% 
-  summarise(deeper_1m = mean(deeper_1m, na.rm = TRUE), deeper_2m = mean(deeper_2m, na.rm = TRUE)) %>% 
-  mutate(deeper_1m = ifelse(deeper_1m < 0.5, 0, 1), deeper_2m = ifelse(deeper_2m < 0.5, 0, 1)) %>% 
+df_agg <- df |> 
+  group_by(lon_mid, lat_mid) |> 
+  summarise(deeper_1m = mean(deeper_1m, na.rm = TRUE), deeper_2m = mean(deeper_2m, na.rm = TRUE)) |> 
+  mutate(deeper_1m = ifelse(deeper_1m < 0.5, 0, 1), deeper_2m = ifelse(deeper_2m < 0.5, 0, 1)) |> 
   rename(lon = lon_mid, lat = lat_mid)
 ```
 
@@ -2210,7 +2210,7 @@ save(df_cwd_lue0_agg, file = "data/df_cwd_lue0_agg.Rdata")
 
 Read tenth-degree global file and plot.
 ```{r}
-load("data/df_cwd_lue0_agg.Rdata")
+# load("data/df_cwd_lue0_agg.Rdata")
 
 # apply vegetation mask
 df_cwd_lue0_agg <- df_cwd_lue0_agg |> 
@@ -2228,7 +2228,8 @@ gg <- plot_map4(df_cwd_lue0_agg,
                 combine = FALSE, 
                 colorscale = "batlowK", 
                 legend_title = "(mm)",
-                legend_direction = "horizontal"
+                legend_direction = "horizontal",
+                ocean = TRUE
                 )
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dSIF])))
@@ -2733,8 +2734,9 @@ df_cwd_et0 |>
 ### Regional
 
 ```{r}
-# load("data/df_cwd_et0_3_flattening.RData")
-# load("data/df_rivers.RData")
+load("data/df_cwd_et0_3_flattening.RData")
+load("data/df_rivers.RData")
+load("data/df_irr.RData")
 source("R/plot_map_cwdx_type_irrigation.R")
 
 # ## apply vegetation mask
@@ -2756,18 +2758,19 @@ source("R/plot_map_cwdx_type_irrigation.R")
   
 ## central asia, multi layer map
 gg <- plot_map_cwdx_type_irrigation(
-  df_cwd_et0, df_irr,
+  df_cwd_et0, 
+  df_irr,
   name_cwdx = "cwd_lue0_fet", name_type = "flat_fet", name_irr = "irr",
   lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5,
   # lonmin = 52, lonmax = 85, latmin = 27, latmax = 45,
   breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
   spacing = "constant",
   combine = FALSE, 
-  colorscale = "batlowK", 
+  colorscale = viridis::cividis,  # "batlowK", 
   legend_title = "(mm)", 
   hillshade = TRUE,
   rivers = TRUE,
-  scale = 50,
+  scale = "medium",
   expand_size_y = 0.7,
   irr_cutoff = 0.3
   )
@@ -2882,7 +2885,7 @@ gg <- plot_map_cwdx_type_irrigation(
   legend_title = expression(paste(italic("S")[dEF], " (mm)")), 
   hillshade = TRUE,
   rivers = TRUE,
-  scale = 50,
+  scale = "medium",
   expand_size_y = 0.4,
   irr_cutoff = 0.3
   )
@@ -3040,12 +3043,11 @@ df_cwd_et0 <- df
 rm("df")
 
 ## add vegetation mask (fraction of non-vegetated)
-# load("data/df_vegmask.RData") # loads df_vegmask
+load("data/df_vegmask.RData") # loads df_vegmask
 df_cwd_et0 <- df_cwd_et0 |>
   left_join(df_vegmask |> dplyr::select(lon, lat, nonveg),
             by = c("lon", "lat"))
 
-## bin to half-degree gridcells for determining climate forcing
 dlon <- 0.1
 dlat <- 0.1
 lon_breaks <- seq(from = floor(min(df_cwd_et0$lon)), to = ceiling(max(df_cwd_et0$lon)), by = dlon)
@@ -3084,7 +3086,7 @@ save(df_cwd_et0_agg, file = "data/df_cwd_et0_agg.RData")
 Read tenth-degree global file and plot.
 
 ```{r}
-load("data/df_cwd_et0_agg.RData")
+# load("data/df_cwd_et0_agg.RData")
 
 df_box <- tibble(
   long = c(45, 95, 95, 45, 45), lat = c(47.5, 47.5, 25, 25, 47.5),
@@ -3110,6 +3112,7 @@ gg <- plot_map4(df_cwd_et0_agg,
                 hillshade = FALSE,
                 rivers = FALSE,
                 expand_size_y = 0.5,
+                ocean = TRUE,
                 legend_direction = "horizontal")
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[dEF]))) +

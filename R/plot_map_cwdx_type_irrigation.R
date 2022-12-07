@@ -199,7 +199,7 @@ plot_map_cwdx_type_irrigation <- function(
 	  geom_tile(data = df, aes(x = lon, y = lat, fill = type, color = type)) +     # , show.legend = FALSE
 
 	  ## color scale for type, colors from here: https://github.com/cj-holmes/vhs/blob/main/data-raw/create-palettes.R
-	  scale_fill_manual(name = "Flattening", values = "royalblue", labels = c("TRUE", "FALSE")) +  # mauve: "#be7682ff"; orange: "#eb6133ff", green: "#00902eff"
+	  scale_fill_manual(name = "Flattening", values = "royalblue", labels = c("TRUE", "FALSE"), na.value = "transparent") +  # mauve: "#be7682ff"; orange: "#eb6133ff", green: "#00902eff"
 	  scale_color_manual(name = "Flattening", values = "royalblue", labels = c("TRUE", "FALSE")) +
 	  
   	## geoms below will use another color scale
@@ -207,7 +207,7 @@ plot_map_cwdx_type_irrigation <- function(
 	  new_scale_color() +
 	  
 	  ## second layer: CWDX
-	  geom_tile(data = df, aes(x = lon, y = lat, fill = cwdxcut, color = cwdxcut), show.legend = FALSE) +   # 
+	  geom_tile(data = df, aes(x = lon, y = lat, fill = cwdxcut, color = cwdxcut), show.legend = FALSE, na.value = "transparent") +   # 
 
     scale_fill_manual(values = colorscale) +
     scale_color_manual(values = colorscale) +
