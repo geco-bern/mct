@@ -315,7 +315,11 @@ load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwd
 
 df_cwdx <- df %>%
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3))
+```
 
+### Add CTI data
+
+```{r}
 ## combine S_cwdxXX and GTI into one big data frame
 df_cwdx <- df %>% 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
@@ -345,27 +349,46 @@ df_cwdx <- df %>%
          gti_q90 = ifelse(gti_q90 < 0, NA, gti_q90))
 ```
 
+### Add elevation data
+
+```{r}
+## combine S_cwdxXX and GTI into one big data frame
+df_cwdx <- df_cwdx %>% 
+  left_join(
+    nc_to_df("~/data/etopo/ETOPO1_Bed_g_mean_0_05deg.nc", varnam = "elv") %>%
+      drop_na() %>%
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)),
+    by = c("lon", "lat")) %>% 
+  mutate(elv = ifelse(elv < 0, NA, elv))
+```
+
+### Apply vegetation mask
+
 ```{r}
 load("data/df_vegmask.RData")  # loads df_vegmask
 
 df_cwdx <- df_cwdx %>%
   left_join(df_vegmask,
             by = c("lon", "lat")) %>%
-  mutate(cwdx80 = ifelse(nonveg > 99, NA, cwdx80))
+  mutate(cwdx80 = ifelse(nonveg > 0.99, NA, cwdx80))
 ```
     
-S0 in CTI bins
+S0 in CTI and elevation bins
 ```{r}
 gti_breaks <- 0:15
+elv_breaks <- seq(0, 9, by = 0.5)
 
 df_cwdx <- df_cwdx %>%
+  mutate(elv = elv/1000) %>% 
   ungroup() %>%
   mutate(igti_q10 = cut(gti_q10,
                     breaks = gti_breaks),
          igti_q50 = cut(gti_q50,
                     breaks = gti_breaks),
          igti_q90 = cut(gti_q90,
-                    breaks = gti_breaks))
+                    breaks = gti_breaks)) %>%
+  mutate(ielv = cut(elv,
+                    breaks = elv_breaks))
 ```  
 
 ### Central asia
@@ -399,10 +422,10 @@ gg_cwdx$ggmap <- gg_cwdx$ggmap +
   geom_path(aes(x = long, y = lat, group = group), data = df_box1, size = 0.5, color = "red") +
   geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
 
-cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
+# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 ```
 
-Plot CTI
+Map CTI
 ```{r}
 ## central asia
 gg_cti <- df_cwdx %>% 
@@ -421,41 +444,84 @@ gg_cti$ggmap <- gg_cti$ggmap +
   geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
 ```
 
+Map Elevation
+```{r}
+## central asia
+gg_elv <- df_cwdx %>% 
+  plot_map4(varnam = "elv", lonmin = 45, lonmax = 95, latmin = 25, latmax = 47.5, 
+            breaks = seq(0, 8.500, by = 0.500), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = "batlow", invert = 1, legend_title = "(km)",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+gg_elv$ggmap <- gg_elv$ggmap + 
+  labs(title = "Elevation") + 
+  geom_path(aes(x = long, y = lat, group = group), data = df_box1, size = 0.5, color = "red") +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
+
+gg_elv$ggmap
+```
+
 Red box: `long = c(50, 65, 65, 50, 50), lat = c(26, 26, 35, 35, 26)`
 ```{r}
-gg_boxplot <- df_cwdx %>% 
+gg_boxplot1_cwdx_casia <- df_cwdx %>% 
   filter(lon > 50 & lon < 65 & lat > 26 & lat < 35 & !is.na(igti_q90)) %>%
   ggplot(aes(igti_q90, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
   ylim(0, 700) +
   theme_classic() +
-  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "Red box")
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "CTI", subtitle = "Red box")
 
-gg_boxplot
+gg_boxplot1_cwdx_casia
+
+gg_boxplot1_elv_casia <- df_cwdx %>% 
+  filter(lon > 50 & lon < 65 & lat > 26 & lat < 35 & !is.na(ielv)) %>%
+  ggplot(aes(ielv, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 600) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Red box")
+
+gg_boxplot1_elv_casia
 ```
 
 Blue box: `long = c(76, 84, 84, 76, 76), lat = c(26, 26, 31, 31, 26)`
 ```{r}
-gg_boxplot2 <- df_cwdx %>% 
+gg_boxplot2_cwdx_casia <- df_cwdx %>% 
   filter(lon > 76 & lon < 84 & lat > 26 & lat < 31 & !is.na(igti_q90)) %>%
   ggplot(aes(igti_q90, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
   ylim(0, 700) +
   theme_classic() +
-  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "Blue box")
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "CTI", subtitle = "Blue box")
 
-gg_boxplot2
+gg_boxplot2_cwdx_casia
+
+gg_boxplot2_elv_casia <- df_cwdx %>% 
+  filter(lon > 76 & lon < 84 & lat > 26 & lat < 31 & !is.na(ielv)) %>%
+  ggplot(aes(ielv, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 600) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Blue box")
+
+gg_boxplot2_elv_casia
 ```
 
 Publication figure
 ```{r}
 top <- cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend, 
-                   gg_cti$ggmap, gg_cti$gglegend,
-                   ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
-btm <- cowplot::plot_grid(gg_boxplot, gg_boxplot2,
-                          ncol = 2, labels = c('c', 'd'))
-cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(2, 0.4))
-ggsave("fig/fig_topography_casia.png", width = 10, height = 12)
+                          gg_cti$ggmap, gg_cti$gglegend,
+                          gg_elv$ggmap, gg_elv$gglegend,
+                          ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', '', 'c', ''))
+btm <- cowplot::plot_grid(gg_boxplot1_cwdx_casia, gg_boxplot2_cwdx_casia,
+                          gg_boxplot1_elv_casia, gg_boxplot2_elv_casia,
+                          ncol = 2, labels = c('d', 'e', 'f', 'g'))
+cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(3, 0.85))
+ggsave("fig/fig_topography_casia.png", width = 10, height = 19)
 ```
 
 ### Western USA
@@ -513,42 +579,86 @@ gg_cti$ggmap <- gg_cti$ggmap +
   geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
 ```
 
+Map Elevation
+```{r}
+## central asia
+gg_elv <- df_cwdx %>% 
+  plot_map4(varnam = "elv", 
+            lonmin = -125, lonmax = -95, latmin = 32.5, latmax = 47,
+            breaks = seq(0, 4.000, by = 0.200), 
+            spacing = "constant",
+            combine = FALSE, 
+            colorscale = "batlow", invert = 1, legend_title = "(km)",
+            expand_size_y = 0.5,
+            hillshade = TRUE, rivers = TRUE, lakes = TRUE,
+            scale = "medium"
+            )
+gg_elv$ggmap <- gg_elv$ggmap + 
+  labs(title = "Elevation") + 
+  geom_path(aes(x = long, y = lat, group = group), data = df_box1, size = 0.5, color = "red") +
+  geom_path(aes(x = long, y = lat, group = group), data = df_box2, size = 0.5, color = "royalblue")
+
+gg_elv$ggmap
+```
+
 Red box 
 ```{r}
-gg_boxplot <- df_cwdx %>% 
+gg_boxplot1_cwdx_wusa <- df_cwdx %>% 
   filter(lon > -119 & lon < -113 & lat > 38 & lat < 42 & !is.na(igti_q90)) %>%
   ggplot(aes(igti_q90, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
-  ylim(0, 300) +
+  ylim(0, 700) +
   theme_classic() +
-  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin")
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "CTI", subtitle = "Red box")
 
-gg_boxplot
+gg_boxplot1_cwdx_wusa
+
+gg_boxplot1_elv_wusa <- df_cwdx %>% 
+  filter(lon > -119 & lon < -113 & lat > 38 & lat < 42 & !is.na(ielv)) %>%
+  ggplot(aes(ielv, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 600) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Red box")
+
+gg_boxplot1_elv_wusa
 ```
 
 Blue box `long = c(-118, -120.5, -120.5, -118, -118), lat = c(35, 35, 37, 37, 35),`
 ```{r}
-gg_boxplot2 <- df_cwdx %>% 
+gg_boxplot2_cwdx_wusa <- df_cwdx %>% 
   filter(lon > -120.5 & lon < -118 & lat > 35 & lat < 37 & !is.na(igti_q90)) %>%
   ggplot(aes(igti_q90, cwdx80)) +
   geom_boxplot(outlier.shape = NA, fill = "grey70") +
-  ylim(0, 300) +
+  ylim(0, 700) +
   theme_classic() +
-  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin")
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "CTI bin", title = "CTI", subtitle = "Blue box")
 
-gg_boxplot2
+gg_boxplot2_cwdx_wusa
+
+gg_boxplot2_elv_wusa <- df_cwdx %>% 
+  filter(lon > -120.5 & lon < -118 & lat > 35 & lat < 37 & !is.na(ielv)) %>%
+  ggplot(aes(ielv, cwdx80)) +
+  geom_boxplot(outlier.shape = NA, fill = "grey70") +
+  ylim(0, 600) +
+  theme_classic() +
+  labs(y = expression(paste(italic("S")[CWDX80])), x = "Elevation bin (km)", title = "Elevation", subtitle = "Blue box")
+
+gg_boxplot2_elv_wusa
 ```
 
 
 Publication figure
 ```{r}
 top <- cowplot::plot_grid(gg_cwdx$ggmap, gg_cwdx$gglegend, 
-                   gg_cti$ggmap, gg_cti$gglegend,
-                   ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', ''))
-btm <- cowplot::plot_grid(gg_boxplot, gg_boxplot2,
-                          ncol = 2, labels = c('c', 'd'))
-cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(2, 0.4))
-ggsave("fig/fig_topography_wusa.png", width = 10, height = 12)
+                          gg_cti$ggmap, gg_cti$gglegend,
+                          gg_elv$ggmap, gg_elv$gglegend,
+                          ncol = 2, rel_widths = c(1, 0.12), labels = c('a', '', 'b', '', 'c', ''))
+btm <- cowplot::plot_grid(gg_boxplot1_cwdx_wusa, gg_boxplot2_cwdx_wusa,
+                          gg_boxplot1_elv_wusa, gg_boxplot2_elv_wusa,
+                          ncol = 2, labels = c('d', 'e', 'f', 'g'))
+cowplot::plot_grid(top, btm, ncol = 1, rel_heights = c(3, 0.85))
+ggsave("fig/fig_topography_wusa.png", width = 10, height = 19)
 ```
 
 

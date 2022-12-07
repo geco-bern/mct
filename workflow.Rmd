@@ -1073,7 +1073,7 @@ nc_tenthdeg <- nc_to_df("data/cwdx80_tenthdeg.nc", varnam = "cwdx80") %>%
   left_join(df_vegmask_tenthdeg %>%
               mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)),
             by = c("lon", "lat")) %>%
-  mutate(cwdx80 = ifelse(nonveg > 99, NA, cwdx80)) %>% 
+  mutate(cwdx80 = ifelse(nonveg > 0.99, NA, cwdx80)) %>% 
   mutate(cwdx80 = ifelse(lat > 74, NA, cwdx80))
 
 gg <- plot_map4(nc_tenthdeg, 
@@ -1269,7 +1269,7 @@ ggsave("fig/whc_soil.png", width = 8, height = 4)
 
 Regrid to 0.1 deg.
 ```{r}
-load("data/df_whc.RData")
+# load("data/df_whc.RData")
 
 # source("R/regrid_df.R")
 # df_whc_agg <- regrid_df(df_whc, varnam = "whc_1m", dlon = 0.1, dlat = 0.1)
@@ -1298,8 +1298,12 @@ df_whc_agg <- df_whc %>%
   summarise(whc_1m = mean(whc_1m, na.rm = TRUE), whc_2m = mean(whc_2m, na.rm = TRUE)) %>% 
   rename(lon = lon_mid, lat = lat_mid)
   # mutate(!!varnam := ifelse(is.nan(!!varnam), NA, !!varnam))
+```
 
-gg1 <- plot_map3(df_whc_agg, 
+### Plot global WHC
+
+```{r}
+gg1 <- plot_map4(df_whc_agg, 
                 varnam = "whc_1m", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
                 latmin = -60, latmax = 80,
@@ -1313,7 +1317,7 @@ gg1 <- plot_map3(df_whc_agg,
 # ggsave("fig/map_whc_1m.pdf", width = 10, height = 5)
 # ggsave("fig/map_whc_1m.png", width = 10, height = 5)
 
-gg2 <- plot_map3(df_whc_agg, 
+gg2 <- plot_map4(df_whc_agg, 
                 varnam = "whc_2m", 
                 breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
                 latmin = -60, latmax = 80,
@@ -1327,11 +1331,112 @@ gg2 <- plot_map3(df_whc_agg,
 # ggsave("fig/map_whc_2m.pdf", width = 10, height = 5)
 # ggsave("fig/map_whc_2m.png", width = 10, height = 5)
 
-plot_grid(gg1$ggmap, gg2$ggmap, gg2$gglegend, ncol = 3, labels = c('a', 'b', ''), rel_widths = c(1,1,0.2))
-ggsave("fig/map_whc_1m_2m.pdf", width = 17, height = 5)
-ggsave("fig/map_whc_1m_2m.png", width = 17, height = 5)
+# plot_grid(gg1, gg2, ncol = 1, labels = c('a', 'b'), rel_widths = c(1,1))
+# ggsave("fig/map_whc_1m_2m.pdf", width = 10, height = 8)
+# ggsave("fig/map_whc_1m_2m.png", width = 10, height = 8)
 ```
 
+### Deep water access
+
+```{r}
+load("data/df_cwdx_10_20_40.RData") # loads 'df', created by rscript_collect_cwdx.R
+df_cwdx <- df %>% 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
+rm("df")
+load("data/df_vegmask.RData") # loads df_vegmask
+
+df <- df_whc %>% 
+  dplyr::select(lon, lat, whc_1m, whc_2m) %>% 
+  left_join(
+    df_cwdx,
+    by = c("lon", "lat")
+  ) %>%
+  left_join(df_vegmask %>% 
+              dplyr::select(lon, lat, nonveg),
+            by = c("lon", "lat")) %>% 
+  mutate(area = rbeni::calc_area(lat, dx = 0.05, dy = 0.05)) %>% 
+  mutate(deeper_2m = ifelse(cwdx80 > whc_2m, 1, 0),
+         deeper_1m = ifelse(cwdx80 > whc_1m, 1, 0)) %>% 
+  mutate(vegetated = ifelse(nonveg < 0.99, 1, 0))
+
+## fraction of vegetated earth surface where plants have access to deep (>2 m) water
+sum_deeper_1m <- df %>% 
+  mutate(tmp = area * vegetated * deeper_1m) %>% 
+  summarise(tmp = sum(tmp, na.rm = TRUE)) %>% 
+  pull(tmp)
+sum_deeper_2m <- df %>% 
+  mutate(tmp = area * vegetated * deeper_2m) %>% 
+  summarise(tmp = sum(tmp, na.rm = TRUE)) %>% 
+  pull(tmp)
+sum_vegetated <- df %>% 
+    mutate(tmp = area * vegetated) %>% 
+    summarise(tmp = sum(tmp, na.rm = TRUE)) %>% 
+    pull(tmp)
+sum_deeper_1m / sum_vegetated
+sum_deeper_2m / sum_vegetated
+```
+
+Plot where deeper
+```{r}
+df <- df %>%
+  ungroup() %>%
+  mutate(ilon = cut(lon,
+                    breaks = lon_breaks),
+         ilat = cut(lat,
+                    breaks = lat_breaks)) %>%
+  mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
+         lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
+         lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )) %>%
+  mutate(lon_mid = (lon_lower + lon_upper)/2,
+         lat_mid = (lat_lower + lat_upper)/2) %>%
+  
+  ## create cell name to associate with climate input
+  dplyr::select(-ilon, -ilat, -lon_lower, -lon_upper, -lat_lower, -lat_upper)
+
+df_agg <- df %>% 
+  group_by(lon_mid, lat_mid) %>% 
+  summarise(deeper_1m = mean(deeper_1m, na.rm = TRUE), deeper_2m = mean(deeper_2m, na.rm = TRUE)) %>% 
+  mutate(deeper_1m = ifelse(deeper_1m < 0.5, 0, 1), deeper_2m = ifelse(deeper_2m < 0.5, 0, 1)) %>% 
+  rename(lon = lon_mid, lat = lat_mid)
+```
+
+```{r}
+gg3 <- plot_map4(df_agg, 
+                varnam = "deeper_1m", 
+                breaks = c(0, 0.5, 1), 
+                latmin = -60, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = FALSE, 
+                colorscale = viridis::cividis, 
+                legend_title = "",
+                expand_size_y = 0.5)
+
+# ggsave("fig/map_whc_1m.pdf", width = 10, height = 5)
+# ggsave("fig/map_whc_1m.png", width = 10, height = 5)
+
+gg4 <- plot_map4(df_agg, 
+                varnam = "deeper_2m", 
+                breaks = c(0, 0.5, 1), 
+                latmin = -60, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = FALSE, 
+                colorscale = viridis::cividis, 
+                legend_title = "",
+                expand_size_y = 0.5)
+
+# ggsave("fig/map_whc_2m.pdf", width = 10, height = 5)
+# ggsave("fig/map_whc_2m.png", width = 10, height = 5)
+
+plot_grid(gg1$ggmap, gg2$ggmap, gg2$gglegend, 
+          gg3$ggmap, gg4$ggmap, gg4$gglegend,
+          ncol = 3, labels = c('a', 'b', '', 'c', 'd', ''),
+          rel_widths = c(1, 1, 0.12))
+ggsave("fig/map_whc_1m_2m_deeper.png", width = 10, height = 5)
+ggsave("fig/map_whc_1m_2m_deeper.pdf", width = 10, height = 5)
+```
 
 ## Rooting depth
 
@@ -1491,7 +1596,7 @@ nc_tenthdeg <- nc_to_df("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_cwd80") 
   left_join(df_vegmask_tenthdeg %>%
               mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)),
             by = c("lon", "lat")) %>%
-  mutate(zroot_cwd80 = ifelse(nonveg > 99, NA, zroot_cwd80)) %>%
+  mutate(zroot_cwd80 = ifelse(nonveg > 0.99, NA, zroot_cwd80)) %>%
   mutate(zroot_cwd80 = ifelse(lat > 74, NA, zroot_cwd80)) %>%
   mutate(zroot_cwd80 = zroot_cwd80 / 1000)
 
