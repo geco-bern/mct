@@ -207,7 +207,7 @@ plot_map_cwdx_type_irrigation <- function(
 	  new_scale_color() +
 	  
 	  ## second layer: CWDX
-	  geom_tile(data = df, aes(x = lon, y = lat, fill = cwdxcut, color = cwdxcut), show.legend = FALSE) +   # 
+	  geom_tile(data = df, aes(x = lon, y = lat, fill = cwdxcut, color = cwdxcut), show.legend = FALSE, na.value = "transparent") +   # 
 
     scale_fill_manual(values = colorscale, na.value = "transparent") +
     scale_color_manual(values = colorscale, na.value = "transparent") +
