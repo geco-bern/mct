@@ -21,13 +21,13 @@ library(ggridges)
 ## Get sites
 
 ```{r cars}
-# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") %>%      # previously done with "data/RSIP_Analysis_sheet.csv"
-df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>%
-  rename(lon = Long, lat = Lat) %>% 
-  rowid_to_column(var = "id") %>% 
+# df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210409.csv") |>      # previously done with "data/RSIP_Analysis_sheet.csv"
+df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") |>
+  rename(lon = Long, lat = Lat) |> 
+  rowid_to_column(var = "id") |> 
   
   ## problem: some have a reference error
-  dplyr::filter(lon != "#REF!") %>% 
+  dplyr::filter(lon != "#REF!") |> 
   mutate(lon = as.numeric(lon), lat = as.numeric(lat), 
          Dr = as.numeric(Dr),
          wtd = as.numeric(Water_Table_Depth_Fan))
@@ -39,26 +39,26 @@ print(paste("Total number of entries:", nrow(df)))
 
 1705 distinct sites based on lon and lat info.
 ```{r}
-df_sites <- df %>% 
-  mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) %>% 
-  group_by(sitename) %>% 
+df_sites <- df |> 
+  mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))) |> 
+  group_by(sitename) |> 
   summarise(Dr = mean(Dr, na.rm = TRUE), wtd = mean(wtd, na.rm = TRUE))
 
 ## add WWF biome info
 df_wwf_sites <- ingest(
-  df %>% 
-    distinct(lon, lat) %>% 
+  df |> 
+    distinct(lon, lat) |> 
     mutate(sitename = paste0("i_", as.character(lon), "_", as.character(lat))),
   source = "wwf",
   dir = "~/data/biomes/wwf_ecoregions/official/",
   settings = list(layer = "wwf_terr_ecos")
-  )%>% 
-  mutate(data = purrr::map(data, ~slice(., 1))) %>% 
+  )|> 
+  mutate(data = purrr::map(data, ~slice(., 1))) |> 
   unnest(data)
 
-df_sites <- df_sites %>% 
+df_sites <- df_sites |> 
   left_join(
-    df_wwf_sites %>% 
+    df_wwf_sites |> 
       dplyr::select(sitename, biome = BIOME, biome_name = BIOME_NAME),
     by = "sitename"
   )
@@ -76,10 +76,10 @@ df_sites <- df_sites %>%
 
 ### Add model results.
 ```{r}
-df_sites <- extract_nc(df_sites %>% dplyr::select(sitename, lon, lat), "data/zroot_cwd80.nc") %>% 
-  unnest(data) %>% 
-  rename(zroot_cwdx80 = V1) %>% 
-  mutate(zroot_cwdx80 = zroot_cwdx80 / 1000) %>% 
+df_sites <- extract_nc(df_sites |> dplyr::select(sitename, lon, lat), "data/zroot_cwd80.nc") |> 
+  unnest(data) |> 
+  rename(zroot_cwdx80 = V1) |> 
+  mutate(zroot_cwdx80 = zroot_cwdx80 / 1000) |> 
   right_join(df_sites, by = c("lon", "lat", "sitename"))
 ```
 
@@ -96,7 +96,7 @@ df_sites <- extract_nc(df_sites %>% dplyr::select(sitename, lon, lat), "data/zro
 <!--   coords = c("lon","lat"), -->
 <!--   crs = 4326) -->
 <!-- df$elv <- raster::extract(r, s) -->
-<!-- df <- df %>% -->
+<!-- df <- df |> -->
 <!--   mutate( -->
 <!--     elv = ifelse(elv < 0, 0, elv) -->
 <!--   ) -->
@@ -126,7 +126,7 @@ read_myfile <- function(ichunk, use_whc){
   path <- "./data/out_rsofun_cwdx/"
   filename <- file.path(path, paste0("out_rsofun_cwdx_whc_", as.character(use_whc), "_ichunk_", as.character(ichunk), ".rds"))
   if (file.exists(filename)){
-    df <- readRDS(filename) %>% 
+    df <- readRDS(filename) |> 
       dplyr::select(sitename, whc, s_def, s_cwdx80)
     return(df)
   } else {
@@ -137,20 +137,20 @@ read_myfile <- function(ichunk, use_whc){
 df <- purrr::map_dfr(
   as.list(seq(50)),
   ~read_myfile(., 100)
-  ) %>% 
-  mutate(setup = "whc_100") %>% 
+  ) |> 
+  mutate(setup = "whc_100") |> 
   bind_rows(
     purrr::map_dfr(
       as.list(seq(50)),
       ~read_myfile(., 200)
-      ) %>% 
+      ) |> 
       mutate(setup = "whc_200")
-  ) %>% 
+  ) |> 
   bind_rows(
     purrr::map_dfr(
       as.list(seq(50)),
       ~read_myfile(., "NA")
-      ) %>% 
+      ) |> 
       mutate(setup = "whc_NA")
   )
 
@@ -162,25 +162,32 @@ saveRDS(df, file = "data/df_test_cwdx_rsofun.rds")
 ```{r}
 df <- readRDS("data/df_test_cwdx_rsofun.rds")
 
-# out2 <- df %>% 
-#   dplyr::filter(setup == "whc_NA" & !is.nan(s_cwdx80) & !is.infinite(s_cwdx80) & s_cwdx80 < 1e4) %>%
-#   mutate(s_cwdx80 = remove_outliers(s_cwdx80)) %>% 
+# out2 <- df |> 
+#   dplyr::filter(setup == "whc_NA" & !is.nan(s_cwdx80) & !is.infinite(s_cwdx80) & s_cwdx80 < 1e4) |>
+#   mutate(s_cwdx80 = remove_outliers(s_cwdx80)) |> 
 #   analyse_modobs2("whc", "s_cwdx80", type = "hex")
 # 
 # out2$gg <- out2$gg + xlim(0, 2000) + ylim(0, 2000)
 
-out <- df %>% 
-  dplyr::filter(setup == "whc_NA") %>% 
+n_fun <- function(x){
+  return(data.frame(y = 380,
+                    label = length(x)))
+}
+
+out <- df |> 
+  dplyr::filter(setup == "whc_NA") |> 
   analyse_modobs2("whc", "s_def", shortsubtitle = TRUE) 
 gg1 <- out$gg +
   labs(x = expression("Prescribed" ~ "S"[0] ~ "(mm)"), y = expression("Diagnosed" ~ "S"[0] ~ "(mm)"))
 
-gg2 <- df %>% 
-  dplyr::filter(setup != "whc_NA") %>% 
+gg2 <- df |> 
+  dplyr::filter(setup != "whc_NA") |> 
   ggplot(aes(as.factor(whc), s_def)) +
   geom_violin(draw_quantiles = 0.5, fill = "grey70") +
+  stat_summary(fun.data = n_fun, geom = "text", hjust = 0.5, size = 2.5) +
   labs(x = expression("Prescribed" ~ "S"[0] ~ "(mm)"), y = expression("Diagnosed" ~ "S"[0] ~ "(mm)")) +
   geom_hline(yintercept = c(100, 200), linetype = "dotted") +
+  ylim(0, 380) +
   theme_classic()
 
 toprow <- cowplot::plot_grid(gg2, gg1, ncol = 2, rel_widths = c(1, 1), labels = c('a', 'b'))
@@ -189,20 +196,27 @@ toprow <- cowplot::plot_grid(gg2, gg1, ncol = 2, rel_widths = c(1, 1), labels = 
 ### By biome
 
 ```{r}
-df_sites <- read_csv("data/df_sites_rsip.csv")
-
-tmp <- df %>% 
+tmp <- df |> 
   left_join(df_sites, by = "sitename")
 
+q75 <- function(x){quantile(probs = 0.75, ...)}
+
+n_fun <- function(x){
+  return(c(y = median(x) + 30, label = length(x))) 
+}
+
 ## boxplot
-gg3 <- tmp %>% 
-  dplyr::filter(!(biome_name %in% c(NA))) %>%
-  dplyr::filter(setup != "whc_NA") %>% 
+gg3 <- tmp |> 
+  dplyr::filter(!(biome_name %in% c(NA))) |>
+  dplyr::filter(setup != "whc_NA") |> 
   ggplot(aes(x = biome_name, y = s_def, fill = as.factor(setup))) +
   geom_boxplot(outlier.shape = NA, position=position_dodge(0)) +
+  stat_summary(fun.data = n_fun, geom = "text", fun.y = median,
+               position = position_dodge(width = 0), size = 2.5) +
   scale_fill_manual(values = c("#E69F00", "#56B4E9"), labels = c("100", "200"), name = "Prescribed" ~ "S"[0] ~ "(mm)") +
   labs(x = expression("Biome"), y = expression("Diagnosed" ~ "S"[0] ~ "(mm)")) +
   geom_hline(yintercept = c(100, 200), linetype = "dotted") +
+  ylim(0, 300) +
   theme_classic() +
   coord_flip()
 
@@ -215,13 +229,13 @@ ggsave("fig/plot_rsofun_rsip.png", width = 10, height = 8)
 ### ridge plot
 
 ```{r}
-gg4 <- df %>% 
-  dplyr::filter(!(biome_name %in% biome_exclude)) %>%
-  filter(setup == "whc_NA") %>% 
-  rename(obs = whc, mod = s_def) %>% 
-  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "s0") %>% 
-  dplyr::filter(!is.na(biome_name)) %>% 
-  dplyr::filter(biome_name!="Mangroves") %>%   
+gg4 <- df |> 
+  dplyr::filter(!(biome_name %in% biome_exclude)) |>
+  filter(setup == "whc_NA") |> 
+  rename(obs = whc, mod = s_def) |> 
+  tidyr::pivot_longer(cols = c(mod, obs), names_to = "source", values_to = "s0") |> 
+  dplyr::filter(!is.na(biome_name)) |> 
+  dplyr::filter(biome_name!="Mangroves") |>   
   ggplot(aes(x = s0, y = biome_name, color = source, point_color = source, fill = source)) +
   geom_density_ridges(
     jittered_points = TRUE, scale = .95, rel_min_height = .01,
