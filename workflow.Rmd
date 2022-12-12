@@ -2786,8 +2786,8 @@ gg$ggmap <- gg$ggmap +
 
 gg <- cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.15))
 gg
-ggsave("fig/map_cwd_lue0_types_fet0_casia.png", width = 10, height = 5)
-ggsave("fig/map_cwd_lue0_types_fet0_casia.pdf", width = 10, height = 5)
+ggsave("fig/fig2.png", width = 10, height = 5)
+ggsave("fig/fig2.pdf", width = 10, height = 5)
 
 ## save for publication figure
 gg_fig1c <- gg
@@ -2951,6 +2951,11 @@ df_tmp <- df_cwd_et0 |>
 
 plot_map3(df_tmp, varnam = "landcover")
 
+n_fun <- function(x){
+  return(data.frame(y = 520,
+                    label = length(x)))
+}
+
 ## only woody savannah
 gg1 <- df_tmp |> 
   drop_na(savannah) |> 
@@ -2970,6 +2975,7 @@ gg1b <- df_tmp |>
   drop_na() |> 
   ggplot(aes(landcover, f_flat)) +
   geom_bar(stat = "identity") +
+  stat_summary(fun.data = n_fun, geom = "text", hjust = 0.5, size = 3) +
   theme_classic() +
   labs(x = "Land cover", y = "Fraction flattening")
 
@@ -2986,6 +2992,7 @@ gg2 <- df_irrbin |>
   drop_na() |> 
   ggplot(aes(irr_bin, f_flat)) +
   geom_bar(stat = "identity") +
+  stat_summary(fun.data = n_fun, geom = "text", hjust = 0.5, size = 3) +
   theme_classic() +
   labs(x = "Irrigated area fraction (bins)", y = "Fraction flattening")
 
@@ -4486,7 +4493,7 @@ ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
 
 cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, 
                    gg_fig3b, gg_fig3b_legend, 
-                   ncol = 2, rel_widths = c(1, 0.1), labels = c('a', '', 'b', ''))
-ggsave("fig/fig3.png", width = 10, height = 8) # height = 11 when including the histograms
-ggsave("fig/fig3.pdf", width = 10, height = 8) # height = 11 when including the histograms
+                   ncol = 2, rel_widths = c(1, 0.08), labels = c('a', '', 'b', ''))
+ggsave("fig/fig3.png", width = 10, height = 8)
+ggsave("fig/fig3.pdf", width = 10, height = 8)
 ```
