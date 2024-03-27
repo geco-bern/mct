@@ -1,0 +1,276 @@
+---
+title: "Create rsofun-WHC forcing map"
+author: "Beni Stocker"
+date: "2024-03-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(terra)
+library(rbeni)
+```
+
+
+Get WHC data for topsoil and subsoil per gridcell as data frame.
+```{r}
+rasta_whc_1m <- rast(here::here("data/whc_1m.nc"))
+rasta_whc_2m <- rast(here::here("data/whc_2m.nc"))
+```
+
+Get vegetation height data and regrid to same grid as WHC.
+```{r}
+rasta_height <- rast(here::here("~/data/archive/vegheight_simard_2011/data/vegheight_simard_2011.nc"))
+rasta_height_regridded <- resample(rasta_height, rasta_whc_1m, method = "bilinear")
+```
+
+Combine values of all rasters as data frame.
+```{r}
+df_map <- as.data.frame(rasta_whc_1m, xy = TRUE) |>
+  as_tibble() |>
+  rename(lon = x,
+         lat = y) |>
+  left_join(
+    as.data.frame(rasta_whc_2m, xy = TRUE) |>
+      as_tibble() |>
+      rename(lon = x,
+             lat = y),
+      by = join_by(lon, lat)
+    ) |>
+  left_join(
+    as.data.frame(rasta_height_regridded, xy = TRUE) |>
+      as_tibble() |>
+      rename(lon = x,
+             lat = y,
+             vegheight = Band1),
+      by = join_by(lon, lat)
+    )
+```
+
+Fit regression of rooting depth with tree height.
+```{r}
+df <- read_csv("~/data/rootingdepth/rsip/RSIP_Analysis_sheet_210721.csv") %>%
+  rename(lon = Long, lat = Lat) %>% 
+  rowid_to_column(var = "id") %>% 
+  
+  ## problem: some have a reference error
+  dplyr::filter(lon != "#REF!") %>% 
+  mutate(lon = as.numeric(lon), lat = as.numeric(lat), 
+         Dr = as.numeric(Dr),
+         wtd = as.numeric(Water_Table_Depth_Fan))
+```
+
+Explorations with tree height (`Hs`).
+```{r}
+df2 <- df |> 
+  mutate(Hs = as.numeric(Hs)) |> 
+  mutate(log_dr = log10(Dr), 
+         log_hs = log10(Hs))|> 
+  dplyr::filter(!is.nan(log_dr) & 
+                  !is.nan(log_hs) & 
+                  !is.na(log_dr) & 
+                  !is.na(log_hs) & 
+                  !is.infinite(log_dr) & 
+                  !is.infinite(log_hs))
+
+linmod <- lm(log_dr ~ log_hs, data = df2)
+
+plot(linmod)
+```
+
+```{r}
+# vegetation height in RSIP data is in m
+df2 |> 
+  ggplot(aes(Hs, after_stat(density))) +
+  geom_histogram()
+
+# vegetation height in map is also in m
+df_map |> 
+  ggplot(aes(vegheight, after_stat(density))) +
+  geom_histogram()
+```
+
+Visualise relationship and quantile regression fits.
+```{r}
+df2 |> 
+  ggplot(aes(log_hs, log_dr)) + 
+  geom_point(alpha = 0.5) + 
+  geom_smooth(method = "lm") + 
+  geom_quantile(color = "royalblue", alpha = 0.5,
+                quantiles = seq(.1, .9, by = 0.1)) +
+  geom_quantile(color = "tomato", quantiles = 0.1) +
+  theme_classic()
+```
+
+Get the quantile regression model for the 10% quantile.
+```{r}
+qrmod <- quantreg::rq(
+  log_dr ~ log_hs, 
+  tau = 0.1,
+  data = df2
+  )
+```
+
+Predict 10% quantile of rooting depth as a function of vegetation height.
+```{r}
+df_map <- df_map |> 
+  mutate(log_hs = log(vegheight))
+
+df_map <- df_map |> 
+  mutate(log_dr = predict(qrmod, newdata = df_map)) |> 
+  mutate(dr = exp(log_dr))
+```
+
+Distribution of predicted rooting depths minima (10% quantiles).
+```{r}
+df_map |> 
+  ggplot(aes(dr, after_stat(count))) +
+  geom_histogram()
+```
+
+Convert rooting depth into root zone water storage capacity, using WHC info of top and subsoil.
+```{r}
+get_rzwsc <- function(dr, whc_1, whc_2){
+  ifelse(dr <= 1,
+         dr * whc_1,
+         whc_1 + (dr - 1) * (whc_2/2)
+         )
+}
+
+df_map <- df_map |> 
+  
+  # where no rooting depth estimate is available, assume the 25% quantile rooting depth
+  # preferred over mean because missing rooting depth is where vegetation height is missing
+  # which is mostly in non-forested vegetation.
+  mutate(dr = ifelse(is.na(dr), quantile(df_map$dr, probs = 0.25, na.rm = TRUE), dr)) |> 
+  
+  # convert to storage capacity
+  mutate(rzwsc = get_rzwsc(dr, whc_1m, whc_2m))
+```
+
+Distribution of predicted root zone water storage capacities.
+```{r}
+df_map |> 
+  ggplot(aes(rzwsc, after_stat(count))) +
+  geom_histogram() + 
+  xlim(0, 1500)
+```
+
+Take maximum of S_CWDX80 and the rzwsc calculated above. And the same for rooting depth.
+```{r}
+df_scwdx80 <- rast(here::here("data/cwdx80.nc")) |> 
+  as.data.frame(xy = TRUE) |> 
+  as_tibble() |> 
+  rename(lon = x, lat = y) |> 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) |>
+  left_join(
+    rast(here::here("data/zroot_cwd80.nc")) |> 
+      as.data.frame(xy = TRUE) |> 
+      as_tibble() |> 
+      rename(lon = x, lat = y) |> 
+      mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)),
+    by = join_by(lon, lat)
+  )
+
+df_map <- df_map |> 
+  mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) |>
+  left_join(
+    df_scwdx80,
+    by = join_by(lon, lat)
+  ) |> 
+  mutate(
+    cwdx80_forcing = ifelse(cwdx80 > rzwsc, cwdx80, rzwsc),
+    zroot_cwdx80_forcing = ifelse(zroot_cwd80 > dr, zroot_cwd80, dr)
+  )
+```
+
+Write to file
+```{r}
+nc <- df_to_grid(df_map, 
+                 varnam = "cwdx80_forcing", 
+                 lonnam = "lon", 
+                 latnam = "lat"
+                 )
+write_nc2(nc, 
+          varnams = "cwdx80_forcing", 
+          lon = df_map$lon |> unique() |> sort(), 
+          lat = df_map$lat |> unique() |> sort(), 
+          path = here::here("data/cwdx80_forcing.nc"), 
+          make_zdim = FALSE
+          )
+
+nc <- df_to_grid(df_map, 
+                 varnam = "zroot_cwdx80_forcing", 
+                 lonnam = "lon", 
+                 latnam = "lat"
+                 )
+write_nc2(nc, 
+          varnams = "zroot_cwdx80_forcing", 
+          lon = df_map$lon |> unique() |> sort(), 
+          lat = df_map$lat |> unique() |> sort(), 
+          path = here::here("data/zroot_cwdx80_forcing.nc"), 
+          make_zdim = FALSE
+          )
+```
+
+Regrid to 0.1 deg.
+```{r}
+lon_breaks <- seq(from = floor(min(df_map$lon)), to = ceiling(max(df_map$lon)), by = 0.1)
+lat_breaks <- seq(from = floor(min(df_map$lat)), to = ceiling(max(df_map$lat)), by = 0.1)
+
+df_map <- df_map |>
+  ungroup() |>
+  mutate(ilon = cut(lon,
+                    breaks = lon_breaks),
+         ilat = cut(lat,
+                    breaks = lat_breaks)) |>
+  mutate(lon_lower = as.numeric( sub("\\((.+),.*", "\\1", ilon)),
+         lon_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilon) ),
+         lat_lower = as.numeric( sub("\\((.+),.*", "\\1", ilat) ),
+         lat_upper = as.numeric( sub("[^,]*,([^]]*)\\]", "\\1", ilat) )) |>
+  mutate(lon_mid = (lon_lower + lon_upper)/2,
+         lat_mid = (lat_lower + lat_upper)/2) |>
+  
+  ## create cell name to associate with climate input
+  dplyr::select(-ilon, -ilat, -lon_lower, -lon_upper, -lat_lower, -lat_upper)
+
+df_map_agg <- df_map |> 
+  group_by(lon_mid, lat_mid) |> 
+  summarise(rzwsc = mean(rzwsc, na.rm = TRUE),
+            cwdx80_forcing = mean(cwdx80_forcing, na.rm = TRUE)) |> 
+  rename(lon = lon_mid, lat = lat_mid)
+  # mutate(!!varnam := ifelse(is.nan(!!varnam), NA, !!varnam))
+```
+
+### Plot global WHC
+
+```{r}
+gg1 <- plot_map4(df_map_agg, 
+                varnam = "rzwsc", 
+                breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+                latmin = -60, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = TRUE, 
+                colorscale = "batlowK", 
+                legend_title = "(mm)",
+                expand_size_y = 0.5,
+                ocean = TRUE)
+gg1
+
+gg2 <- plot_map4(df_map_agg, 
+                varnam = "cwdx80_forcing", 
+                breaks = c(seq(0, 100, by = 20), 150, 200, 300, 500, 700, 900, 1200, Inf), 
+                latmin = -60, latmax = 80,
+                spacing = "constant", 
+                maxval = 6000, 
+                combine = TRUE, 
+                colorscale = "batlowK", 
+                legend_title = "(mm)",
+                expand_size_y = 0.5,
+                ocean = TRUE)
+gg2
+# ggsave("fig/map_whc_1m.pdf", width = 10, height = 5)
+# ggsave("fig/map_whc_1m.png", width = 10, height = 5)
+```

@@ -1115,9 +1115,9 @@ gg <- plot_map4(nc_tenthdeg,
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(paste(italic("S")[CWDX80])))
 
-# cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
-# ggsave("fig/map_cwdx80.png", width = 10, height = 5)
-# ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
+cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
+ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
+ggsave("fig/map_cwdx80.png", width = 10, height = 5)
 
 gg_fig3a <- gg$ggmap
 gg_fig3a_legend <- gg$gglegend
@@ -1290,6 +1290,35 @@ gg1 + gg2
 
 ggsave("fig/whc_soil.pdf", width = 8, height = 4)
 ggsave("fig/whc_soil.png", width = 8, height = 4)
+```
+
+Create NetCDF file with map of Extended Data Fig. 5.
+```{r}
+nc <- df_to_grid(df_whc, 
+                 varnam = "whc_1m", 
+                 lonnam = "lon", 
+                 latnam = "lat"
+                 )
+write_nc2(nc, 
+          varnams = "whc_1m", 
+          lon = df_whc$lon |> unique() |> sort(), 
+          lat = df_whc$lat |> unique() |> sort(), 
+          path = "data/whc_1m.nc", 
+          make_zdim = FALSE
+          )
+
+nc <- df_to_grid(df_whc, 
+                 varnam = "whc_2m", 
+                 lonnam = "lon", 
+                 latnam = "lat"
+                 )
+write_nc2(nc, 
+          varnams = "whc_2m", 
+          lon = df_whc$lon |> unique() |> sort(), 
+          lat = df_whc$lat |> unique() |> sort(), 
+          path = "data/whc_2m.nc", 
+          make_zdim = FALSE
+          )
 ```
 
 Regrid to 0.1 deg.
