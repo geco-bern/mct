@@ -2,7 +2,9 @@
 
 *Benjamin D. Stocker*
 
-Code for analysis published as *Global distribution of the rooting zone water storage capacity reflects plant adaptation to the environment*.
+Code for analysis published as *Global patterns of water storage in the rooting zones of vegetation*.
+
+The name of this repo derives from Mass Curve Technique, as referred to by [Gao et al., 2014](https://doi.org/10.1002/2014GL061668), the paper that stood at the very beginning of this analysis.
 
 Code of this repository is published under a GPL v3 license.
 
