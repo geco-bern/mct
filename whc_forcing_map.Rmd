@@ -12,7 +12,6 @@ library(terra)
 library(rbeni)
 ```
 
-
 Get WHC data for topsoil and subsoil per gridcell as data frame.
 ```{r}
 rasta_whc_1m <- rast(here::here("data/whc_1m.nc"))
@@ -155,6 +154,14 @@ df_map |>
   ggplot(aes(rzwsc, after_stat(count))) +
   geom_histogram() + 
   xlim(0, 1500)
+```
+
+Quantiles of veg height-derived root zone water storage capacities. 
+```{r}
+quantile(
+  df_map$rzwsc,
+  probs = c(0.01, 0.05, 0.1)
+)
 ```
 
 Take maximum of S_CWDX80 and the rzwsc calculated above. And the same for rooting depth.
