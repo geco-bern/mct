@@ -43,10 +43,10 @@ df_wtd <- nc_to_df("~/data/watertable_fan13sci/Africa_model_wtd_v2_0.05deg_CLEAN
       drop_na()
     )
 
-save(df_wtd, file = "data/df_wtd.RData")
+save(df_wtd, file = climate_output_path("data/df_wtd.RData", config))
 
-load("data/df_corr.RData")
-load("data/df_wtd.RData")
+load(climate_output_path("data/df_corr.RData", config))
+load(climate_output_path("data/df_wtd.RData", config))
 
 # nc_vegtype <- read_nc_onefile("~/data/landcover/modis_landcover__LPDAAC__v5.1__0.05deg__2010.nc", varnam = "landcover")
 
@@ -90,14 +90,14 @@ df_pred <- df_corr |>
     by = c("lon", "lat")
   )
 
-save(df_pred, file = "data/df_pred.RData")  
+save(df_pred, file = climate_output_path("data/df_pred.RData", config))
 
 df_pred |> 
   mutate(cwd_lue0_SIF = remove_outliers(cwd_lue0_SIF, coef = 10)) |> 
   ggplot(aes(x = cwd_lue0_SIF, y = ..count..)) +
   geom_histogram()
 
-load("data/df_pred.RData")
+load(climate_output_path("data/df_pred.RData", config))
 
 df_pred <- df_pred |> 
   mutate(cwd_lue0_SIF = remove_outliers(cwd_lue0_SIF, coef = 10)) |> 
@@ -133,7 +133,7 @@ df_pred |>
 library(recipes)
 library(caret)
 
-load("data/df_pred.RData")
+load(climate_output_path("data/df_pred.RData", config))
 
 df_sub <- df_pred |> 
   
@@ -178,7 +178,7 @@ modl <- train(myrecipe,
               trControl = traincotrlParams
               )
 
-save(modl, file = "data/modl_lm_allvars.RData")
+save(modl, file = climate_output_path("data/modl_lm_allvars.RData", config))
 
 df_sub$.pred1 <- predict(linmod1, newdata = df_sub)
 df_sub$.pred2 <- predict(linmod2, newdata = df_sub)
@@ -195,13 +195,13 @@ gg40 <- out$gg +
        y = expression(italic(S)[dSIF] ~ " (mm)")) +
   ylim(0.1, 12) + xlim(0.1, 12)
 gg40
-ggsave("fig/corr_FULL.pdf", width = 6, height = 5)
-ggsave("fig/corr_FULL.png", width = 6, height = 5)
+ggsave(climate_output_path("fig/corr_FULL.pdf", config), width = 6, height = 5)
+ggsave(climate_output_path("fig/corr_FULL.png", config), width = 6, height = 5)
 
 library(caret)
 library(recipes)
 
-load("data/df_pred.RData")
+load(climate_output_path("data/df_pred.RData", config))
 
 df_sub <- df_pred |> 
   mutate(aai = ifelse(is.na(aai), 0, aai)) |> 
@@ -250,7 +250,7 @@ modl <- train(myrecipe,
 
 modl
 
-save(modl, file = "data/modl_rf_allvars_casia.RData")
+save(modl, file = climate_output_path("data/modl_rf_allvars_casia.RData", config))
 
 df_test$.pred <- predict(modl, newdata = df_test)
 
@@ -263,10 +263,10 @@ df_pd_aai <- partial(modl, pred.var = "aai")
 df_pd_wtd <- partial(modl, pred.var = "wtd")
 df_pd_forest <- partial(modl, pred.var = "forest")
 
-save(df_pd_gti, file = "data/df_pd_gti.RData")
-save(df_pd_aai, file = "data/df_pd_aai.RData")
-save(df_pd_wtd, file = "data/df_pd_wtd.RData")
-save(df_pd_forest, file = "data/df_pd_forest.RData")
+save(df_pd_gti, file = climate_output_path("data/df_pd_gti.RData", config))
+save(df_pd_aai, file = climate_output_path("data/df_pd_aai.RData", config))
+save(df_pd_wtd, file = climate_output_path("data/df_pd_wtd.RData", config))
+save(df_pd_forest, file = climate_output_path("data/df_pd_forest.RData", config))
 
 df_pd_gti |> 
   ggplot(aes(gti, yhat)) +
@@ -357,9 +357,9 @@ df_gti <- nc_to_df("~/data/gti_marthews/ga2_casia_05deg.nc", varnam = "Band1") |
 df_gti |> 
   analyse_modobs2("gti", "bias_20", type = "hex")
 
-save(df_gti, file = "data/df_gti.RData")
+save(df_gti, file = climate_output_path("data/df_gti.RData", config))
 
-load("data/df_corr.RData")
+load(climate_output_path("data/df_corr.RData", config))
 
 ## 80 year return period
 out <- df_corr |> 
@@ -376,8 +376,8 @@ gg80_sif <- out$gg +
         colours = colorRampPalette( c("gray65", "navy", "red", "yellow"))(5), 
         trans = "log", breaks = c(1, 10, 100, 1000, 10000))
 gg80_sif
-ggsave("fig/corr_cwd_lue0_nSIF_cwdx80.pdf", width = 6, height = 5)
-ggsave("fig/corr_cwd_lue0_nSIF_cwdx80.png", width = 6, height = 5)
+ggsave(climate_output_path("fig/corr_cwd_lue0_nSIF_cwdx80.pdf", config), width = 6, height = 5)
+ggsave(climate_output_path("fig/corr_cwd_lue0_nSIF_cwdx80.png", config), width = 6, height = 5)
 
 ## 80 year return period
 out <- df_corr |> 
@@ -393,15 +393,15 @@ gg80_ef <- out$gg +
         colours = colorRampPalette( c("gray65", "navy", "red", "yellow"))(5), 
         trans = "log", breaks = c(1, 10, 100, 1000, 10000))
 gg80_ef
-ggsave("fig/corr_cwd_lue0_fet_cwdx80.pdf", width = 6, height = 5)
-ggsave("fig/corr_cwd_lue0_fet_cwdx80.png", width = 6, height = 5)
+ggsave(climate_output_path("fig/corr_cwd_lue0_fet_cwdx80.pdf", config), width = 6, height = 5)
+ggsave(climate_output_path("fig/corr_cwd_lue0_fet_cwdx80.png", config), width = 6, height = 5)
 
 ## publication figure
 plot_grid(gg80_sif, gg80_ef, ncol = 2, labels = c('a', 'b'))
-ggsave("fig/corr_cwd_lue0_fet_sif_cwdx80.pdf", width = 12, height = 5)
-ggsave("fig/corr_cwd_lue0_fet_sif_cwdx80.png", width = 12, height = 5)
+ggsave(climate_output_path("fig/corr_cwd_lue0_fet_sif_cwdx80.pdf", config), width = 12, height = 5)
+ggsave(climate_output_path("fig/corr_cwd_lue0_fet_sif_cwdx80.png", config), width = 12, height = 5)
 
-load("data/df_corr.RData")
+load(climate_output_path("data/df_corr.RData", config))
 
 df_corr_biome <- df_corr |> 
   dplyr::filter(biome_name != "Mangroves") |> 
@@ -488,8 +488,8 @@ gg_ef_90 <- out$gg + labs(title = "90% quantile by biome",
               x = expression(italic(S)[CWDX80] ~ " (mm)"),
               y = expression(italic(S)[dEF] ~ " (mm)"))
 
-save(gg_sif_50, file = "data/gg_sif_50.RData")
-save(gg_ef_50, file = "data/gg_ef_50.RData")
+save(gg_sif_50, file = climate_output_path("data/gg_sif_50.RData", config))
+save(gg_ef_50, file = climate_output_path("data/gg_ef_50.RData", config))
 
 library(patchwork)
 load("data/80.RData")
@@ -498,11 +498,11 @@ load("data/gg_rsip_50.RData")
 load("data/gg_rsip_75.RData")
 load("data/gg_rsip_90.RData")
 
-load("data/gg_sj02_10.RData")
-load("data/gg_sj02_25.RData")
-load("data/gg_sj02_50.RData")
-load("data/gg_sj02_75.RData")
-load("data/gg_sj02_90.RData")
+load(climate_output_path("data/gg_sj02_10.RData", config))
+load(climate_output_path("data/gg_sj02_25.RData", config))
+load(climate_output_path("data/gg_sj02_50.RData", config))
+load(climate_output_path("data/gg_sj02_75.RData", config))
+load(climate_output_path("data/gg_sj02_90.RData", config))
 
 (gg_sj02_10 + gg_sj02_50 + gg_sj02_90) /
   (gg_rsip_10 + gg_rsip_50 + gg_rsip_90) /
@@ -511,10 +511,10 @@ load("data/gg_sj02_90.RData")
   plot_annotation(tag_levels = 'a') &  # , tag_prefix = '(', tag_suffix = ')'
   theme(plot.tag = element_text(face = "bold"))
 
-ggsave("fig/modobs_quantiles_biome.pdf", width = 15, height = 15)
-ggsave("fig/modobs_quantiles_biome.png", width = 15, height = 15)
+ggsave(climate_output_path("fig/modobs_quantiles_biome.pdf", config), width = 15, height = 15)
+ggsave(climate_output_path("fig/modobs_quantiles_biome.png", config), width = 15, height = 15)
 
-load("data/df_corr.RData")
+load(climate_output_path("data/df_corr.RData", config))
 
 df_corr |> 
   dplyr::select(biome_name, obs = cwd_lue0_SIF, mod = cwdx40) |>
@@ -549,8 +549,8 @@ df_corr |>
                 limits = c(10, 10000)) +
   labs(y = "")
 
-ggsave("fig/modobs_ridges_cwdx_dsif.pdf", width = 15, height = 10)
-ggsave("fig/modobs_ridges_cwdx_dsif.png", width = 15, height = 10)
+ggsave(climate_output_path("fig/modobs_ridges_cwdx_dsif.pdf", config), width = 15, height = 10)
+ggsave(climate_output_path("fig/modobs_ridges_cwdx_dsif.png", config), width = 15, height = 10)
 
 df_corr |> dplyr::select(biome_name, obs = cwd_lue0_fet, mod = cwdx40) |>
   drop_na() |> 
@@ -583,8 +583,8 @@ df_corr |> dplyr::select(biome_name, obs = cwd_lue0_fet, mod = cwdx40) |>
                 limits = c(10, 10000)) +
   labs(y = "")
 
-ggsave("fig/modobs_ridges_cwdx_fet.pdf", width = 15, height = 10)
-ggsave("fig/modobs_ridges_cwdx_fet.png", width = 15, height = 10)
+ggsave(climate_output_path("fig/modobs_ridges_cwdx_fet.pdf", config), width = 15, height = 10)
+ggsave(climate_output_path("fig/modobs_ridges_cwdx_fet.png", config), width = 15, height = 10)
 
 lon_hires <- seq(-179.975, 179.975, by = 0.05)
 ilon <- purrr::map_int(as.list(df$lon), ~which.min(abs(. - lon_hires)))
@@ -607,31 +607,31 @@ dfs <- siteinfo_fluxnet2015 |>
   
   mutate(data = purrr::map2(ilon, siteinfo, ~calc_cwd_et0_byilon(.x, siteinfo = .y, drop_data = FALSE, overwrite = TRUE, do_plot = TRUE)))
 
-saveRDS(dfs, file = "data/sample_checks_fluxnet2015sites.rds")
+saveRDS(dfs, file = climate_output_path("data/sample_checks_fluxnet2015sites.rds", config))
 
 ## One plot can then be shown as
 dfs$data[[1]]$out_lue0_fet[[1]]$gg + labs(subtitle = dfs$siteinfo[[1]]$sitename)
 
-load("data/gg_fig1a.Rdata")
-load("data/gg_fig1c.Rdata")
-load("data/gg_fig1b.Rdata")
+load(climate_output_path("data/gg_fig1a.Rdata", config))
+load(climate_output_path("data/gg_fig1c.Rdata", config))
+load(climate_output_path("data/gg_fig1b.Rdata", config))
 
 plot_grid(gg_fig1a, gg_fig1b, gg_fig1_legend, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.2))
-ggsave("fig/fig1.png", width = 8, height = 8)
-ggsave("fig/fig1.pdf", width = 8, height = 8)
+ggsave(climate_output_path("fig/fig1.png", config), width = 8, height = 8)
+ggsave(climate_output_path("fig/fig1.pdf", config), width = 8, height = 8)
 
 # Fig. 5
-load("data/gg_fig5a.Rdata")
-load("data/gg_fig5b.Rdata")
+load(climate_output_path("data/gg_fig5a.Rdata", config))
+load(climate_output_path("data/gg_fig5b.Rdata", config))
 bottom_row <- plot_grid(gg_fig5c, gg_fig5d, ncol = 2, labels = c('c', 'd'))
 plot_grid(gg_fig4a, gg_fig4b, gg_fig4_legend, bottom_row, ncol = 1, labels = c('a', 'b', ''), rel_heights = c(1,1,0.25,0.7))
-ggsave("fig/fig_return_period.pdf", width = 8, height = 11)
-ggsave("fig/fig_return_period.png", width = 8, height = 11)
+ggsave(climate_output_path("fig/fig_return_period.pdf", config), width = 8, height = 11)
+ggsave(climate_output_path("fig/fig_return_period.png", config), width = 8, height = 11)
 
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_heights = c(1, 0.12))
 
-ggsave("fig/map_zroot_cwd80.png", width = 10, height = 5)
-ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
+ggsave(climate_output_path("fig/map_zroot_cwd80.png", config), width = 10, height = 5)
+ggsave(climate_output_path("fig/map_zroot_cwd80.pdf", config), width = 10, height = 5)
 
 ## fig 3
 # top <- cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, 
@@ -644,5 +644,5 @@ ggsave("fig/map_zroot_cwd80.pdf", width = 10, height = 5)
 cowplot::plot_grid(gg_fig3a, gg_fig3a_legend, 
                    gg_fig3b, gg_fig3b_legend, 
                    ncol = 2, rel_widths = c(1, 0.08), labels = c('a', '', 'b', ''))
-ggsave("fig/fig3.png", width = 10, height = 8)
-ggsave("fig/fig3.pdf", width = 10, height = 8)
+ggsave(climate_output_path("fig/fig3.png", config), width = 10, height = 8)
+ggsave(climate_output_path("fig/fig3.pdf", config), width = 10, height = 8)

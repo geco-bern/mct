@@ -1,13 +1,15 @@
-get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
+get_cwdx_byilon <- function(ilon_hires, df_lat = NULL,
+                            config = read_input_config()){
   
   source("R/mct2.R")
   source("R/get_plantwhc_mct_bysite.R")
   
   ## construct output file name
-  dirn <- "data/df_cwdx/"
-  filn <- paste0("df_cwdx_ilon_", ilon_hires, ".RData")
-  if (!dir.exists(dirn)) system("mkdir -p data/df_cwdx")
-  path <- paste0(dirn, filn)
+  path <- climate_output_path(
+    paste0("data/df_cwdx/df_cwdx_ilon_", ilon_hires, ".RData"),
+    config
+  )
+  ensure_directory(dirname(path))
   
   if (!is.null(df_lat)){
     ##---------------------------------------------------------------------
@@ -17,10 +19,12 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
     if (!file.exists(path)) rlang::abort(paste("Aborting. File does not exist:", path))
 
     ## Open file with daily water balance
-    dirn <- "data/df_bal/"
-    filn <- paste0("df_bal_ilon_", ilon_hires, ".RData")
-    if (!file.exists(paste0(dirn, filn))) rlang::abort(paste("Aborting. File does not exist:", paste0(dirn, filn)))
-    load(paste0(dirn, filn)) # loads 'df'
+    balance_path <- climate_output_path(
+      paste0("data/df_bal/df_bal_ilon_", ilon_hires, ".RData"),
+      config
+    )
+    if (!file.exists(balance_path)) rlang::abort(paste("Aborting. File does not exist:", balance_path))
+    load(balance_path) # loads 'df'
     
     ## do it only for latitudes (single cells) where CWDX data was actually found missing
     df_cwdx_corr <- df %>% 
@@ -77,9 +81,11 @@ get_cwdx_byilon <- function(ilon_hires, df_lat = NULL){
     if (!file.exists(path)){
       
       ## Open file with daily water balance
-      dirn <- "data/df_bal/"
-      filn <- paste0("df_bal_ilon_", ilon_hires, ".RData")
-      load(paste0(dirn, filn)) # loads 'df'
+      balance_path <- climate_output_path(
+        paste0("data/df_bal/df_bal_ilon_", ilon_hires, ".RData"),
+        config
+      )
+      load(balance_path) # loads 'df'
       
       ## determine CWD and events
       df <- df %>% 

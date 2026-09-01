@@ -18,7 +18,7 @@ save(df_whc, file = "data/df_whc.RData")
 df_biome <- nc_to_df("~/data/biomes/wwf_ecoregions/official/wwf_terr_ecos_raster.nc", varnam = "biome") |> 
   tidyr::drop_na(biome)
 
-load("data/df_cwdx_10_20_80.RData") # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
+load(climate_output_path("data/df_cwdx_10_20_40.RData", config)) # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
 
 ## merge
 df <- df |> 
@@ -30,7 +30,7 @@ df <- df |>
               mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)), 
             by = c("lon", "lat"))
 
-save(df, file = "data/df_mct_merged.RData")
+save(df, file = climate_output_path("data/df_mct_merged.RData", config))
 
 gg <- df_whc |> 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) |> 
@@ -49,8 +49,8 @@ cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
 # system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/whc_top.nc data/whc_top_quartdeg.nc")
 
 nc <- df_to_grid(df, varnam = "whc_sub", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "whc_sub", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = "data/whc_sub.nc", make_zdim = FALSE)
-system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/whc_sub.nc data/whc_sub_quartdeg.nc")
+write_nc2(nc, varnams = "whc_sub", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = climate_output_path("data/whc_sub.nc", config), make_zdim = FALSE)
+system2("cdo", c("remapbil,data-raw/grid/gridfile_quartdeg.txt", climate_output_path("data/whc_sub.nc", config), climate_output_path("data/whc_sub_quartdeg.nc", config)))
 
 ## FC
 # nc <- df_to_grid(df, varnam = "fc_top", lonnam = "lon", latnam = "lat")
@@ -58,8 +58,8 @@ system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/whc_sub.nc data/wh
 # system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/fc_top.nc data/fc_top_quartdeg.nc")
 
 nc <- df_to_grid(df, varnam = "fc_sub", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "fc_sub", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = "data/fc_sub.nc", make_zdim = FALSE)
-system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/fc_sub.nc data/fc_sub_quartdeg.nc")
+write_nc2(nc, varnams = "fc_sub", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = climate_output_path("data/fc_sub.nc", config), make_zdim = FALSE)
+system2("cdo", c("remapbil,data-raw/grid/gridfile_quartdeg.txt", climate_output_path("data/fc_sub.nc", config), climate_output_path("data/fc_sub_quartdeg.nc", config)))
 
 ## PWP
 # nc <- df_to_grid(df, varnam = "pwp_top", lonnam = "lon", latnam = "lat")
@@ -67,8 +67,8 @@ system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/fc_sub.nc data/fc_
 # system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/pwp_top.nc data/pwp_top_quartdeg.nc")
 
 nc <- df_to_grid(df, varnam = "pwp_sub", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "pwp_sub", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = "data/pwp_sub.nc", make_zdim = FALSE)
-system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/pwp_sub.nc data/pwp_sub_quartdeg.nc")
+write_nc2(nc, varnams = "pwp_sub", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = climate_output_path("data/pwp_sub.nc", config), make_zdim = FALSE)
+system2("cdo", c("remapbil,data-raw/grid/gridfile_quartdeg.txt", climate_output_path("data/pwp_sub.nc", config), climate_output_path("data/pwp_sub_quartdeg.nc", config)))
 
 nc_quartdeg <- read_nc_onefile("data/whc_top_quartdeg.nc", varnam = "whc_top")
 gg <- plot_map3(
@@ -82,11 +82,11 @@ gg <- plot_map3(
   )
 gg$ggmap <- gg$ggmap + labs(title = "WHC", subtitle = "Topsoil, fraction")
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.2))
-ggsave("fig/map_whc_top.pdf", width = 10, height = 6)
-ggsave("fig/map_whc_top.png", width = 10, height = 6)
+ggsave(climate_output_path("fig/map_whc_top.pdf", config), width = 10, height = 6)
+ggsave(climate_output_path("fig/map_whc_top.png", config), width = 10, height = 6)
 
 source("R/calc_zroot.R")
-load("data/df_mct_merged.RData")
+load(climate_output_path("data/df_mct_merged.RData", config))
 
 df <- df |> 
   rowwise() |> 
@@ -100,32 +100,32 @@ df <- df |>
  ungroup() |> 
  dplyr::select(lon, lat, biome, starts_with("zroot_"))
 
-save(df, file = "data/df_zroot80.RData")
+save(df, file = climate_output_path("data/df_zroot80.RData", config))
 
 ## save this as a mask
 df_mask <- df |> 
   mutate(mask = ifelse(!is.na(zroot_cwd80), 1, NA)) |> 
   dplyr::select(lon, lat, mask)
-save(df_mask, file = "data/df_mask.RData")
+save(df_mask, file = climate_output_path("data/df_mask.RData", config))
 
-load("data/df_zroot80.RData")
+load(climate_output_path("data/df_zroot80.RData", config))
 
 df |> 
   ggplot(aes(zroot_cwd80/1000, ..density..)) + 
   geom_density() +
   xlim(0, 30)
 
-load("data/df_zroot80.RData")
+load(climate_output_path("data/df_zroot80.RData", config))
 
 nc <- df_to_grid(df, varnam = "zroot_cwd80", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "zroot_cwd80", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = "data/zroot_cwd80.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "zroot_cwd80", lon = df$lon |> unique() |> sort(), lat = df$lat |> unique() |> sort(), path = climate_output_path("data/zroot_cwd80.nc", config), make_zdim = FALSE)
 
-system("cdo remapbil,data-raw/grid/gridfile_quartdeg.txt data/zroot_cwd80.nc data/zroot_cwd80_quartdeg.nc")
-system("cdo remapbil,data-raw/grid/gridfile_tenthdeg.txt data/zroot_cwd80.nc data/zroot_cwd80_tenthdeg.nc")
+system2("cdo", c("remapbil,data-raw/grid/gridfile_quartdeg.txt", climate_output_path("data/zroot_cwd80.nc", config), climate_output_path("data/zroot_cwd80_quartdeg.nc", config)))
+system2("cdo", c("remapbil,data-raw/grid/gridfile_tenthdeg.txt", climate_output_path("data/zroot_cwd80.nc", config), climate_output_path("data/zroot_cwd80_tenthdeg.nc", config)))
 
 load("data/df_vegmask_tenthdeg.RData")  # loads df_vegmask_tenthdeg
 
-nc_tenthdeg <- nc_to_df("data/zroot_cwd80_tenthdeg.nc", varnam = "zroot_cwd80") |> 
+nc_tenthdeg <- nc_to_df(climate_output_path("data/zroot_cwd80_tenthdeg.nc", config), varnam = "zroot_cwd80") |>
   mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) |>
   left_join(df_vegmask_tenthdeg |>
               mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)),
@@ -157,7 +157,7 @@ gg$ggmap <- gg$ggmap +
 gg_fig3b <- gg$ggmap
 gg_fig3b_legend <- gg$gglegend
 
-load("data/df_zroot80.RData") # loads df
+load(climate_output_path("data/df_zroot80.RData", config)) # loads df
 
 gg_hist_zr <- df |> 
   # filter(zroot_cwd80 < 25000) |>
@@ -169,7 +169,7 @@ gg_hist_zr <- df |>
   labs(x = expression(italic(z)[CWDX80] ~ "(m)"), y = "Count")
 gg_hist_zr
 
-filn <- "data/df_zroot_sj02.RData"
+filn <- climate_output_path("data/df_zroot_sj02.RData", config)
 
 if (!file.exists(filn)){
 
@@ -236,7 +236,7 @@ df_sj02 <- df_sj02 |>
               dplyr::select(sitename, biome_name = biome_name),
             by = "sitename")
 
-save(df_sj02, file = paste0("data/df_sj02_biome_wwf_NEW.Rdata"))
+save(df_sj02, file = climate_output_path("data/df_sj02_biome_wwf_NEW.Rdata", config))
 
 library(ggridges)
 #load("data/df_sj02_biome_wwf.Rdata")
@@ -267,8 +267,8 @@ df_sj02 |>
   labs(title = expression("Rooting depth, SJ02 data")) +
   theme_ridges(center = TRUE)
 
-ggsave("fig/modobs_ridges_zroot_biome_wwf_2022.pdf", width = 15, height = 10)
-ggsave("fig/modobs_ridges_zroot_biome_wwf_2022.png", width = 15, height = 10)
+ggsave(climate_output_path("fig/modobs_ridges_zroot_biome_wwf_2022.pdf", config), width = 15, height = 10)
+ggsave(climate_output_path("fig/modobs_ridges_zroot_biome_wwf_2022.png", config), width = 15, height = 10)
 
 #load("data/df_sj02_biome_wwf_NEW.Rdata")
 
@@ -294,7 +294,7 @@ gg_sj02_10 <- out$gg + labs(title = "10% quantile by biome, SJ02 data",
               x = expression(italic(z)[CWDX40] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_sj02_10
-save(gg_sj02_10, file = "data/gg_sj02_10.RData")
+save(gg_sj02_10, file = climate_output_path("data/gg_sj02_10.RData", config))
 
 out <- df_corr_biome |> 
   analyse_modobs2("q25_zroot_cwdx40", "q25_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
@@ -302,7 +302,7 @@ gg_sj02_25 <- out$gg + labs(title = "25% quantile by biome, SJ02 data",
               x = expression(italic(z)[CWDX40] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_sj02_25
-save(gg_sj02_25, file = "data/gg_sj02_25.RData")
+save(gg_sj02_25, file = climate_output_path("data/gg_sj02_25.RData", config))
 
 out <- df_corr_biome |> 
   analyse_modobs2("q50_zroot_cwdx40", "q50_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
@@ -310,7 +310,7 @@ gg_sj02_50 <- out$gg + labs(title = "50% quantile by biome, SJ02 data",
               x = expression(italic(z)[CWDX40] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_sj02_50
-save(gg_sj02_50, file = "data/gg_sj02_50.RData")
+save(gg_sj02_50, file = climate_output_path("data/gg_sj02_50.RData", config))
 
 out <- df_corr_biome |> 
   analyse_modobs2("q75_zroot_cwdx40", "q75_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
@@ -318,7 +318,7 @@ gg_sj02_75 <- out$gg + labs(title = "75% quantile by biome, SJ02 data",
               x = expression(italic(z)[CWDX40] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_sj02_75
-save(gg_sj02_75, file = "data/gg_sj02_75.RData")
+save(gg_sj02_75, file = climate_output_path("data/gg_sj02_75.RData", config))
 
 out <- df_corr_biome |> 
   analyse_modobs2("q90_zroot_cwdx40", "q90_zroot_obs", label = FALSE, id = "biome_name", nlabels = 3)
@@ -326,7 +326,7 @@ gg_sj02_90 <- out$gg + labs(title = "90% quantile by biome, SJ02 data",
               x = expression(italic(z)[CWDX40] ~ " (m)"),
               y = expression("Observed" ~ italic(z)[root] ~ " (m)"))
 gg_sj02_90
-save(gg_sj02_90, file = "data/gg_sj02_90.RData")
+save(gg_sj02_90, file = climate_output_path("data/gg_sj02_90.RData", config))
 
 df_tmp <- df_modobs |> 
   mutate(error = zroot - D95_extrapolated) |> 
@@ -381,7 +381,7 @@ df_sif |>
   ggtitle("Rooting depth by WWF biomes, SJ02 sites") +
   theme_ridges(center = TRUE)
 
-ggsave(paste0("fig/modobs_ridges_cwd_biome_wwf_NEW", siteset, ".pdf"), width = 15, height = 10)
+ggsave(climate_output_path(paste0("fig/modobs_ridges_cwd_biome_wwf_NEW", siteset, ".pdf"), config), width = 15, height = 10)
 
 load("data/df_modobs_reOLD.Rdata")
 df_modobs_new <- dplyr::select(df_modobs, sitename, cwdx20, zroot)

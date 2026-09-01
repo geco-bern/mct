@@ -5,7 +5,7 @@
 source("analysis/_common.R")
 
 ## CWDX data
-load("data/df_cwdx_10_20_40.RData") # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
+load(climate_output_path("data/df_cwdx_10_20_40.RData", config)) # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
 
 df_cwdx <- df |> 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
@@ -13,7 +13,7 @@ df_cwdx <- df |>
 rm("df")
 
 ## mask out non-land cells based on zroot (get info from soil data)
-load("data/df_mask.RData")
+load(climate_output_path("data/df_mask.RData", config))
 df_cwdx <- df_cwdx |> 
   left_join(df_mask, by = c("lon", "lat"))
 for (i in 3:8){
@@ -39,42 +39,49 @@ gt/all
 
 ## 10 y return period
 nc <- df_to_grid(df_cwdx, varnam = "cwdx10", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx10", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = "data/cwdx10.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwdx10", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = climate_output_path("data/cwdx10.nc", config), make_zdim = FALSE)
 
 ## 20 y return period
 nc <- df_to_grid(df_cwdx, varnam = "cwdx20", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx20", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = "data/cwdx20.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwdx20", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = climate_output_path("data/cwdx20.nc", config), make_zdim = FALSE)
 
 ## 40 y return period
 nc <- df_to_grid(df_cwdx, varnam = "cwdx40", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx40", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = "data/cwdx40.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwdx40", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = climate_output_path("data/cwdx40.nc", config), make_zdim = FALSE)
 
 ## 80 y return period
 nc <- df_to_grid(df_cwdx, varnam = "cwdx80", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx80", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = "data/cwdx80.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwdx80", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = climate_output_path("data/cwdx80.nc", config), make_zdim = FALSE)
 
 ## 100 y return period
 nc <- df_to_grid(df_cwdx, varnam = "cwdx100", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx100", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = "data/cwdx100.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwdx100", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = climate_output_path("data/cwdx100.nc", config), make_zdim = FALSE)
 
 ## 200 y return period
 nc <- df_to_grid(df_cwdx, varnam = "cwdx200", lonnam = "lon", latnam = "lat")
-write_nc2(nc, varnams = "cwdx200", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = "data/cwdx200.nc", make_zdim = FALSE)
+write_nc2(nc, varnams = "cwdx200", lon = df_cwdx$lon |> unique() |> sort(), lat = df_cwdx$lat |> unique() |> sort(), path = climate_output_path("data/cwdx200.nc", config), make_zdim = FALSE)
 
-system("cdo remapbil,data-raw/grid/gridfile_tenthdeg.txt data/cwdx10.nc data/cwdx10_tenthdeg.nc")
-system("cdo remapbil,data-raw/grid/gridfile_tenthdeg.txt data/cwdx20.nc data/cwdx20_tenthdeg.nc")
-system("cdo remapbil,data-raw/grid/gridfile_tenthdeg.txt data/cwdx40.nc data/cwdx40_tenthdeg.nc")
-system("cdo remapbil,data-raw/grid/gridfile_tenthdeg.txt data/cwdx80.nc data/cwdx80_tenthdeg.nc")
-system("cdo remapbil,data-raw/grid/gridfile_tenthdeg.txt data/cwdx100.nc data/cwdx100_tenthdeg.nc")
-system("cdo remapbil,data-raw/grid/gridfile_tenthdeg.txt data/cwdx200.nc data/cwdx200_tenthdeg.nc")
+for (period in c(10, 20, 40, 80, 100, 200)) {
+  system2(
+    "cdo",
+    c(
+      "remapbil,data-raw/grid/gridfile_tenthdeg.txt",
+      climate_output_path(paste0("data/cwdx", period, ".nc"), config),
+      climate_output_path(paste0("data/cwdx", period, "_tenthdeg.nc"), config)
+    )
+  )
+}
 
 source("R/extract_cwdx_byilon_lores.R")
-out <- purrr::map_dfr(as.list(seq(720)), ~extract_cwdx_byilon_lores(.))
+out <- purrr::map_dfr(
+  as.list(seq_len(config$et$low_resolution_source$grid$longitude_count)),
+  ~extract_cwdx_byilon_lores(., config)
+)
 
 load("data/df_vegmask_tenthdeg.RData")  # loads df_vegmask_tenthdeg
 
 ## 80 yr
-nc_tenthdeg <- nc_to_df("data/cwdx80_tenthdeg.nc", varnam = "cwdx80") |> 
+nc_tenthdeg <- nc_to_df(climate_output_path("data/cwdx80_tenthdeg.nc", config), varnam = "cwdx80") |>
   mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) |>
   left_join(df_vegmask_tenthdeg |>
               mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)),
@@ -101,8 +108,8 @@ gg$ggmap <- gg$ggmap +
   labs(title = expression(paste(italic("S")[CWDX80])))
 
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.12))
-ggsave("fig/map_cwdx80.pdf", width = 10, height = 5)
-ggsave("fig/map_cwdx80.png", width = 10, height = 5)
+ggsave(climate_output_path("fig/map_cwdx80.pdf", config), width = 10, height = 5)
+ggsave(climate_output_path("fig/map_cwdx80.png", config), width = 10, height = 5)
 
 gg_fig3a <- gg$ggmap
 gg_fig3a_legend <- gg$gglegend
@@ -122,7 +129,7 @@ gg_fig3a_legend <- gg$gglegend
 #                        )
 # save(df_rivers, file = "data/df_rivers.RData")
 
-load("data/df_cwdx_10_20_40.RData") # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
+load(climate_output_path("data/df_cwdx_10_20_40.RData", config)) # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
 
 df_cwdx <- df |> 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
@@ -163,8 +170,8 @@ gg <- df_cwdx |>
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
-ggsave("fig/map_cwdx80_europe.pdf", width = 8, height = 6)
-ggsave("fig/map_cwdx80_europe.png", width = 8, height = 6)
+ggsave(climate_output_path("fig/map_cwdx80_europe.pdf", config), width = 8, height = 6)
+ggsave(climate_output_path("fig/map_cwdx80_europe.png", config), width = 8, height = 6)
 
 ## western usa
 gg <- df_cwdx |> 
@@ -181,8 +188,8 @@ gg <- df_cwdx |>
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
-ggsave("fig/map_cwdx80_wusa.pdf", width = 10, height = 6)
-ggsave("fig/map_cwdx80_wusa.png", width = 10, height = 6)
+ggsave(climate_output_path("fig/map_cwdx80_wusa.pdf", config), width = 10, height = 6)
+ggsave(climate_output_path("fig/map_cwdx80_wusa.png", config), width = 10, height = 6)
 
 ## central asia
 gg <- df_cwdx |> 
@@ -198,8 +205,8 @@ gg <- df_cwdx |>
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80]))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
-ggsave("fig/map_cwdx80_casia.pdf", width = 9, height = 5)
-ggsave("fig/map_cwdx80_casia.png", width = 9, height = 5)
+ggsave(climate_output_path("fig/map_cwdx80_casia.pdf", config), width = 9, height = 5)
+ggsave(climate_output_path("fig/map_cwdx80_casia.png", config), width = 9, height = 5)
 
 ## Amazon
 gg <- df_cwdx |> 
@@ -216,10 +223,10 @@ gg <- df_cwdx |>
 gg$ggmap <- gg$ggmap + 
   labs(title = expression(italic(S)[CWDX80])) 
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 2, rel_widths = c(1, 0.1))
-ggsave("fig/map_cwdx80_amazon.pdf", width = 9, height = 6)
-ggsave("fig/map_cwdx80_amazon.png", width = 9, height = 6)
+ggsave(climate_output_path("fig/map_cwdx80_amazon.pdf", config), width = 9, height = 6)
+ggsave(climate_output_path("fig/map_cwdx80_amazon.png", config), width = 9, height = 6)
 
-load("data/df_cwdx_10_20_40.RData") # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
+load(climate_output_path("data/df_cwdx_10_20_40.RData", config)) # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
 load("data/df_vegmask.RData") # loads df_vegmask
 df_cwdx <- df |> 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) |> 
@@ -259,8 +266,8 @@ gg2 <- df_whc |>
 
 gg1 + gg2
 
-ggsave("fig/whc_soil.pdf", width = 8, height = 4)
-ggsave("fig/whc_soil.png", width = 8, height = 4)
+ggsave(climate_output_path("fig/whc_soil.pdf", config), width = 8, height = 4)
+ggsave(climate_output_path("fig/whc_soil.png", config), width = 8, height = 4)
 
 nc <- df_to_grid(df_whc, 
                  varnam = "whc_1m", 
@@ -271,7 +278,7 @@ write_nc2(nc,
           varnams = "whc_1m", 
           lon = df_whc$lon |> unique() |> sort(), 
           lat = df_whc$lat |> unique() |> sort(), 
-          path = "data/whc_1m.nc", 
+          path = climate_output_path("data/whc_1m.nc", config),
           make_zdim = FALSE
           )
 
@@ -284,7 +291,7 @@ write_nc2(nc,
           varnams = "whc_2m", 
           lon = df_whc$lon |> unique() |> sort(), 
           lat = df_whc$lat |> unique() |> sort(), 
-          path = "data/whc_2m.nc", 
+          path = climate_output_path("data/whc_2m.nc", config),
           make_zdim = FALSE
           )
 
@@ -318,7 +325,7 @@ df_whc_agg <- df_whc |>
 
 saveRDS(
   df_whc_agg,
-  file = here::here("data/df_whc_agg.rds")
+  file = climate_output_path(here::here("data/df_whc_agg.rds"), config)
 )
 
 gg1 <- plot_map4(df_whc_agg, 
@@ -352,10 +359,10 @@ gg2 <- plot_map4(df_whc_agg,
 # ggsave("fig/map_whc_2m.png", width = 10, height = 5)
 
 plot_grid(gg1, gg2, ncol = 1, labels = c('a', 'b'))
-ggsave("fig/map_whc_1m_2m.pdf", width = 10, height = 9)
-ggsave("fig/map_whc_1m_2m.png", width = 10, height = 9)
+ggsave(climate_output_path("fig/map_whc_1m_2m.pdf", config), width = 10, height = 9)
+ggsave(climate_output_path("fig/map_whc_1m_2m.png", config), width = 10, height = 9)
 
-load("data/df_cwdx_10_20_40.RData") # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
+load(climate_output_path("data/df_cwdx_10_20_40.RData", config)) # loads 'df', created by analysis/04_cwd_extremes/04_collect_return_levels.R
 df_cwdx <- df |> 
   mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
 rm("df")
@@ -450,5 +457,5 @@ gg4 <- plot_map4(df_agg,
 # ggsave("fig/map_whc_2m.png", width = 10, height = 5)
 
 plot_grid(gg3$ggmap, gg4$ggmap, ncol = 1, labels = c('a', 'b'))
-ggsave("fig/map_whc_1m_2m_deeper.png", width = 10, height = 9)
-ggsave("fig/map_whc_1m_2m_deeper.pdf", width = 10, height = 9)
+ggsave(climate_output_path("fig/map_whc_1m_2m_deeper.png", config), width = 10, height = 9)
+ggsave(climate_output_path("fig/map_whc_1m_2m_deeper.pdf", config), width = 10, height = 9)

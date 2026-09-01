@@ -7,18 +7,20 @@ notebook.
 
 ## 01 — Tidy inputs
 
-1. `01_watch_prec.R` — WATCH precipitation
-2. `02_watch_snow.R` — WATCH snowfall
+1. `01_watch_prec.R` — configured precipitation
+2. `02_watch_snow.R` — configured snowfall
 3. `03_watch_swrad.R` — WATCH shortwave radiation
-4. `04_watch_temp.R` — WATCH air temperature
-5. `05_alexi.R`, `06_alexi_lores.R` — ALEXI ET
+4. `04_watch_temp.R` — configured air temperature
+5. `05_alexi.R`, `06_alexi_lores.R` — configured ET at both resolutions
 6. `07_sif_jj.R` through `10_sif_pk_lores.R` — both SIF products and resolutions
 7. `11_glass.R` — GLASS radiation
 8. `12_regrid_evi_max.R` — EVI aggregation
 9. `13_extract_global_inputs.R` — remaining global input assembly
 
 Scripts 01–11 call the shared `map2tidy` adapter. They can run independently
-where their source NetCDF files exist.
+where their source NetCDF files exist. The historical script basenames are
+retained for continuity, but scripts 01, 02, 04, 05, and 06 read all source
+details from `config/input_sources.R` rather than assuming WATCH or ALEXI.
 
 ## 02 — Spatial and site preparation
 
@@ -65,6 +67,7 @@ bias analysis and figures.
 
 Chunked scripts accept `CHUNK TOTAL_CHUNKS`. `MCT_ILON` restricts a run to exact
 longitude indices. Existing per-longitude products are skipped, allowing safe
-restart after interruption. Run `Rscript analysis/00_status.R` to compare the
-current output count with the UBELIX job registry.
-
+restart after interruption. All run-dependent paths include the ET and
+precipitation IDs selected in `config/input_sources.R`. Run
+`Rscript analysis/00_status.R` to compare the current configured run's output
+count with the UBELIX job registry.

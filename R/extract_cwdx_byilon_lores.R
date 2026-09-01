@@ -1,6 +1,10 @@
-extract_cwdx_byilon_lores <- function(ilon, overwrite = FALSE){
+extract_cwdx_byilon_lores <- function(ilon, overwrite = FALSE,
+                                      config = read_input_config()){
   
-  infil <- paste0("data/df_cwdx_lores/df_cwdx_ilon_", ilon, ".RData")
+  infil <- climate_output_path(
+    paste0("data/df_cwdx_lores/df_cwdx_ilon_", ilon, ".RData"),
+    config
+  )
   
   df <- NA
   
@@ -8,10 +12,11 @@ extract_cwdx_byilon_lores <- function(ilon, overwrite = FALSE){
     
     load(infil)
     
-    dirn <- "data/df_cwdx_10_20_40_lores/"
-    filn <- paste0("df_cwdx_10_20_40_ilon_", ilon, ".RData")
-    if (!dir.exists(dirn)) system("mkdir -p data/df_cwdx_10_20_40_lores")
-    path <- paste0(dirn, filn)
+    path <- climate_output_path(
+      paste0("data/df_cwdx_10_20_40_lores/df_cwdx_10_20_40_ilon_", ilon, ".RData"),
+      config
+    )
+    ensure_directory(dirname(path))
     
     if (!file.exists(path) || overwrite){
       

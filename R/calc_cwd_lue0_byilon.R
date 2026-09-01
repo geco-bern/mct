@@ -1,4 +1,7 @@
-calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "data/df_cwd_lue0_2", verbose = FALSE){
+calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE,
+                                 dirn = "data/df_cwd_lue0_2",
+                                 verbose = FALSE,
+                                 config = read_input_config()){
   
   source("R/calc_cwd_lue0_v2.R")
   
@@ -7,35 +10,56 @@ calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "data/df_cwd_lue
   }
   
   ## construct output file name
-  filn <- paste0("df_cwd_lue0_", ilon, ".RData")
-  if (!dir.exists(dirn)) system(paste0("mkdir -p ", dirn))
-  path <- paste0(dirn, "/", filn)
+  path <- climate_output_path(
+    file.path(dirn, paste0("df_cwd_lue0_", ilon, ".RData")),
+    config
+  )
+  ensure_directory(dirname(path))
   
   if (!file.exists(path)){
     
     ## Open WATCH-WFDEI SWdown data
-    lon_lores <- seq(-179.75, 179.75, by = 0.5)
-    lon_hires <- seq(-179.975, 179.975, by = 0.05)
-    ilon_lores <- which.min(abs(lon_lores - lon_hires[ilon]))
-    load(paste0("~/data/watch_wfdei/data_tidy/SWdown_daily_WFDEI__ilon_", ilon_lores, ".RData"))
+    ilon_lores <- nearest_source_index(
+      ilon,
+      from_source = config$et$source,
+      to_source = config$temperature$source
+    )
+    sw_path <- climate_output_path(
+      paste0(
+        "~/data/watch_wfdei/data_tidy/SWdown_daily_WFDEI__ilon_",
+        ilon_lores,
+        ".RData"
+      ),
+      config
+    )
+    load(path.expand(sw_path))
     df_sw <- df %>% 
       mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2))
     rm("df")
     
-    ## filter watch data to years within ALEXI data availability (2003-2017)
+    ## filter shortwave data to the configured analysis period
     df_sw <- df_sw %>% 
       ungroup() %>% 
-      dplyr::filter(!is.null(data)) %>% 
-      mutate(data = purrr::map(data, ~dplyr::filter(., lubridate::year(time)>2002 & lubridate::year(time)<2018))) %>% 
+      dplyr::filter(!purrr::map_lgl(data, is.null)) %>%
+      mutate(data = purrr::map(
+        data,
+        ~dplyr::filter(
+          .,
+          lubridate::year(time) >= config$analysis_period$start_year,
+          lubridate::year(time) <= config$analysis_period$end_year
+        )
+      )) %>%
       mutate(data = purrr::map(data, ~rename(., sw = SWdown)))
     
     ## get closest matching latitude indices and merge data frames
     vec_lat_lores <- df_sw$lat %>% unique()
     
     ## Open file CWDX output
-    dirn <- "data/df_cwdx/"
-    filn <- paste0("df_cwdx_ilon_", ilon, ".RData")
-    load(paste0(dirn, filn)) # loads 'df'
+    cwdx_path <- climate_output_path(
+      paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData"),
+      config
+    )
+    load(cwdx_path) # loads 'df'
     
     ## extract data from CWDX output. This now contains the CWD and instances information
     df_cwd <- df %>% 
@@ -48,17 +72,27 @@ calc_cwd_lue0_byilon <- function(ilon, drop_data = TRUE, dirn = "data/df_cwd_lue
     
     ## Load SiF data
     ## version PK
-    filn <- paste0("GOME_PK_dcSIF_005deg_8day__ilon_", ilon, ".RData")
-    dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
-    load(paste0(dirn, filn)) # loads 'df'
+    sif_pk_path <- climate_output_path(
+      paste0(
+        "~/data/gome_2_sif_downscaled/data_tidy/",
+        "GOME_PK_dcSIF_005deg_8day__ilon_", ilon, ".RData"
+      ),
+      config
+    )
+    load(path.expand(sif_pk_path)) # loads 'df'
     df_pk <- df %>% 
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>%
       rename(data_pk = data)
     
     ## version JJ
-    filn <- paste0("GOME_JJ_dcSIF_005deg_8day__ilon_", ilon, ".RData")
-    dirn <- "~/data/gome_2_sif_downscaled/data_tidy/"
-    load(paste0(dirn, filn)) # loads 'df'
+    sif_jj_path <- climate_output_path(
+      paste0(
+        "~/data/gome_2_sif_downscaled/data_tidy/",
+        "GOME_JJ_dcSIF_005deg_8day__ilon_", ilon, ".RData"
+      ),
+      config
+    )
+    load(path.expand(sif_jj_path)) # loads 'df'
     
     df <- df %>% 
       

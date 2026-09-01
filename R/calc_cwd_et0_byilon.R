@@ -1,4 +1,9 @@
-calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "data/df_cwd_et0_2/", verbose = FALSE, overwrite = FALSE, siteinfo = NULL, use_lat = NULL, do_plot = TRUE){
+calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE,
+                                dirn = "data/df_cwd_et0_2/",
+                                verbose = FALSE, overwrite = FALSE,
+                                siteinfo = NULL, use_lat = NULL,
+                                do_plot = TRUE,
+                                config = read_input_config()){
   
   source("R/calc_cwd_lue0_v2.R")
 
@@ -14,19 +19,21 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "data/df_cwd_et0_
       mutate(fet = ifelse(is.na(NR), NA, fet))
   }
   
-  convert_et_MJ <- function(x){ x * 1e6 / (24 * 60 * 60) }  # MJ m-2 d-1 -> W m-2
-  
   ## construct output file name
-  filn <- paste0("df_cwd_et0_", ilon, ".RData")
-  if (!dir.exists(dirn)) system(paste0("mkdir -p ", dirn))
-  path <- paste0(dirn, "/", filn)
+  path <- climate_output_path(
+    file.path(dirn, paste0("df_cwd_et0_", ilon, ".RData")),
+    config
+  )
+  ensure_directory(dirname(path))
   
   if (!file.exists(path) || overwrite){
     
     ## Open file CWDX output
-    dirn <- "data/df_cwdx/"
-    filn <- paste0("df_cwdx_ilon_", ilon, ".RData")
-    load(paste0(dirn, filn)) # loads 'df'
+    cwdx_path <- climate_output_path(
+      paste0("data/df_cwdx/df_cwdx_ilon_", ilon, ".RData"),
+      config
+    )
+    load(cwdx_path) # loads 'df'
     
     ## extract data from CWDX output. This now contains the CWD and instances information
     df_cwd <- df %>%
@@ -38,18 +45,23 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "data/df_cwd_et0_
       dplyr::select(-mct)
     
     ## Load net radiation data (daytime net radiation in W m-2)
-    filn <- paste0("GLASS07B01.V41._ilon_", ilon, ".RData")
-    dirn <- "~/data/glass/data_tidy/"
-    load(paste0(dirn, filn)) # loads 'df'
+    netrad_path <- climate_output_path(
+      paste0(
+        "~/data/glass/data_tidy/GLASS07B01.V41._ilon_",
+        ilon,
+        ".RData"
+      ),
+      config
+    )
+    load(path.expand(netrad_path)) # loads 'df'
     df_netrad <- df %>% 
       rename(data_netrad = data) %>% 
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) 
     rm("df")
       
-    ## Load ALEXI ET data (in MJ d-1 m-2)
-    filn <- paste0("EDAY_CERES__ilon_", ilon, ".RData")
-    dirn <- "~/data/alexi_tir/data_tidy/"
-    load(paste0(dirn, filn)) # loads 'df'
+    ## Load configured ET data
+    et_source <- config$et$source
+    load(source_tidy_path(et_source, ilon, config)) # loads 'df'
     
     ## this is for checks at certain sites
     if (!is.null(siteinfo)){
@@ -64,10 +76,16 @@ calc_cwd_et0_byilon <- function(ilon, drop_data = TRUE, dirn = "data/df_cwd_et0_
     df <- df %>% 
       
       mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
-      rename(data_alexi = data) %>% 
+      rename(data_alexi = data) %>%
+      mutate(data_alexi = purrr::map(
+        data_alexi,
+        ~dplyr::rename(.x, et = tidyselect::all_of(et_source$variable))
+      )) %>%
       
-      ## convert ALEXI ET data to W m-2 (mean across entire day; problem for comparison to netrad if significant condensation at night)
-      dplyr::mutate(data_alexi = purrr::map(data_alexi, ~mutate(., et = convert_et_MJ(et)))) %>% 
+      ## convert ET data to W m-2 (mean across the entire day)
+      dplyr::mutate(
+        data_alexi = purrr::map(data_alexi, ~mutate(.x, et = et_to_w_m2(et, et_source)))
+      ) %>%
       
       ## Combine with netrad data
       inner_join(mutate(df_netrad, lon = round(lon, digits = 3), lat = round(lat, digits = 3)), by = c("lon", "lat")) %>% 

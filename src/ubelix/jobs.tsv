@@ -1,10 +1,10 @@
 stage	job	script	mode	array	chunks	max_parallel	cpus	memory	time	output_pattern	expected_outputs	extra_args
-01_tidy_inputs	watch_prec	analysis/01_tidy_inputs/01_watch_prec.R	chunk_count	72	72	24	2	5G	12:00:00	~/data/watch_wfdei/data_tidy/Rainf_daily_WFDEI_CRU__ilon_*.RData	720	-
-01_tidy_inputs	watch_snow	analysis/01_tidy_inputs/02_watch_snow.R	chunk_count	72	72	24	2	5G	12:00:00	~/data/watch_wfdei/data_tidy/Snowf_daily_WFDEI_CRU__ilon_*.RData	720	-
+01_tidy_inputs	prepare_precipitation	analysis/01_tidy_inputs/01_watch_prec.R	chunk_count	72	72	24	2	5G	12:00:00	@precipitation_tidy	720	-
+01_tidy_inputs	prepare_snowfall	analysis/01_tidy_inputs/02_watch_snow.R	chunk_count	72	72	24	2	5G	12:00:00	@snow_tidy	720	-
 01_tidy_inputs	watch_swrad	analysis/01_tidy_inputs/03_watch_swrad.R	chunk_count	72	72	24	2	5G	12:00:00	~/data/watch_wfdei/data_tidy/SWdown_daily_WFDEI__ilon_*.RData	720	-
-01_tidy_inputs	watch_temp	analysis/01_tidy_inputs/04_watch_temp.R	chunk_count	72	72	24	2	5G	12:00:00	~/data/watch_wfdei/data_tidy/Tair_daily_WFDEI__ilon_*.RData	720	-
-01_tidy_inputs	alexi	analysis/01_tidy_inputs/05_alexi.R	chunk_count	100	100	25	4	20G	3-00:00:00	~/data/alexi_tir/data_tidy/EDAY_CERES__ilon_*.RData	7200	-
-01_tidy_inputs	alexi_lores	analysis/01_tidy_inputs/06_alexi_lores.R	chunk_count	10	10	10	4	10G	1-00:00:00	~/data/alexi_tir/data_tidy_halfdeg/EDAY_CERES__ilon_*.RData	720	-
+01_tidy_inputs	prepare_temperature	analysis/01_tidy_inputs/04_watch_temp.R	chunk_count	72	72	24	2	5G	12:00:00	@temperature_tidy	720	-
+01_tidy_inputs	prepare_et	analysis/01_tidy_inputs/05_alexi.R	chunk_count	100	100	25	4	20G	3-00:00:00	@et_tidy	7200	-
+01_tidy_inputs	prepare_et_lores	analysis/01_tidy_inputs/06_alexi_lores.R	chunk_count	10	10	10	4	10G	1-00:00:00	@et_lores_tidy	720	-
 01_tidy_inputs	sif_jj	analysis/01_tidy_inputs/07_sif_jj.R	chunk_count	100	100	25	4	8G	3-00:00:00	~/data/gome_2_sif_downscaled/data_tidy/GOME_JJ_dcSIF_005deg_8day__ilon_*.RData	7200	-
 01_tidy_inputs	sif_jj_lores	analysis/01_tidy_inputs/08_sif_jj_lores.R	chunk_count	10	10	10	4	8G	1-00:00:00	~/data/gome_2_sif_downscaled/data_tidy_halfdeg/GOME_JJ_dcSIF_05deg_8day__ilon_*.RData	720	-
 01_tidy_inputs	sif_pk	analysis/01_tidy_inputs/09_sif_pk.R	chunk_count	100	100	25	4	8G	3-00:00:00	~/data/gome_2_sif_downscaled/data_tidy/GOME_PK_dcSIF_005deg_8day__ilon_*.RData	7200	-
@@ -12,7 +12,7 @@ stage	job	script	mode	array	chunks	max_parallel	cpus	memory	time	output_pattern	
 01_tidy_inputs	glass	analysis/01_tidy_inputs/11_glass.R	chunk_count	100	100	25	4	30G	3-00:00:00	~/data/glass/data_tidy/GLASS07B01.V41._ilon_*.RData	7200	-
 02_prepare_spatial	fluxnet_data	analysis/02_prepare_spatial/02_get_fluxnet_data.R	none	1	1	1	1	10G	04:00:00	data/df_sif.Rdata	1	-
 02_prepare_spatial	sj02_data	analysis/02_prepare_spatial/03_get_sj02_data.R	none	1	1	1	1	10G	1-00:00:00	data/df_sif_sj02.Rdata	1	-
-03_water_balance	convert_et_mm	analysis/03_water_balance/01_convert_et_mm.R	chunk_count	100	100	25	4	10G	3-00:00:00	data/df_alexi_et_mm/df_alexi_et_mm_ilon_*.RData	7200	-
+03_water_balance	convert_et_mm	analysis/03_water_balance/01_convert_et_mm.R	chunk_count	100	100	25	4	10G	3-00:00:00	data/df_et_mm/df_et_mm_ilon_*.RData	7200	-
 03_water_balance	simulate_snow	analysis/03_water_balance/02_simulate_snow.R	chunk_count	72	72	24	4	10G	3-00:00:00	data/df_snow/df_snow_ilon_*.RData	720	-
 03_water_balance	calculate_balance	analysis/03_water_balance/03_calculate_balance.R	chunk_count	200	200	40	4	75G	3-00:00:00	data/df_bal/df_bal_ilon_*.RData	7200	-
 03_water_balance	calculate_balance_lores	analysis/03_water_balance/04_calculate_balance_lores.R	chunk_count	72	72	24	2	20G	3-00:00:00	data/df_bal_lores/df_bal_ilon_*.RData	720	-
@@ -36,4 +36,4 @@ stage	job	script	mode	array	chunks	max_parallel	cpus	memory	time	output_pattern	
 08_site_analysis	rsofun_cwdx_200	analysis/08_site_analysis/02_run_rsofun_cwdx.R	chunk_value	50	50	20	2	48G	3-00:00:00	data/out_rsofun_cwdx/out_rsofun_cwdx_whc_200_ichunk_*.rds	50	200
 08_site_analysis	rsofun_cwdx_100	analysis/08_site_analysis/02_run_rsofun_cwdx.R	chunk_value	50	50	20	2	48G	3-00:00:00	data/out_rsofun_cwdx/out_rsofun_cwdx_whc_100_ichunk_*.rds	50	100
 08_site_analysis	rsofun_cwdx_observed	analysis/08_site_analysis/02_run_rsofun_cwdx.R	chunk_value	50	50	20	2	48G	3-00:00:00	data/out_rsofun_cwdx/out_rsofun_cwdx_whc_NA_ichunk_*.rds	50	9999
-09_diagnostics	check_files	analysis/09_diagnostics/01_check_files.R	none	1	1	1	2	10G	12:00:00	data/df_file_availability_cwdx_10_20_40.RData	1	-
+09_diagnostics	check_files	analysis/09_diagnostics/01_check_files.R	none	1	1	1	2	10G	12:00:00	data/df_file_availability.RData	1	-

@@ -12,4 +12,6 @@ library(stringr)
 library(broom)
 
 source(here::here("R", "workflow_helpers.R"))
+source(here::here("R", "input_config.R"))
 
+config <- read_input_config()

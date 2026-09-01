@@ -1,42 +1,51 @@
-get_bal_byilon <- function(ilon_hires){
+get_bal_byilon <- function(ilon_hires, config = read_input_config()){
   
   source("R/get_bal.R")
   
-  dirn <- "data/df_bal/"
-  filn <- paste0("df_bal_ilon_", ilon_hires, ".RData")
-  if (!dir.exists(dirn)) system("mkdir -p data/df_bal")
-  path_out <- paste0(dirn, filn)
+  path_out <- climate_output_path(
+    paste0("data/df_bal/df_bal_ilon_", ilon_hires, ".RData"),
+    config
+  )
+  ensure_directory(dirname(path_out))
 
   if (!file.exists(path_out)){
   
-    ## determine closest longitude in 0.5 res files (WATCH)
-    lon_lores <- seq(-179.75, 179.75, by = 0.5)
-    lon_hires <- seq(-179.975, 179.975, by = 0.05)
-    ilon_lores <- which.min(abs(lon_lores - lon_hires[ilon_hires]))
+    ilon_lores <- nearest_source_index(
+      ilon_hires,
+      from_source = config$et$source,
+      to_source = config$precipitation$rain
+    )
     
     ## Open ET-mm file
-    dirn <- "data/df_alexi_et_mm/"
-    filn <- paste0("df_alexi_et_mm_ilon_", ilon_hires, ".RData")
-    path_et_mm <- paste0(dirn, filn)
+    path_et_mm <- climate_output_path(
+      paste0("data/df_et_mm/df_et_mm_ilon_", ilon_hires, ".RData"),
+      config
+    )
     
     ## open snow file of corresponding longitude slice
-    dirn <- "data/df_snow/"
-    filn <- paste0("df_snow_ilon_", ilon_lores, ".RData")
-    path_snow <- paste0(dirn, filn)
+    path_snow <- climate_output_path(
+      paste0("data/df_snow/df_snow_ilon_", ilon_lores, ".RData"),
+      config
+    )
     
     if (file.exists(path_et_mm) && file.exists(path_snow)){
      
       load(path_et_mm) # loads 'df_alexi'
       load(path_snow)  # loads 'df'
+      et_digits <- source_coordinate_digits(config$et$source, "longitude")
+      forcing_digits <- source_coordinate_digits(config$precipitation$rain, "longitude")
       df_watch <- df %>% 
-        mutate(lon = round(lon, digits = 2), lat = round(lat, digits = 2)) # rename
+        mutate(
+          lon = round(lon, digits = forcing_digits),
+          lat = round(lat, digits = forcing_digits)
+        ) # rename
       rm("df")
       
       ## get closest matching latitude indices and merge data frames
       df <- df_alexi %>% 
         
         ## round to correct numerical imprecision on some lon and lat values
-        mutate(lon = round(lon, digits = 3), lat = round(lat, digits = 3)) %>% 
+        mutate(lon = round(lon, digits = et_digits), lat = round(lat, digits = et_digits)) %>%
         
         ## select only time and et_mm from alexi dataframe
         mutate(data = purrr::map(data, ~dplyr::select(., time, et_mm))) %>% 
@@ -50,11 +59,11 @@ get_bal_byilon <- function(ilon_hires){
         mutate(data_watch = purrr::map(data_watch, ~dplyr::select(., time, liquid_to_soil))) %>% 
         
         ## drop columns no longer used
-        dplyr::select(-lon_lores, -lat_lores, -elv) %>% 
+        dplyr::select(-dplyr::any_of(c("lon_lores", "lat_lores", "elv"))) %>%
         
         ## remove rows where watch data is missing
         ungroup() %>% 
-        dplyr::filter(!is.null(data_watch)) %>% 
+        dplyr::filter(!purrr::map_lgl(data_watch, is.null)) %>%
         
         ## merge liquid into 'data'
         mutate(data = purrr::map2(data, data_watch, ~left_join(.x, .y, by = "time"))) %>% 
