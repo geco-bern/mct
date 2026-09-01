@@ -40,18 +40,12 @@ nclist_to_df(
   )
 
 source("R/get_bal_byilon_lores.R")
-df_out <- purrr::map(
-  as.list(seq_len(config$et$low_resolution_source$grid$longitude_count)),
-  ~get_bal_byilon_lores(., config)
-)
+df_out <- purrr::map(as.list(seq(720)), ~get_bal_byilon_lores(.))
 
 source("R/get_cwdx_byilon_lores.R")
-df_out <- purrr::map(
-  as.list(seq_len(config$et$low_resolution_source$grid$longitude_count)),
-  ~get_cwdx_byilon_lores(., config)
-)
+df_out <- purrr::map(as.list(seq(720)), ~get_cwdx_byilon_lores(.))
 
-load(climate_output_path("data/df_file_availability.RData", config))
+load("data/df_file_availability.RData")
 
 df |> 
   dplyr::filter(!avl_snow)
@@ -75,3 +69,4 @@ df |>
 df |> 
   ungroup() |> 
   dplyr::filter(!avl_cwdx_10_20_40)
+

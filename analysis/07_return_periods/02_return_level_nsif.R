@@ -4,16 +4,14 @@ library(tidyverse)
 library(extRemes)
 
 source("R/workflow_helpers.R")
-source("R/input_config.R")
 source("R/calc_return_level.R")
 
 chunk_info <- chunk_arguments()
 args <- c(chunk_info$chunk, chunk_info$chunks)
-config <- read_input_config()
 overwrite <- identical(tolower(Sys.getenv("MCT_OVERWRITE", "false")), "true")
 ensure_directory("data/df_rl")
 
-load(climate_output_path("data/df_corr.RData", config))
+load("data/df_corr.RData")
 
 df_corr_tmp <- df_corr %>% 
   dplyr::select(lon, lat, s0 = cwd_lue0_nSIF) %>% ## select which one to consider here!
@@ -27,16 +25,13 @@ df_corr_sub <- df_corr_tmp %>%
 ##------------------------------------------------------------------------
 ## asdf
 ##------------------------------------------------------------------------
-filn <- climate_output_path(
-  paste0("data/df_rl/df_rl_nSIF_ichunk_", args[1], "_", args[2], ".RData"),
-  config
-)
+filn <- paste0("data/df_rl/df_rl_nSIF_ichunk_", args[1], "_", args[2], ".RData")
 
 df_rl_diag <- df_corr_sub %>% 
   drop_na() %>% 
   group_by(lon) %>% 
   nest() %>% 
-  mutate(ilon = source_longitude_index(lon, config$et$source)) %>%
+  mutate(ilon = as.integer((lon + 179.975)/0.05 + 1)) %>% 
   ungroup()
 
 # ## xxx debug
@@ -47,7 +42,7 @@ df_rl_diag <- df_corr_sub %>%
 if (nrow(df_rl_diag)>0){
   if (!file.exists(filn) || overwrite){
     df <- df_rl_diag %>% 
-      mutate(data = purrr::map2(ilon, data, ~calc_return_level(.x, .y, config))) %>%
+      mutate(data = purrr::map2(ilon, data, ~calc_return_level(.x, .y))) %>% 
       unnest(data) %>% 
       dplyr::select(-ilon)
     save(df, file = filn)

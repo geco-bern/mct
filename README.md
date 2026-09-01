@@ -13,7 +13,6 @@ The project follows the structure of a reproducible R analysis:
 
 - `analysis/` contains numbered, executable work steps. Run scripts from the
   project root and in numerical order.
-- `config/` contains the user-editable climate-input namelist.
 - `R/` contains reusable functions and no analysis orchestration.
 - `data-raw/` contains small, immutable source material kept with the project,
   currently the CDO grid definitions.
@@ -26,9 +25,8 @@ The project follows the structure of a reproducible R analysis:
   submission layer.
 - `tests/` contains focused tests for workflow infrastructure.
 
-Generated files under `data/`, `fig/`, and `logs/` are ignored by Git.
-Run-dependent output names include their configured ET and precipitation
-identifiers, so products from alternative input combinations can coexist.
+Generated files under `data/`, `fig/`, and `logs/` are ignored by Git. They are
+not moved or renamed by the reorganised workflow.
 
 ## Software setup
 
@@ -56,56 +54,12 @@ Several later scripts also call command-line geospatial software, principally
 CDO, NCO, and GDAL. Historical reports may require retired packages such as
 `rgdal`; those reports are not prerequisites for the computational pipeline.
 
-## Climate-input namelist
+## External inputs
 
-Edit [`config/input_sources.R`](config/input_sources.R) to select the ET,
-precipitation, and temperature datasets. It is a plain R list so it can be read
-without an extra configuration package, and serves the same purpose as a
-FORTRAN `NAMELIST`. Each source entry defines:
-
-- a short `id` for the dataset;
-- the NetCDF directory and filename pattern;
-- the tidy-cache directory and filename prefix;
-- NetCDF variable and coordinate names;
-- scale and offset transformations;
-- the longitude/latitude grid.
-
-ET sources additionally set `conversion` to either
-`"latent_energy_to_mm"` (energy converted with configured temperature and
-elevation) or `"identity_mm_day"` (the source is already ET in mm d-1). The
-rain, snow, temperature, and low-resolution ET grids must match because those
-inputs are joined during snow simulation and the low-resolution balance. The
-default namelist reproduces the existing ALEXI ET and WATCH-WFDEI
-precipitation/temperature analysis for 2003–2017.
-
-The selected ET and precipitation IDs form a run ID such as
-`et-alexi__prec-watch-wfdei`. Every climate-dependent checkpoint, NetCDF,
-diagnostic, figure, and UBELIX log carries that suffix, for example:
-
-```text
-data/df_bal/df_bal_ilon_123__et-alexi__prec-watch-wfdei.RData
-fig/map_cwdx80__et-alexi__prec-watch-wfdei.pdf
-```
-
-To maintain multiple namelists, copy the default file and select one without
-editing code:
-
-```sh
-MCT_INPUT_CONFIG=config/input_sources_era5.R \
-  Rscript analysis/03_water_balance/01_convert_et_mm.R 1 100
-```
-
-The same environment variable is inherited by UBELIX jobs and the pipeline
-submitter. `R/input_config.R` validates the namelist before computation and
-provides the common grid and naming functions; analysis variable names remain
-unchanged.
-
-## Other external inputs
-
-Large immutable inputs remain outside the repository. Climate paths are set in
-the namelist above. Other established `~/data/...` paths can be reproduced on
-another system with links or mounts. The remaining machine-specific controls
-are:
+Large immutable inputs remain outside the repository. Existing `~/data/...`
+paths are deliberately preserved because they define the current input-file
+contract. On another system, reproduce that layout with links or mounts. The
+few formerly machine-specific paths are configurable:
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -122,13 +76,13 @@ required chunks are present.
 
 | Stage | Purpose | Main checkpoint |
 |---|---|---|
-| `01_tidy_inputs` | Convert configured gridded NetCDF inputs to nested tidy R data using `map2tidy` | tagged `*_ilon_*__et-*__prec-*.RData` files in configured `data_tidy` directories |
+| `01_tidy_inputs` | Convert gridded NetCDF inputs to nested tidy R data using `map2tidy` | established `*_ilon_*.RData` files in external `data_tidy` directories |
 | `02_prepare_spatial` | Prepare site metadata, masks, grids, and spatial inputs | site/grid objects in `data/` |
-| `03_water_balance` | Convert ET, simulate snow, and calculate daily balance | `data/df_bal/df_bal_ilon_*__et-*__prec-*.RData` |
-| `04_cwd_extremes` | Fit cumulative-water-deficit extremes and collect return levels | tagged `data/df_cwdx_10_20_40*.RData` |
+| `03_water_balance` | Convert ET, simulate snow, and calculate daily balance | `data/df_bal/df_bal_ilon_*.RData` |
+| `04_cwd_extremes` | Fit cumulative-water-deficit extremes and collect return levels | `data/df_cwdx_10_20_40.RData` |
 | `05_soil` | Calculate and combine soil hydraulic properties, then rooting depth | `df_whc_hires_ilon_*.RData` and combined WHC objects |
-| `06_thresholds` | Diagnose SIF- and ET-based CWD thresholds | tagged `data/df_cwd_lue0_2*.RData`, `data/df_cwd_et0_3*.RData` |
-| `07_return_periods` | Calculate, diagnose, and collect return periods | tagged `data/df_rl_*.RData`, `data/df_rp_diag_*.RData` |
+| `06_thresholds` | Diagnose SIF- and ET-based CWD thresholds | `data/df_cwd_lue0_2.RData`, `data/df_cwd_et0_3.RData` |
+| `07_return_periods` | Calculate, diagnose, and collect return periods | `data/df_rl_*.RData`, `data/df_rp_diag_*.RData` |
 | `08_site_analysis` | Run RSIP/SOFUN and FLUXNET site analyses | chunked forcing and SOFUN output under `data/` |
 | `09_diagnostics` | Check completeness and selected site results | file-availability and diagnostic objects |
 | `10_results` | Create bias analyses and publication figures | figures and final derived objects |
@@ -180,8 +134,7 @@ wrappers around `R/map_netcdf_to_tidy.R`. The adapter delegates NetCDF reading
 and longitude chunking to `map2tidy`, then restores the established downstream
 contract:
 
-- output basenames retain their source prefix and add the run ID, for example,
-  `EDAY_CERES__ilon_123__et-alexi__prec-watch-wfdei.RData`;
+- output basenames remain, for example, `EDAY_CERES__ilon_123.RData`;
 - every file still contains an object named `df`;
 - the outer columns remain `lon`, `lat`, and nested `data`;
 - nested `datetime` is normalised to the existing `time` name.
@@ -196,16 +149,15 @@ UBELIX scripts in `src/ubelix/`. The job registry records script paths, arrays,
 CPU, memory, time, and expected output counts.
 
 ```sh
-src/ubelix/submit.sh prepare_et
+src/ubelix/submit.sh alexi
 src/ubelix/submit.sh calculate_balance
 src/ubelix/submit_pipeline.sh
 ```
 
-Jobs use `%A_%a` logs under `logs/ubelix/`, with the run ID included in each log
-name, `SLURM_ARRAY_TASK_ID` for arrays, `afterok` dependencies for the pipeline,
-`srun` for the R process, and the R environment requested through UBELIX
-modules. See `src/ubelix/README.md` for account, partition, Workspace, resource,
-and recovery controls.
+Jobs use `%A_%a` logs under `logs/ubelix/`, `SLURM_ARRAY_TASK_ID` for arrays,
+`afterok` dependencies for the pipeline, `srun` for the R process, and the R
+environment requested through UBELIX modules. See `src/ubelix/README.md` for
+account, partition, Workspace, resource, and recovery controls.
 
 ## Reusable scientific code
 
@@ -219,8 +171,6 @@ The principal reusable functions remain under `R/`:
 - `calc_cwd_lue0_v2.R`: SIF/EF threshold diagnosis;
 - `workflow_helpers.R`: paths, chunking, allocation-aware parallelism, and
   atomic checkpoint writes;
-- `input_config.R`: climate-input validation, grid lookup, unit transforms,
-  and run-specific filenames;
 - `map_netcdf_to_tidy.R`: generic `map2tidy` compatibility adapter.
 
 Analysis-specific choices, paths, object assembly, and plotting remain in the

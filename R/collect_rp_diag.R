@@ -1,9 +1,9 @@
-collect_rp_diag_nSIF <- function(ichunk, config = read_input_config()){
+collect_rp_diag_nSIF <- function(ichunk){
   
   ## construct output file name
   dirn <- "data/df_rp_diag/"
   filn <- paste0("df_rp_diag_nSIF_ichunk_", ichunk, "_30.RData")
-  path <- climate_output_path(paste0(dirn, filn), config)
+  path <- paste0(dirn, filn)
   
   if (file.exists(path)){
     load(path)
@@ -15,12 +15,12 @@ collect_rp_diag_nSIF <- function(ichunk, config = read_input_config()){
   return(df_rp_diag)
 }
 
-collect_rp_diag_fet <- function(ichunk, config = read_input_config()){
+collect_rp_diag_fet <- function(ichunk){
   
   ## construct output file name
   dirn <- "data/df_rp_diag/"
   filn <- paste0("df_rp_diag_fet_ichunk_", ichunk, "_30.RData")
-  path <- climate_output_path(paste0(dirn, filn), config)
+  path <- paste0(dirn, filn)
   
   if (file.exists(path)){
     load(path)

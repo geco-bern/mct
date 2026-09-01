@@ -1,9 +1,8 @@
-collect_cwdx_byilon <- function(ilon, config = read_input_config()){
+collect_cwdx_byilon <- function(ilon){
   
-  path <- climate_output_path(
-    paste0("data/df_cwdx_10_20_40/df_cwdx_10_20_40_ilon_", ilon, ".RData"),
-    config
-  )
+  dirn <- "data/df_cwdx_10_20_40/"
+  filn <- paste0("df_cwdx_10_20_40_ilon_", ilon, ".RData")
+  path <- paste0(dirn, filn)
   
   if (file.exists(path)) {
     print(paste("opening file", path))

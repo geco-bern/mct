@@ -4,7 +4,7 @@
 # Extracted from vignettes/archive/workflow_legacy.Rmd.
 source("analysis/_common.R")
 
-load(climate_output_path("data/df_rl_fet.RData", config))  # loads df_rl_fet
+load("data/df_rl_fet.RData")  # loads df_rl_fet
 
 ## function to determine the return period with the lowest bias (absolute)
 find_rp_diag <- function(df){
@@ -52,7 +52,7 @@ df_rl_agg_fet <- df_rl_fet |>
   dplyr::select(-data) |> 
   rename(lon = lon_mid, lat = lat_mid)
 
-save(df_rl_agg_fet, file = climate_output_path("data/df_rl_agg_fet.RData", config))
+save(df_rl_agg_fet, file = "data/df_rl_agg_fet.RData")
 
 ## distribution of diagnosed return periods
 df_rl_agg_fet |> 
@@ -67,9 +67,9 @@ df_rl_fet |>
   geom_hline(yintercept = 0, linetype = "dotted") +
   ylim(-1.2, 1.2)
 
-save(df_rl_fet, file = climate_output_path("data/df_rl_fet.RData", config))
+save(df_rl_fet, file = "data/df_rl_fet.RData")
 
-load(climate_output_path("data/df_rl_agg_fet.RData", config))
+load("data/df_rl_agg_fet.RData")
 
 # nc <- df_to_grid(
 #   df_rl_agg, 
@@ -99,12 +99,12 @@ gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[EF]))
 cowplot::plot_grid(gg$ggmap, gg$gglegend, ncol = 1, rel_heights = c(1, 0.3))
 gg_fig4a <- gg$ggmap
 gg_fig4_legend <- gg$gglegend
-save(gg_fig4a, file = climate_output_path("data/gg_fig5a.Rdata", config))
+save(gg_fig4a, file = "data/gg_fig5a.Rdata")
 
-ggsave(climate_output_path("fig/map_rp_fet.pdf", config), width = 8, height = 5)
-ggsave(climate_output_path("fig/map_rp_fet.png", config), width = 8, height = 5)
+ggsave("fig/map_rp_fet.pdf", width = 8, height = 5)
+ggsave("fig/map_rp_fet.png", width = 8, height = 5)
 
-load(climate_output_path("data/df_rl_nSIF.RData", config))
+load("data/df_rl_nSIF.RData")
 
 # ## xxx debug
 # load("data/df_rl/df_rl_fet_ichunk_TEST.RData")  # loads df
@@ -156,7 +156,7 @@ df_rl_agg_nSIF <- df_rl_nSIF |>
   dplyr::select(-data) |> 
   rename(lon = lon_mid, lat = lat_mid)
 
-save(df_rl_agg_nSIF, file = climate_output_path("data/df_rl_agg_nSIF.RData", config))
+save(df_rl_agg_nSIF, file = "data/df_rl_agg_nSIF.RData")
 
 ## distribution of diagnosed return periods
 df_rl_agg_nSIF |> 
@@ -171,7 +171,7 @@ df_rl_nSIF |>
   geom_hline(yintercept = 0, linetype = "dotted") +
   ylim(-1.2, 1.2)
 
-load(climate_output_path("data/df_rl_agg_nSIF.RData", config))
+load("data/df_rl_agg_nSIF.RData")
 
 # nc <- df_to_grid(
 #   df_rl_agg, 
@@ -198,10 +198,10 @@ gg <- plot_map4(df_rl_agg_nSIF,
 gg$ggmap <- gg$ggmap + labs(title = expression(italic(T)[SIF]))
 
 gg_fig4b <- gg$ggmap
-save(gg_fig4b, file = climate_output_path("data/gg_fig5b.Rdata", config))
+save(gg_fig4b, file = "data/gg_fig5b.Rdata")
 
-ggsave(climate_output_path("fig/map_rp_nsif.pdf", config), width = 8, height = 5)
-ggsave(climate_output_path("fig/map_rp_nsif.png", config), width = 8, height = 5)
+ggsave("fig/map_rp_nsif.pdf", width = 8, height = 5)
+ggsave("fig/map_rp_nsif.pdf", width = 8, height = 5)
 
 # ## missing lon-bands
 # tmp <- df_rl_fet |>
@@ -244,10 +244,10 @@ df_rl_agg <- df_rl_agg_nSIF |>
                                  rp_diag_nsif,
                                  (rp_diag_fet + rp_diag_nsif) / 2)))
 
-save(df_rl_agg, file = climate_output_path("data/df_rl_agg.RData", config))
+save(df_rl_agg, file = "data/df_rl_agg.RData")
 
 plot_map4(df_rl_agg, varnam = "rp_diag")
-ggsave(climate_output_path("fig/map_rl.pdf", config), width = 12, height = 8)
+ggsave("fig/map_rl.pdf", width = 12, height = 8)
 
 df_rl_agg_test <- df_rl_agg |> 
   mutate(lon = round(lon, digits = 1), lat = round(lat, digits = 1))
@@ -280,9 +280,9 @@ df_rl_agg_test <- tmp_gti |>
          ssdth_bin = cut(ssdth, seq(0, 50, by = 5))) |> 
   mutate(forest = ifelse(forestcoverfraction > 0.4, TRUE, FALSE))
 
-save(df_rl_agg_test, file = climate_output_path("data/df_rl_agg_test.Rdata", config))
+save(df_rl_agg_test, file = "data/df_rl_agg_test.Rdata")
 
-load(climate_output_path("data/df_rl_agg_test.Rdata", config))
+load("data/df_rl_agg_test.Rdata")
 
 n_fun <- function(x){
   return(data.frame(y = 520,
@@ -349,3 +349,4 @@ mod_rp_diag <- ranger(
   respect.unordered.factors = "order",
   seed = 123
 )
+
